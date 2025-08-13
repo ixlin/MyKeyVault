@@ -1,0 +1,27 @@
+@model MyKeyVault.Web.Models.VaultAccount
+@{
+    ViewData["Title"] = "账号详情";
+}
+<h2>@ViewData["Title"]</h2>
+<dl class="row">
+  <dt class="col-sm-2">标题</dt>
+  <dd class="col-sm-10">@Model.Title</dd>
+  <dt class="col-sm-2">URL</dt>
+  <dd class="col-sm-10">@Model.Url</dd>
+  <dt class="col-sm-2">登录账号</dt>
+  <dd class="col-sm-10">
+  @Model.AccountNameEncrypted
+  </dd>
+  <dt class="col-sm-2">登录密码</dt>
+  <dd class="col-sm-10">
+  @Model.PasswordEncrypted
+  </dd>
+  <dt class="col-sm-2">备注</dt>
+  <dd class="col-sm-10">
+  @Model.NoteEncrypted
+  </dd>
+</dl>
+<a class="btn btn-outline-primary" asp-action="Edit" asp-route-id="@Model.AccountId">编辑</a>
+<a class="btn btn-outline-secondary" asp-action="Index">返回</a>
+
+@* 无脚本 *@

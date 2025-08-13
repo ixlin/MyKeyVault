@@ -1,0 +1,38 @@
+@model IEnumerable<MyKeyVault.Web.Models.Tag>
+@{
+    ViewData["Title"] = "标签管理";
+}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>@ViewData["Title"]</h2>
+    <a class="btn btn-primary" asp-action="Create">新增标签</a>
+</div>
+<table class="table table-striped">
+  <thead>
+    <tr>
+  <th>名称</th>
+  <th>创建时间</th>
+  <th>关联账号数</th>
+      <th style="width:160px;"></th>
+    </tr>
+  </thead>
+  <tbody>
+  @foreach (var t in Model)
+  {
+    <tr>
+      <td>
+        @{ var tagCounts = ViewBag.TagCounts as System.Collections.Generic.Dictionary<long,int>; var cnt = (tagCounts != null && tagCounts.ContainsKey(t.TagId)) ? tagCounts[t.TagId] : 0; }
+        @t.TagName（@cnt）
+      </td>
+      <td>@t.CreatedAt.ToLocalTime()</td>
+      <td>
+        @{ var counts = ViewBag.TagCounts as System.Collections.Generic.Dictionary<long,int>; }
+        @(counts != null && counts.ContainsKey(t.TagId) ? counts[t.TagId] : 0)
+      </td>
+      <td>
+        <a class="btn btn-sm btn-outline-primary" asp-action="Edit" asp-route-id="@t.TagId">编辑</a>
+        <a class="btn btn-sm btn-outline-danger" asp-action="Delete" asp-route-id="@t.TagId">删除</a>
+      </td>
+    </tr>
+  }
+  </tbody>
+</table>

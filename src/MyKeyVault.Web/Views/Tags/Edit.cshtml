@@ -1,0 +1,21 @@
+@model MyKeyVault.Web.Models.Tag
+@{
+    ViewData["Title"] = "编辑标签";
+}
+<h2>@ViewData["Title"]</h2>
+<form method="post" asp-action="Edit">
+  @Html.AntiForgeryToken()
+  <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+  <input type="hidden" asp-for="TagId" />
+  <div class="mb-3">
+    <label class="form-label">标签名</label>
+    <input asp-for="TagName" class="form-control" />
+    <span class="text-danger" asp-validation-for="TagName"></span>
+  </div>
+  <button type="submit" class="btn btn-primary">保存</button>
+  <a class="btn btn-outline-secondary" asp-action="Index">返回</a>
+</form>
+
+@section Scripts {
+  <partial name="_ValidationScriptsPartial" />
+}

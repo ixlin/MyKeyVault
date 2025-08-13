@@ -1,0 +1,17 @@
+@model MyKeyVault.Web.Models.VaultAccount
+@{
+    ViewData["Title"] = "删除账号";
+}
+<h2>@ViewData["Title"]</h2>
+<div class="alert alert-warning">确认删除该条记录？该操作不可恢复。</div>
+<dl class="row">
+  <dt class="col-sm-2">标题</dt>
+  <dd class="col-sm-10">@Model.Title</dd>
+  <dt class="col-sm-2">URL</dt>
+  <dd class="col-sm-10">@Model.Url</dd>
+</dl>
+<form method="post">
+  <input type="hidden" asp-for="AccountId" />
+  <button type="submit" class="btn btn-danger">确定删除</button>
+  <a class="btn btn-outline-secondary" asp-action="Index">取消</a>
+</form>

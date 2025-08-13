@@ -1,0 +1,16 @@
+@model MyKeyVault.Web.Models.Tag
+@{
+    ViewData["Title"] = "删除标签";
+}
+<h2>@ViewData["Title"]</h2>
+<div class="alert alert-warning">确认删除该标签？该操作不可恢复。</div>
+<dl class="row">
+  <dt class="col-sm-2">名称</dt>
+  <dd class="col-sm-10">@Model.TagName</dd>
+</dl>
+<form method="post" asp-action="Delete">
+  @Html.AntiForgeryToken()
+  <input type="hidden" asp-for="TagId" />
+  <button type="submit" class="btn btn-danger">确定删除</button>
+  <a class="btn btn-outline-secondary" asp-action="Index">取消</a>
+</form>

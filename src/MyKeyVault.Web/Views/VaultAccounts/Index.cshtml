@@ -1,0 +1,83 @@
+@model IEnumerable<MyKeyVault.Web.Models.VaultAccount>
+@{
+    ViewData["Title"] = "账号列表";
+}
+@* 取消迁移与解锁逻辑 *@
+<form id="af-form" class="d-none">@Html.AntiForgeryToken()</form>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>@ViewData["Title"]</h2>
+    <a class="btn btn-primary" asp-action="Create">新增账号</a>
+</div>
+@{
+    var allTags = ViewBag.AllTags as IEnumerable<MyKeyVault.Web.Models.Tag>;
+    var counts = ViewBag.TagCounts as System.Collections.Generic.Dictionary<long,int>;
+    long? currentTagId = ViewData["tagId"] as long?;
+}
+
+<div class="mb-2">
+    @if (allTags != null)
+    {
+        <a class="btn btn-sm @(currentTagId==null?"btn-primary":"btn-outline-primary") me-1" href="@Url.Action("Index", new { q = ViewData["q"], tagId = (long?)null })">全部</a>
+        @foreach (var t in allTags)
+        {
+            var c = (counts!=null && counts.ContainsKey(t.TagId)) ? counts[t.TagId] : 0;
+        <a class="btn btn-sm @(currentTagId==t.TagId?"btn-primary":"btn-outline-primary") me-1" href="@Url.Action("Index", new { q = ViewData["q"], tagId = t.TagId })">@t.TagName（@c）</a>
+        }
+    }
+</div>
+
+<hr class="my-2" />
+
+<form class="row row-cols-lg-auto g-2 align-items-center mb-3">
+    <div class="col-12">
+        <input type="text" name="q" value="@ViewData["q"]" class="form-control" placeholder="搜索标题/URL（简单搜索）">
+    </div>
+    <div class="col-12">
+        <input type="date" name="createdFrom" value="@ViewData["createdFrom"]" class="form-control" placeholder="开始日期">
+    </div>
+    <div class="col-12">
+        <input type="date" name="createdTo" value="@ViewData["createdTo"]" class="form-control" placeholder="结束日期">
+    </div>
+    <div class="col-12">
+        <button class="btn btn-outline-secondary" type="submit">搜索</button>
+    </div>
+</form>
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>
+                @{ var sort = (ViewData["sort"] as string) ?? "updated"; var dir = (ViewData["dir"] as string) ?? "desc"; }
+                <a href="@Url.Action("Index", new { q = ViewData["q"], tagId = ViewData["tagId"], createdFrom = ViewData["createdFrom"], createdTo = ViewData["createdTo"], sort = "title", dir = sort=="title" && dir=="asc"?"desc":"asc" })">标题</a>
+            </th>
+            <th>URL</th>
+            <th>账号</th>
+            <th>密码</th>
+            <th>
+                <a href="@Url.Action("Index", new { q = ViewData["q"], tagId = ViewData["tagId"], createdFrom = ViewData["createdFrom"], createdTo = ViewData["createdTo"], sort = "created", dir = sort=="created" && dir=="asc"?"desc":"asc" })">创建时间</a>
+            </th>
+            <th>
+                <a href="@Url.Action("Index", new { q = ViewData["q"], tagId = ViewData["tagId"], createdFrom = ViewData["createdFrom"], createdTo = ViewData["createdTo"], sort = "updated", dir = sort=="updated" && dir=="asc"?"desc":"asc" })">修改时间</a>
+            </th>
+            <th>操作</th>
+        </tr>
+    </thead>
+    <tbody>
+    @foreach (var item in Model)
+    {
+        <tr>
+            <td>@item.Title</td>
+            <td>@item.Url</td>
+            <td>@item.AccountNameEncrypted</td>
+            <td>@item.PasswordEncrypted</td>
+            <td>@item.CreatedAt.ToLocalTime()</td>
+            <td>@item.UpdatedAt.ToLocalTime()</td>
+            <td>
+                <a class="btn btn-sm btn-outline-secondary" asp-action="Details" asp-route-id="@item.AccountId">详情</a>
+                <a class="btn btn-sm btn-outline-primary" asp-action="Edit" asp-route-id="@item.AccountId">编辑</a>
+                <a class="btn btn-sm btn-outline-danger" asp-action="Delete" asp-route-id="@item.AccountId">删除</a>
+            </td>
+        </tr>
+    }
+    </tbody>
+</table>
+@* 无前端脚本 *@

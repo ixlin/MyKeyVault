@@ -1,0 +1,58 @@
+@model MyKeyVault.Web.Models.VaultAccount
+@{
+    ViewData["Title"] = "新增账号";
+}
+<h2>@ViewData["Title"]</h2>
+<form method="post" asp-action="Create">
+    @Html.AntiForgeryToken()
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+    <div class="mb-3">
+        <label class="form-label">标题</label>
+        <input asp-for="Title" class="form-control" />
+        <span class="text-danger" asp-validation-for="Title"></span>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">标签</label>
+        @{ var tags = ViewBag.AllTags as IEnumerable<MyKeyVault.Web.Models.Tag>; var selected = ViewBag.SelectedTagIds as System.Collections.Generic.HashSet<long> ?? new System.Collections.Generic.HashSet<long>(); }
+        @if (tags != null && tags.Any())
+        {
+            foreach (var t in tags)
+            {
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="checkbox" name="selectedTagIds" value="@t.TagId" @(selected.Contains(t.TagId)?"checked":null) id="tag_@t.TagId">
+                    <label class="form-check-label" for="tag_@t.TagId">@t.TagName</label>
+                </div>
+            }
+        }
+        else
+        {
+            <div class="form-text">暂无标签，可到“标签管理”中新增。</div>
+        }
+    </div>
+    <div class="mb-3">
+        <label class="form-label">登录账号</label>
+        <input asp-for="AccountNameEncrypted" class="form-control" />
+        <span class="text-danger" asp-validation-for="AccountNameEncrypted"></span>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">登录密码</label>
+        <input asp-for="PasswordEncrypted" class="form-control" />
+        <span class="text-danger" asp-validation-for="PasswordEncrypted"></span>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">登录地址(URL)</label>
+        <input asp-for="Url" class="form-control" />
+        <span class="text-danger" asp-validation-for="Url"></span>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">备注</label>
+        <textarea asp-for="NoteEncrypted" class="form-control" rows="3"></textarea>
+        <span class="text-danger" asp-validation-for="NoteEncrypted"></span>
+    </div>
+    <button type="submit" class="btn btn-primary">保存</button>
+    <a class="btn btn-outline-secondary" asp-action="Index">返回</a>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

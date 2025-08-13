@@ -1,0 +1,23 @@
+# .NET build artifacts
+**/bin/
+**/obj/
+**/.vs/
+*.user
+*.suo
+
+# OS/editor
+.DS_Store
+.vscode/
+
+# Local databases
+**/*.db
+
+# App settings containing secrets (use *.sample instead)
+src/**/appsettings.json
+src/**/appsettings.Development.json
+src/**/appsettings.*.local.json
+!src/**/appsettings.json.sample
+!src/**/appsettings.Development.json.sample
+
+# Logs
+**/*.log
