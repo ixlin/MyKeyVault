@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
 using MyKeyVault.Web.Data;
 using MyKeyVault.Web.Models;
 using Microsoft.AspNetCore.Authorization;
 using Serilog;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -71,7 +71,8 @@ app.UseSerilogRequestLogging();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// 法律条款强制接受：登录但未接受则重定向
+// 法律条款强制接受：若未接受“当前版本”则重定向
+const string CURRENT_TERMS_VERSION = "v1"; // 升级条款版本只需修改这里
 app.Use(async (context, next) =>
 {
     var path = context.Request.Path.Value ?? string.Empty;
@@ -79,6 +80,7 @@ app.Use(async (context, next) =>
         !path.StartsWith("/Identity", StringComparison.OrdinalIgnoreCase) &&
         !path.StartsWith("/Legal/Terms", StringComparison.OrdinalIgnoreCase) &&
         !path.StartsWith("/Legal/Accept", StringComparison.OrdinalIgnoreCase) &&
+        !path.StartsWith("/Legal/Policy", StringComparison.OrdinalIgnoreCase) &&
         !path.StartsWith("/css", StringComparison.OrdinalIgnoreCase) &&
         !path.StartsWith("/js", StringComparison.OrdinalIgnoreCase) &&
         !path.StartsWith("/lib", StringComparison.OrdinalIgnoreCase) &&
@@ -88,9 +90,9 @@ app.Use(async (context, next) =>
         if (!string.IsNullOrEmpty(userId))
         {
             using var scope = app.Services.CreateScope();
-            var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-            var user = await userManager.FindByIdAsync(userId);
-            if (user != null && user.TermsAcceptedAt == null)
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var accepted = await db.TermsAcceptances.AnyAsync(t => t.UserId == userId && t.Version == CURRENT_TERMS_VERSION);
+            if (!accepted)
             {
                 context.Response.Redirect("/Legal/Terms");
                 return;

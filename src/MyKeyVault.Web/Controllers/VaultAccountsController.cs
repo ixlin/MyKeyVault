@@ -224,4 +224,35 @@ public class VaultAccountsController : Controller
         }
         return RedirectToAction(nameof(Index));
     }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> BulkDelete([FromForm] long[]? selectedIds, string? q, long? tagId, DateTime? createdFrom, DateTime? createdTo, string? sort, string? dir)
+    {
+        if (selectedIds == null || selectedIds.Length == 0)
+        {
+            TempData["Info"] = "未选择任何账号";
+            return RedirectToAction(nameof(Index), new { q, tagId, createdFrom, createdTo, sort, dir });
+        }
+        var userId = CurrentUserId;
+        var idSet = selectedIds.Distinct().ToArray();
+        var toDelete = await _db.Accounts.Where(a => a.UserId == userId && idSet.Contains(a.AccountId)).ToListAsync();
+        if (toDelete.Count == 0)
+        {
+            TempData["Warn"] = "所选账号不存在或无权限";
+            return RedirectToAction(nameof(Index), new { q, tagId, createdFrom, createdTo, sort, dir });
+        }
+        _db.Accounts.RemoveRange(toDelete);
+        try
+        {
+            await _db.SaveChangesAsync();
+            TempData["Success"] = $"已删除 {toDelete.Count} 条账号记录";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "批量删除失败");
+            TempData["Error"] = "批量删除失败，请稍后再试";
+        }
+        return RedirectToAction(nameof(Index), new { q, tagId, createdFrom, createdTo, sort, dir });
+    }
 }

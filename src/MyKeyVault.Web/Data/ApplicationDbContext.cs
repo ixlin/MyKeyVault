@@ -15,6 +15,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<Tag> Tags => Set<Tag>();
     public DbSet<AccountTag> AccountTags => Set<AccountTag>();
     public DbSet<UserKeys> UserKeys => Set<UserKeys>();
+    public DbSet<TermsAcceptance> TermsAcceptances => Set<TermsAcceptance>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -48,6 +49,12 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
         builder.Entity<UserKeys>(e =>
         {
             e.HasIndex(x => x.UserId).IsUnique();
+        });
+
+        builder.Entity<TermsAcceptance>(e =>
+        {
+            e.HasIndex(x => new { x.UserId, x.Version }).IsUnique();
+            e.Property(x => x.Version).HasMaxLength(64).IsRequired();
         });
     }
 }

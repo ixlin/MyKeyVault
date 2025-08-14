@@ -1,0 +1,12 @@
+@page
+@model MyKeyVault.Web.Areas.Identity.Pages.Account.Manage.PersonalDataModel
+@{
+    ViewData["Title"] = "个人数据";
+}
+<h3>个人数据</h3>
+<p class="text-muted">此页面允许你下载或删除账户相关的个人数据。</p>
+<p class="fw-bold text-danger">删除数据将永久删除账户且无法恢复。</p>
+<form method="post" asp-page="DownloadPersonalData" class="d-inline">
+  <button class="btn btn-primary">下载</button>
+</form>
+<a class="btn btn-danger ms-2" asp-page="DeletePersonalData">删除</a>

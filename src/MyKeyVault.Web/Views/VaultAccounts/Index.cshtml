@@ -42,9 +42,25 @@
         <button class="btn btn-outline-secondary" type="submit">搜索</button>
     </div>
 </form>
+<form id="bulkDeleteForm" method="post" asp-action="BulkDelete">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="q" value="@ViewData["q"]" />
+    <input type="hidden" name="tagId" value="@ViewData["tagId"]" />
+    <input type="hidden" name="createdFrom" value="@ViewData["createdFrom"]" />
+    <input type="hidden" name="createdTo" value="@ViewData["createdTo"]" />
+    <input type="hidden" name="sort" value="@ViewData["sort"]" />
+    <input type="hidden" name="dir" value="@ViewData["dir"]" />
+<div class="d-flex justify-content-between mb-2">
+    <div>
+        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('确定批量删除选中的账号？此操作不可恢复。');" disabled id="bulkDeleteBtn">批量删除</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary ms-2" id="selectAllBtn">全选</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary ms-1" id="invertSelectBtn">反选</button>
+    </div>
+</div>
 <table class="table table-striped">
     <thead>
         <tr>
+            <th style="width:40px;">#</th>
             <th>
                 @{ var sort = (ViewData["sort"] as string) ?? "updated"; var dir = (ViewData["dir"] as string) ?? "desc"; }
                 <a href="@Url.Action("Index", new { q = ViewData["q"], tagId = ViewData["tagId"], createdFrom = ViewData["createdFrom"], createdTo = ViewData["createdTo"], sort = "title", dir = sort=="title" && dir=="asc"?"desc":"asc" })">标题</a>
@@ -65,6 +81,9 @@
     @foreach (var item in Model)
     {
         <tr>
+            <td>
+                <input type="checkbox" name="selectedIds" value="@item.AccountId" class="sel-chk" />
+            </td>
             <td>@item.Title</td>
             <td>@item.Url</td>
             <td>@item.AccountNameEncrypted</td>
@@ -80,4 +99,18 @@
     }
     </tbody>
 </table>
+    </form>
+<script>
+    (function(){
+        const bulkBtn = document.getElementById('bulkDeleteBtn');
+        const chks = () => Array.from(document.querySelectorAll('.sel-chk'));
+        function refresh(){
+            const any = chks().some(c=>c.checked);
+            bulkBtn.disabled = !any;
+        }
+        document.getElementById('selectAllBtn').addEventListener('click', ()=>{ chks().forEach(c=>c.checked=true); refresh(); });
+        document.getElementById('invertSelectBtn').addEventListener('click', ()=>{ chks().forEach(c=>c.checked=!c.checked); refresh(); });
+        chks().forEach(c=>c.addEventListener('change', refresh));
+    })();
+</script>
 @* 无前端脚本 *@

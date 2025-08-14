@@ -1,0 +1,42 @@
+@{
+    ViewData["Title"] = "概览";
+    var totalAccounts = (int)(ViewBag.TotalAccounts ?? 0);
+    var totalTags = (int)(ViewBag.TotalTags ?? 0);
+    var recent = ViewBag.Recent as IEnumerable<dynamic>;
+}
+<h2>控制台概览</h2>
+<div class="row mb-4">
+  <div class="col-md-3">
+    <div class="card p-3">
+      <div class="fw-bold">账号总数</div>
+      <div class="display-6">@totalAccounts</div>
+      <a class="btn btn-sm btn-primary mt-2" href="/VaultAccounts/Create">新增账号</a>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card p-3">
+      <div class="fw-bold">标签总数</div>
+      <div class="display-6">@totalTags</div>
+      <a class="btn btn-sm btn-outline-primary mt-2" href="/Tags">管理标签</a>
+    </div>
+  </div>
+</div>
+<h4>最近修改账号</h4>
+@if(recent!=null && recent.Any()){
+<table class="table table-hover">
+ <thead><tr><th>标题</th><th>URL</th><th>修改时间</th></tr></thead>
+ <tbody>
+  @foreach(var a in recent){
+    <tr>
+      <td><a href="/VaultAccounts/Edit/@a.AccountId">@a.Title</a></td>
+      <td>@a.Url</td>
+      <td>@a.UpdatedAt.ToLocalTime()</td>
+    </tr>
+  }
+ </tbody>
+</table>
+}
+else
+{
+  <p class="text-muted">暂无数据，开始 <a href="/VaultAccounts/Create">创建账号</a>。</p>
+}

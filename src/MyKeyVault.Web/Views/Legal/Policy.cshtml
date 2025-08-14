@@ -1,0 +1,23 @@
+@model IEnumerable<MyKeyVault.Web.Models.TermsAcceptance>
+@{
+    ViewData["Title"] = "隐私与条款";
+}
+<h1>隐私与条款</h1>
+<p>当前版本：@ViewBag.Version</p>
+@if(ViewBag.FirstAcceptedAt != null){<p>首次接受时间：@(((DateTime)ViewBag.FirstAcceptedAt).ToLocalTime())</p>}
+<h4>当前版本要点</h4>
+<ol>
+  <li>v0.1 数据明文存储，勿录入高敏凭证。</li>
+  <li>未来可能引入本地加密与主口令，届时需重新确认。</li>
+  <li>你可以随时删除自己的账号数据。</li>
+</ol>
+<h4>历史接受记录</h4>
+<table class="table table-sm">
+  <thead><tr><th>版本</th><th>接受时间(本地)</th></tr></thead>
+  <tbody>
+  @foreach(var r in Model){
+    <tr><td>@r.Version</td><td>@r.AcceptedAt.ToLocalTime()</td></tr>
+  }
+  </tbody>
+</table>
+<a class="btn btn-secondary" asp-action="Terms">查看条款正文</a>
