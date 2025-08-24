@@ -16,6 +16,15 @@
       <text class="label">网址</text>
       <input class="input" placeholder="请输入网址" data-k="website" bindinput="onInput" value="{{website}}"/>
     </view>
+    <view class="field top" bindtap="openTags">
+      <text class="label">标签</text>
+      <view class="chips">
+  <block wx:if="{{selectedTags && selectedTags.length}}">
+          <block wx:for="{{selectedTags}}" wx:key="id"><text class="chip">{{item.name}}</text></block>
+        </block>
+        <block wx:else>未选择</block>
+      </view>
+    </view>
     <view class="field top">
       <text class="label">备注</text>
       <textarea class="textarea" placeholder="请输入备注" data-k="note" bindinput="onInput" value="{{note}}"></textarea>
@@ -23,3 +32,4 @@
   </view>
   <button class="btn" loading="{{loading}}" bindtap="onSave">保存</button>
 </view>
+<tag-selector visible="{{tagPopup}}" value="{{tagIds}}" bind:close="closeTags" bind:change="onTagsChange" />

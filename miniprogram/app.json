@@ -4,6 +4,8 @@
     "pages/account/index/index",
     "pages/account/detail/detail",
     "pages/account/edit/edit",
+    "pages/account/add/add",
+    "pages/tags/index/index",
     "pages/index/index",
     "pages/logs/logs"
   ],
@@ -13,6 +15,15 @@
   "navigationBarBackgroundColor": "#ffffff"
   },
   "style": "v2",
+  "tabBar": {
+    "custom": true,
+    "borderStyle": "black",
+    "list": [
+      { "pagePath": "pages/account/index/index", "text": "首页" },
+      { "pagePath": "pages/account/add/add", "text": "新增" },
+      { "pagePath": "pages/tags/index/index", "text": "标签" }
+    ]
+  },
   "componentFramework": "glass-easel",
   "sitemapLocation": "sitemap.json",
   "lazyCodeLoading": "requiredComponents"

@@ -25,21 +25,31 @@ public class VaultAccountsController : ControllerBase
     public record UpdateReq(string Title, string? Username, string? EncryptedPassword, string? Website, string? Note, long[]? TagIds);
 
     [HttpGet]
-    public async Task<IActionResult> List([FromQuery] string? q)
+    public async Task<IActionResult> List([FromQuery] string? q, [FromQuery] long? tagId)
     {
         var userId = CurrentUserId;
         var query = _db.Accounts.AsNoTracking().Where(a => a.UserId == userId);
+        if (tagId.HasValue)
+        {
+            var tid = tagId.Value;
+            query = query.Where(a => _db.AccountTags.Any(at => at.AccountId == a.AccountId && at.TagId == tid));
+        }
         if (!string.IsNullOrWhiteSpace(q))
         {
             query = query.Where(a => (a.Title != null && a.Title.Contains(q)) || (a.Url != null && a.Url.Contains(q)));
         }
-        var items = await query.OrderByDescending(a => a.UpdatedAt).Select(a => new
+        var items = await query
+            .OrderByDescending(a => a.UpdatedAt)
+            .Select(a => new
         {
             id = a.AccountId,
             title = a.Title,
             username = a.AccountNameEncrypted,
             website = a.Url,
-            updatedAt = a.UpdatedAt
+            updatedAt = a.UpdatedAt,
+            tags = _db.AccountTags.Where(at => at.AccountId == a.AccountId)
+                .Join(_db.Tags.Where(t => t.UserId == userId), at => at.TagId, t => t.TagId, (at, t) => new { id = t.TagId, name = t.TagName })
+                .ToList()
         }).ToListAsync();
         return Ok(new { items });
     }
@@ -59,6 +69,10 @@ public class VaultAccountsController : ControllerBase
             encryptedPassword = a.PasswordEncrypted,
             website = a.Url,
             note = a.NoteEncrypted,
+            tags = await _db.AccountTags.AsNoTracking()
+                .Where(at => at.AccountId == a.AccountId)
+                .Join(_db.Tags.AsNoTracking().Where(t => t.UserId == userId), at => at.TagId, t => t.TagId, (at, t) => new { id = t.TagId, name = t.TagName })
+                .ToListAsync(),
             createdAt = a.CreatedAt,
             updatedAt = a.UpdatedAt
         });

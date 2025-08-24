@@ -1,0 +1,2 @@
+.container{padding:24rpx}
+.go{background:#07c160;color:#fff;border-radius:8rpx;height:88rpx;font-size:32rpx}

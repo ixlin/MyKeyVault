@@ -7,6 +7,8 @@
 .field:last-child{border-bottom:none}
 .label{flex:0 0 160rpx;font-size:28rpx;color:#333;font-weight:400}
 .value{flex:1;font-size:28rpx;color:#333;line-height:1.6;word-break:break-word;background:#fafafa;padding:12rpx 16rpx;border-radius:8rpx;border:1rpx solid #ddd}
+.tags{display:flex;flex-wrap:wrap;gap:12rpx}
+.tag{display:inline-block;background:#eef2ff;color:#334155;border:1rpx solid #c7d2fe;border-radius:999rpx;padding:6rpx 16rpx;font-size:24rpx}
 .ops{display:flex;gap:24rpx;margin:0 24rpx}
 .btn-edit{background:#1677ff;color:#fff;border-radius:8rpx;flex:1;height:88rpx;line-height:88rpx;text-align:center;font-size:32rpx;border:none}
 .btn-delete{background:#ff4d4f;color:#fff;border-radius:8rpx;flex:1;height:88rpx;line-height:88rpx;text-align:center;font-size:32rpx;border:none}

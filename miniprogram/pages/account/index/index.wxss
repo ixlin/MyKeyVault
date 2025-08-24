@@ -1,8 +1,19 @@
-.container{padding:24rpx}
+.container{padding:24rpx 24rpx 160rpx}
 .topbar{display:flex;gap:12rpx;margin-bottom:16rpx}
 .search{flex:1;border:1px solid #ddd;border-radius:8rpx;padding:12rpx}
 .btn{background:#1677ff;color:#fff}
-.item{padding:16rpx 0;border-bottom:1px solid #f2f2f2}
-.title{font-size:32rpx}
-.meta{font-size:24rpx;color:#999}
+.tagbar{display:flex;flex-wrap:wrap;gap:12rpx;margin-bottom:16rpx}
+.tag-pill{display:inline-block;border:1rpx solid #e5e7eb;border-radius:9999rpx;padding:8rpx 16rpx;font-size:24rpx;color:#374151;background:#f9fafb}
+.tag-pill.active{background:#1677ff;color:#fff;border-color:#1677ff}
+.list{display:flex;flex-direction:column;gap:20rpx}
+.card{background:#fff;border:1rpx solid #eee;border-radius:16rpx;padding:20rpx 24rpx;box-shadow:0 4rpx 16rpx rgba(0,0,0,.04)}
+.row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8rpx}
+.title{font-size:32rpx;font-weight:600;color:#111}
+.arrow{color:#999;font-size:40rpx}
+.meta{font-size:24rpx;color:#6b7280;display:flex;gap:12rpx;align-items:center;margin-bottom:12rpx}
+.url{color:#6b7280;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dot{color:#d1d5db}
+.time{color:#9ca3af}
+.tags{display:flex;flex-wrap:wrap;gap:12rpx;margin-top:8rpx}
+.tag{display:inline-block;background:#eef2ff;color:#334155;border:1rpx solid #c7d2fe;border-radius:999rpx;padding:6rpx 16rpx;font-size:24rpx}
 .fab{position:fixed;right:24rpx;bottom:24rpx;background:#52c41a;color:#fff;border-radius:9999px}

@@ -1,0 +1,14 @@
+<view class="container">
+  <view class="toolbar">
+    <input placeholder="新标签名称" value="{{newName}}" bindinput="onInputNew" class="input" />
+    <button type="primary" bindtap="onAdd">添加</button>
+  </view>
+  <view class="list">
+    <block wx:for="{{tags}}" wx:key="id">
+      <view class="item" bindlongpress="onLongPress" data-id="{{item.id}}" data-name="{{item.name}}">
+        <text class="name">{{item.name}}</text>
+        <text class="count" wx:if="{{item.count!==undefined}}">{{item.count}}</text>
+      </view>
+    </block>
+  </view>
+</view>

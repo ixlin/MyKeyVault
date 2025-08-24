@@ -1,0 +1,19 @@
+<view wx:if="{{visible}}" class="overlay" catchtouchmove="noop" bindtap="onBgTap">
+  <view class="sheet" catchtap="noop">
+    <view class="header">
+      <text class="title">选择标签</text>
+      <button class="close" size="mini" bindtap="hide">关闭</button>
+    </view>
+    <scroll-view class="body" scroll-y>
+      <view class="chips">
+        <block wx:for="{{tags}}" wx:key="id">
+          <text class="chip {{ isSelected(item.id) ? 'active' : '' }}" data-id="{{item.id}}" bindtap="toggle">{{item.name}}</text>
+        </block>
+      </view>
+    </scroll-view>
+    <view class="footer">
+      <button class="btn cancel" bindtap="hide">取消</button>
+      <button class="btn ok" bindtap="confirm">确定</button>
+    </view>
+  </view>
+</view>

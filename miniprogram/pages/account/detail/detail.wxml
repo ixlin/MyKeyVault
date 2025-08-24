@@ -17,6 +17,19 @@
       <view class="value">{{item.website || '未设置'}}</view>
     </view>
     <view class="field top">
+      <text class="label">标签</text>
+      <view class="value">
+  <block wx:if="{{item.tags && item.tags.length}}">
+          <view class="tags">
+            <block wx:for="{{item.tags}}" wx:key="id">
+              <text class="tag">{{item.name}}</text>
+            </block>
+          </view>
+        </block>
+        <block wx:else>未设置</block>
+      </view>
+    </view>
+    <view class="field top">
       <text class="label">备注</text>
       <view class="value">{{item.note || '未设置'}}</view>
     </view>

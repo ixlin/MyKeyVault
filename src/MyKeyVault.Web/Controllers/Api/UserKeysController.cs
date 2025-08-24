@@ -127,7 +127,7 @@ public class UserKeysController : ControllerBase
             (a.PasswordEncrypted != null && a.PasswordEncrypted.StartsWith("{\"v\":\"v1\"")) ||
             (a.NoteEncrypted != null && a.NoteEncrypted.StartsWith("{\"v\":\"v1\""))
         ));
-        return Ok(new { hasKeys, hasCipher });
+    return Ok(new { hasKeys, hasCipher });
     }
 
     [HttpPost("reset")]

@@ -72,9 +72,20 @@ module.exports = {
   login(identifier, password){ return request('POST', '/api/mp/auth/login', { identifier, password }); },
   logout(){ return request('POST', '/api/mp/auth/logout'); },
   acceptTerms(){ return request('POST', '/api/mp/legal/accept'); },
-  listAccounts(q){ return request('GET', '/api/mp/vault/accounts' + (q? ('?q=' + encodeURIComponent(q)) : '')); },
+  listAccounts(q, tagId){ 
+    const params = [];
+    if (q) params.push('q=' + encodeURIComponent(q));
+    if (tagId) params.push('tagId=' + encodeURIComponent(tagId));
+    const qs = params.length ? ('?' + params.join('&')) : '';
+    return request('GET', '/api/mp/vault/accounts' + qs); 
+  },
   getAccount(id){ return request('GET', `/api/mp/vault/accounts/${id}`); },
   createAccount(body){ return request('POST', '/api/mp/vault/accounts', body); },
   updateAccount(id, body){ return request('PUT', `/api/mp/vault/accounts/${id}`, body); },
-  deleteAccount(id){ return request('DELETE', `/api/mp/vault/accounts/${id}`); }
+  deleteAccount(id){ return request('DELETE', `/api/mp/vault/accounts/${id}`); },
+  // tags
+  listTags(withCounts=false){ return request('GET', '/api/mp/tags' + (withCounts? '?counts=true' : '')); },
+  createTag(name){ return request('POST', '/api/mp/tags', { name }); },
+  renameTag(id, name){ return request('PUT', `/api/mp/tags/${id}`, { name }); },
+  deleteTag(id, force=false){ return request('DELETE', `/api/mp/tags/${id}` + (force? '?force=true' : '')); }
 };

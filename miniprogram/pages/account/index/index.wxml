@@ -3,11 +3,27 @@
     <input class="search" placeholder="搜索标题/网址" bindinput="onSearchInput"/>
     <button class="btn" bindtap="onSearch">搜索</button>
   </view>
+  <view class="tagbar" wx:if="{{tags && tags.length}}">
+    <text class="tag-pill {{!tagId ? 'active' : ''}}" data-id="" bindtap="onTagPick">全部</text>
+    <block wx:for="{{tags}}" wx:key="id">
+      <text class="tag-pill {{tagId===item.id ? 'active' : ''}}" data-id="{{item.id}}" bindtap="onTagPick">{{item.name}}</text>
+    </block>
+  </view>
   <view class="list">
     <block wx:for="{{items}}" wx:key="id">
-      <view class="item" data-id="{{item.id}}" bindtap="toDetail">
-        <view class="title">{{item.title}}</view>
-        <view class="meta">{{item.website}} · {{item.updatedAt}}</view>
+      <view class="card" data-id="{{item.id}}" bindtap="toDetail">
+        <view class="row">
+          <view class="title">{{item.title}}</view>
+          <text class="arrow">›</text>
+        </view>
+        <view class="meta">
+          <text class="url">{{item.website || '—'}}</text>
+          <text class="dot">·</text>
+          <text class="time">{{item.formattedTime}}</text>
+        </view>
+        <view class="tags" wx:if="{{item.tags && item.tags.length}}">
+          <block wx:for="{{item.tags}}" wx:key="id"><text class="tag">{{item.name}}</text></block>
+        </view>
       </view>
     </block>
   </view>

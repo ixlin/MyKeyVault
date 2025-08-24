@@ -4,7 +4,9 @@ Page({
   data: {
     loading: true,
     items: [],
-    q: ''
+  q: '',
+  tagId: null,
+  tags: []
   },
   onLoad() { 
     console.log('📱 [INDEX] onLoad triggered');
@@ -12,6 +14,8 @@ Page({
   },
   onShow() {
     console.log('📱 [INDEX] onShow triggered');
+  // 同步自定义 TabBar 选中态
+  if (this.getTabBar && this.getTabBar()) { this.getTabBar().setData({ selected: 0 }); }
     // onShow 会在页面每次显示时触发，包括从登录页跳转回来
     // 我们在这里统一处理登录检查和数据加载
     this.ensureLoginThenLoad();
@@ -33,8 +37,8 @@ Page({
       }
 
       console.log('✅ [INDEX] User is authenticated, loading data...');
-      // 2. 如果已登录，加载列表
-      await this.loadList();
+  // 2. 如果已登录，加载标签与列表
+  await Promise.all([this.loadTags(), this.loadList()]);
 
     } catch (e) {
       console.error('❌ [INDEX] Error in ensureLoginThenLoad:', e);
@@ -71,9 +75,13 @@ Page({
     // 仅负责加载数据和更新界面，不再处理复杂的错误逻辑
     this.setData({ loading: true });
     try {
-      const data = await api.listAccounts(this.data.q);
+  const data = await api.listAccounts(this.data.q, this.data.tagId);
       console.log('📋 [INDEX] loadList success:', data);
-      this.setData({ items: data.items || [], loading: false });
+      const items = (data.items||[]).map(it=>({
+        ...it,
+        formattedTime: formatShortTime(it.updatedAt)
+      }));
+      this.setData({ items, loading: false });
     } catch (e) {
       console.error('❌ [INDEX] loadList failed:', e);
       // 在 ensureLoginThenLoad 中已经处理了 401 和 451
@@ -83,8 +91,31 @@ Page({
       this.setData({ loading: false });
     }
   },
+  async loadTags(){
+    try{
+      const r = await api.listTags(false);
+      this.setData({ tags: r.items || [] });
+    }catch(e){ /* 忽略 */ }
+  },
   onSearchInput(e) { this.setData({ q: e.detail.value }); },
   onSearch(){ this.loadList(); },
+  onTagPick(e){
+    const idStr = e.currentTarget.dataset.id;
+    const id = idStr === '' || idStr === undefined ? null : Number(idStr);
+    this.setData({ tagId: id }, () => this.loadList());
+  },
   toDetail(e){ const id = e.currentTarget.dataset.id; wx.navigateTo({ url: `/pages/account/detail/detail?id=${id}`}); },
   toCreate(){ wx.navigateTo({ url: '/pages/account/edit/edit' }); }
 });
+
+// 简短时间格式：今天显示 HH:mm，其它显示 MM-DD
+function formatShortTime(iso){
+  try{
+    const d = new Date(iso);
+    const now = new Date();
+    const sameDay = d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth() && d.getDate()===now.getDate();
+    const pad = (n)=> (n<10? '0'+n : ''+n);
+    if(sameDay){ return `${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+    return `${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  }catch(_){ return ''; }
+}

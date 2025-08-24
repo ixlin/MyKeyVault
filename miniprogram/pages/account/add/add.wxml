@@ -1,0 +1,3 @@
+<view class="container">
+  <button class="go" bindtap="toCreate">创建一个账号</button>
+</view>

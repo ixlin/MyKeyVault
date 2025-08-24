@@ -1,1 +1,6 @@
-{ "navigationBarTitleText": "编辑/新建账号" }
+{
+  "navigationBarTitleText": "编辑/新建账号",
+  "usingComponents": {
+    "tag-selector": "/components/tag-selector/tag-selector"
+  }
+}
