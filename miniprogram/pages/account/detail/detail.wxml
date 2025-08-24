@@ -1,0 +1,28 @@
+<view class="container" wx:if="{{item}}">
+  <view class="field-group">
+    <view class="field">
+      <text class="label">标题</text>
+      <view class="value">{{item.title}}</view>
+    </view>
+    <view class="field">
+      <text class="label">账号</text>
+      <view class="value">{{item.username || '未设置'}}</view>
+    </view>
+    <view class="field">
+      <text class="label">密码</text>
+      <view class="value">{{item.encryptedPassword || '未设置'}}</view>
+    </view>
+    <view class="field">
+      <text class="label">网址</text>
+      <view class="value">{{item.website || '未设置'}}</view>
+    </view>
+    <view class="field top">
+      <text class="label">备注</text>
+      <view class="value">{{item.note || '未设置'}}</view>
+    </view>
+  </view>
+  <view class="ops">
+    <button class="btn-edit" bindtap="toEdit">编辑</button>
+    <button class="btn-delete" bindtap="onDelete">删除</button>
+  </view>
+</view>

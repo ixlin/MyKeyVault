@@ -1,0 +1,8 @@
+.container{padding:24rpx}
+.topbar{display:flex;gap:12rpx;margin-bottom:16rpx}
+.search{flex:1;border:1px solid #ddd;border-radius:8rpx;padding:12rpx}
+.btn{background:#1677ff;color:#fff}
+.item{padding:16rpx 0;border-bottom:1px solid #f2f2f2}
+.title{font-size:32rpx}
+.meta{font-size:24rpx;color:#999}
+.fab{position:fixed;right:24rpx;bottom:24rpx;background:#52c41a;color:#fff;border-radius:9999px}

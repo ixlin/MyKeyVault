@@ -1,12 +1,16 @@
 {
   "pages": [
+    "pages/login/login",
+    "pages/account/index/index",
+    "pages/account/detail/detail",
+    "pages/account/edit/edit",
     "pages/index/index",
     "pages/logs/logs"
   ],
   "window": {
-    "navigationBarTextStyle": "black",
-    "navigationBarTitleText": "Weixin",
-    "navigationBarBackgroundColor": "#ffffff"
+  "navigationBarTextStyle": "black",
+  "navigationBarTitleText": "MyKeyVault",
+  "navigationBarBackgroundColor": "#ffffff"
   },
   "style": "v2",
   "componentFramework": "glass-easel",

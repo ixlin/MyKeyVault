@@ -1,0 +1,25 @@
+<view class="container">
+  <view class="field-group">
+    <view class="field">
+      <text class="label">标题</text>
+      <input class="input" placeholder="请输入标题" data-k="title" bindinput="onInput" value="{{title}}"/>
+    </view>
+    <view class="field">
+      <text class="label">账号</text>
+      <input class="input" placeholder="请输入账号" data-k="username" bindinput="onInput" value="{{username}}"/>
+    </view>
+    <view class="field">
+      <text class="label">密码</text>
+      <input class="input" placeholder="请输入密码" data-k="encryptedPassword" bindinput="onInput" value="{{encryptedPassword}}"/>
+    </view>
+    <view class="field">
+      <text class="label">网址</text>
+      <input class="input" placeholder="请输入网址" data-k="website" bindinput="onInput" value="{{website}}"/>
+    </view>
+    <view class="field top">
+      <text class="label">备注</text>
+      <textarea class="textarea" placeholder="请输入备注" data-k="note" bindinput="onInput" value="{{note}}"></textarea>
+    </view>
+  </view>
+  <button class="btn" loading="{{loading}}" bindtap="onSave">保存</button>
+</view>

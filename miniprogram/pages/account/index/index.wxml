@@ -1,0 +1,15 @@
+<view class="container">
+  <view class="topbar">
+    <input class="search" placeholder="搜索标题/网址" bindinput="onSearchInput"/>
+    <button class="btn" bindtap="onSearch">搜索</button>
+  </view>
+  <view class="list">
+    <block wx:for="{{items}}" wx:key="id">
+      <view class="item" data-id="{{item.id}}" bindtap="toDetail">
+        <view class="title">{{item.title}}</view>
+        <view class="meta">{{item.website}} · {{item.updatedAt}}</view>
+      </view>
+    </block>
+  </view>
+  <button class="fab" bindtap="toCreate">＋ 新建</button>
+</view>
