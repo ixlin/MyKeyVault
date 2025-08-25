@@ -19,5 +19,57 @@ src/**/appsettings.*.local.json
 !src/**/appsettings.json.sample
 !src/**/appsettings.Development.json.sample
 
+# Production configuration files (NEVER commit these)
+**/appsettings.Production.json
+**/appsettings.Staging.json
+
+# Deployment files with sensitive information
+deploy-config.sh
+server-credentials.txt
+database-passwords.txt
+
+# SSL certificates and keys
+**/*.pfx
+**/*.key
+**/*.crt
+**/*.pem
+
 # Logs
 **/*.log
+
+# Temporary deployment files
+mykeyvault-deploy.tar.gz
+*.tar.gz
+
+# IDE specific files
+.idea/
+*.swp
+*.swo
+
+# Release directory (contains deployment scripts and sensitive information)
+release/
+
+# 编译和发布文件
+bin/
+obj/
+publish/
+temp_publish/
+
+# 敏感配置文件
+appsettings.Production.json
+*.key
+*.pem
+*.p12
+*.pfx
+
+# 数据库文件
+*.db
+*.db-*
+local_db_*.sql
+
+# 临时文件
+cookies.txt
+*.tar.gz
+# macOS系统文件
+.DS_Store
+Thumbs.db
