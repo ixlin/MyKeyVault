@@ -162,15 +162,44 @@ app.Use(async (context, next) =>
         var userId = context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
         logger.LogInformation("📋 [TERMS] Path: {Path} - User: {UserId}", path, userId);
         
+        // � 重新启用法律条款检查，增加详细日志
+        bool skipTermsCheck = false; // 启用法律条款检查
+        
         // API：/api/mp/** 返回 451 JSON（放行 /api/mp/legal/**）
-        if (path.StartsWith("/api/mp", StringComparison.OrdinalIgnoreCase) &&
+        if (!skipTermsCheck &&
+            path.StartsWith("/api/mp", StringComparison.OrdinalIgnoreCase) &&
             !path.StartsWith("/api/mp/legal", StringComparison.OrdinalIgnoreCase))
         {
             if (!string.IsNullOrEmpty(userId))
             {
                 using var scope = app.Services.CreateScope();
                 var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-                var accepted = await db.TermsAcceptances.AnyAsync(t => t.UserId == userId && t.Version == CURRENT_TERMS_VERSION);
+                
+                // 增加详细的查询日志
+                logger.LogInformation("📋 [TERMS] Checking terms for User: {UserId}, Version: {Version}", userId, CURRENT_TERMS_VERSION);
+                
+                var termsRecord = await db.TermsAcceptances
+                    .Where(t => t.UserId == userId && t.Version == CURRENT_TERMS_VERSION)
+                    .FirstOrDefaultAsync();
+                
+                bool accepted = termsRecord != null;
+                
+                if (termsRecord != null)
+                {
+                    logger.LogInformation("📋 [TERMS] ✅ User {UserId} accepted terms {Version} at {AcceptedAt}", 
+                        userId, termsRecord.Version, termsRecord.AcceptedAt);
+                }
+                else
+                {
+                    // 查询该用户的所有条款记录
+                    var allTerms = await db.TermsAcceptances
+                        .Where(t => t.UserId == userId)
+                        .Select(t => new { t.Version, t.AcceptedAt })
+                        .ToListAsync();
+                    
+                    logger.LogWarning("📋 [TERMS] ❌ User {UserId} has NOT accepted terms {Version}. Found records: {@AllTerms}", 
+                        userId, CURRENT_TERMS_VERSION, allTerms);
+                }
                 
                 logger.LogInformation("📋 [TERMS] User {UserId} terms acceptance: {Accepted}", userId, accepted);
                 

@@ -29,11 +29,38 @@ Page({
       console.log('🔐 [LOGIN] Calling api.login...');
       await api.login(identifier, password);
       console.log('✅ [LOGIN] Login successful, redirecting...');
-      // 跳转到首页，由首页进行后续检查
-      wx.reLaunch({ url: '/pages/account/index/index' });
+      
+      // 显示成功提示
+      wx.showToast({ 
+        title: '登录成功', 
+        icon: 'success',
+        duration: 1000
+      });
+      
+      // 延迟跳转，让用户看到成功提示
+      setTimeout(() => {
+        wx.reLaunch({ url: '/pages/dashboard/index' });
+      }, 1000);
+      
     } catch (err) {
       console.error('❌ [LOGIN] Login failed:', err);
-      wx.showToast({ title: err?.message || '登录失败', icon: 'none' });
+      
+      let title = '登录失败';
+      let duration = 2000;
+      
+      // 根据错误类型提供不同的提示时长和图标
+      if (err?.code === -1) {
+        // 网络错误，提示时间长一些
+        duration = 3000;
+      } else if (err?.message) {
+        title = err.message;
+      }
+      
+      wx.showToast({ 
+        title: title, 
+        icon: 'none',
+        duration: duration
+      });
     } finally {
       this.setData({ loading: false });
     }

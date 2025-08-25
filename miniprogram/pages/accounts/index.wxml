@@ -1,0 +1,107 @@
+<view class="container">
+  <!-- 搜索栏 -->
+  <view class="search-container">
+    <view class="search-bar">
+      <input 
+        class="search-input" 
+        placeholder="搜索标题/网址" 
+        value="{{q}}"
+        bindinput="onSearchInput"
+      />
+      <view class="search-actions">
+        <!-- 搜索图标按钮 -->
+        <view class="icon-btn search-btn" bindtap="onSearch">
+          <text class="icon">🔍</text>
+        </view>
+        <!-- 新增图标按钮 -->
+        <view class="icon-btn add-btn" bindtap="toCreate">
+          <text class="icon">➕</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 搜索历史（当输入框获得焦点且有历史记录时显示） -->
+    <view class="search-history" wx:if="{{searchHistory.length > 0}}">
+      <view class="history-header">
+        <text class="history-title">搜索历史</text>
+        <text class="history-clear" bindtap="onClearSearchHistory">清除</text>
+      </view>
+      <view class="history-list">
+        <text 
+          wx:for="{{searchHistory}}" 
+          wx:key="*this"
+          class="history-item"
+          data-keyword="{{item}}"
+          bindtap="onSearchHistoryTap"
+        >
+          {{item}}
+        </text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 标签筛选 -->
+  <view class="filter-container" wx:if="{{tags && tags.length}}">
+    <scroll-view class="tag-scroll" scroll-x enhanced="{{true}}" show-scrollbar="{{false}}">
+      <view class="tag-list">
+        <text class="tag-pill {{!tagId ? 'active' : ''}}" data-id="" bindtap="onTagPick">
+          全部
+        </text>
+        <block wx:for="{{tags}}" wx:key="id">
+          <text class="tag-pill {{tagId===item.id ? 'active' : ''}}" data-id="{{item.id}}" bindtap="onTagPick">
+            {{item.name}}
+          </text>
+        </block>
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- 加载状态 -->
+  <view wx:if="{{loading}}" class="loading-container">
+    <view class="loading-spinner"></view>
+    <text class="loading-text">加载中...</text>
+  </view>
+
+  <!-- 账号列表 -->
+  <view wx:else class="accounts-list">
+    <!-- 空状态 -->
+    <view wx:if="{{items.length === 0}}" class="empty-state">
+      <view class="empty-icon">📱</view>
+      <view class="empty-text">
+        {{q || tagId ? '没有找到匹配的账号' : '暂无账号'}}
+      </view>
+      <view class="empty-hint">
+        {{q || tagId ? '试试调整搜索条件' : '点击右上角 ➕ 按钮创建您的第一个账号'}}
+      </view>
+    </view>
+
+    <!-- 账号卡片列表 -->
+    <view wx:else class="list">
+      <block wx:for="{{items}}" wx:key="id">
+        <view class="account-card" data-id="{{item.id}}" bindtap="toDetail">
+          <view class="card-header">
+            <view class="account-title">{{item.title}}</view>
+            <text class="arrow-icon">›</text>
+          </view>
+          
+          <view class="card-meta">
+            <text class="account-url">{{item.website || '—'}}</text>
+            <text class="meta-dot">·</text>
+            <text class="update-time">{{item.formattedTime}}</text>
+          </view>
+          
+          <view class="card-tags" wx:if="{{item.tags && item.tags.length}}">
+            <block wx:for="{{item.tags}}" wx:key="id" wx:for-item="tag">
+              <text class="account-tag">{{tag.name}}</text>
+            </block>
+          </view>
+        </view>
+      </block>
+    </view>
+  </view>
+
+  <!-- 结果统计 -->
+  <view wx:if="{{!loading && items.length > 0}}" class="result-stats">
+    找到 {{items.length}} 个账号
+  </view>
+</view>

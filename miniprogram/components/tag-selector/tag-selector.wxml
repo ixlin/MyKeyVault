@@ -7,7 +7,7 @@
     <scroll-view class="body" scroll-y>
       <view class="chips">
         <block wx:for="{{tags}}" wx:key="id">
-          <text class="chip {{ isSelected(item.id) ? 'active' : '' }}" data-id="{{item.id}}" bindtap="toggle">{{item.name}}</text>
+          <text class="chip {{ item.isSelected ? 'active' : '' }}" data-id="{{item.id}}" bindtap="toggle">{{item.name}}</text>
         </block>
       </view>
     </scroll-view>

@@ -1,0 +1,295 @@
+.container {
+  padding: 24rpx 24rpx 120rpx;
+  background-color: #f8f9fa;
+  min-height: 100vh;
+}
+
+/* 搜索容器 */
+.search-container {
+  margin-bottom: 24rpx;
+}
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  background: white;
+  border-radius: 16rpx;
+  padding: 16rpx 20rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.05);
+}
+
+.search-input {
+  flex: 1;
+  font-size: 28rpx;
+  color: #333;
+}
+
+.search-actions {
+  display: flex;
+  gap: 12rpx;
+}
+
+.icon-btn {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 12rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.icon-btn:active {
+  transform: scale(0.95);
+}
+
+.search-btn {
+  background: #f0f2f5;
+  color: #666;
+}
+
+.add-btn {
+  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+  color: white;
+}
+
+.icon {
+  font-size: 32rpx;
+}
+
+/* 搜索历史 */
+.search-history {
+  margin-top: 16rpx;
+  background: white;
+  border-radius: 12rpx;
+  padding: 20rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.05);
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16rpx;
+}
+
+.history-title {
+  font-size: 24rpx;
+  color: #666;
+}
+
+.history-clear {
+  font-size: 24rpx;
+  color: #1677ff;
+  padding: 8rpx;
+}
+
+.history-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.history-item {
+  background: #f0f2f5;
+  color: #666;
+  font-size: 24rpx;
+  padding: 8rpx 16rpx;
+  border-radius: 8rpx;
+  border: 1rpx solid #e5e7eb;
+}
+
+.history-item:active {
+  background: #e5e7eb;
+}
+
+/* 标签筛选 */
+.filter-container {
+  margin-bottom: 24rpx;
+}
+
+.tag-scroll {
+  white-space: nowrap;
+}
+
+.tag-list {
+  display: inline-flex;
+  gap: 12rpx;
+  padding: 0 4rpx;
+}
+
+.tag-pill {
+  display: inline-block;
+  border: 1rpx solid #e5e7eb;
+  border-radius: 20rpx;
+  padding: 12rpx 20rpx;
+  font-size: 24rpx;
+  color: #374151;
+  background: white;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.tag-pill:active {
+  transform: scale(0.98);
+}
+
+.tag-pill.active {
+  background: #1677ff;
+  color: #fff;
+  border-color: #1677ff;
+}
+
+/* 加载状态 */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80rpx 40rpx;
+}
+
+.loading-spinner {
+  width: 60rpx;
+  height: 60rpx;
+  border: 4rpx solid #e9ecef;
+  border-top: 4rpx solid #1677ff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading-text {
+  margin-top: 20rpx;
+  color: #6c757d;
+  font-size: 28rpx;
+}
+
+/* 空状态 */
+.empty-state {
+  text-align: center;
+  padding: 80rpx 40rpx;
+  background: white;
+  border-radius: 16rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.05);
+}
+
+.empty-icon {
+  font-size: 64rpx;
+  margin-bottom: 20rpx;
+}
+
+.empty-text {
+  font-size: 32rpx;
+  color: #495057;
+  margin-bottom: 12rpx;
+}
+
+.empty-hint {
+  font-size: 24rpx;
+  color: #6c757d;
+  line-height: 1.5;
+}
+
+/* 账号列表 */
+.accounts-list {
+  flex: 1;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.account-card {
+  background: white;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+}
+
+.account-card:active {
+  transform: scale(0.98);
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.1);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12rpx;
+}
+
+.account-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #111;
+  flex: 1;
+  margin-right: 16rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.arrow-icon {
+  color: #999;
+  font-size: 40rpx;
+  flex-shrink: 0;
+}
+
+.card-meta {
+  font-size: 24rpx;
+  color: #6b7280;
+  display: flex;
+  gap: 12rpx;
+  align-items: center;
+  margin-bottom: 16rpx;
+}
+
+.account-url {
+  color: #6b7280;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta-dot {
+  color: #d1d5db;
+}
+
+.update-time {
+  color: #9ca3af;
+}
+
+.card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8rpx;
+}
+
+.account-tag {
+  display: inline-block;
+  background: #eef2ff;
+  color: #334155;
+  border: 1rpx solid #c7d2fe;
+  border-radius: 12rpx;
+  padding: 6rpx 12rpx;
+  font-size: 20rpx;
+}
+
+/* 结果统计 */
+.result-stats {
+  text-align: center;
+  margin-top: 32rpx;
+  padding: 20rpx;
+  font-size: 24rpx;
+  color: #6c757d;
+}

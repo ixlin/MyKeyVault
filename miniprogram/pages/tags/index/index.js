@@ -9,7 +9,7 @@ Page({
       const res = await api.listTags(true);
       this.setData({ tags: res.items || [] });
     }catch(err){
-      if(err?.code===401){ wx.switchTab({ url: '/pages/account/index/index' }); }
+      if(err?.code===401){ wx.reLaunch({ url: '/pages/login/login' }); }
       else if(err?.code===451){ wx.showModal({ title:'需先接受条款', content:'请前往网页端接受服务条款后重试' }) }
       else{ wx.showToast({ icon:'none', title: err.message||'加载失败' }) }
     }

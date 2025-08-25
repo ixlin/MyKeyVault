@@ -1,0 +1,81 @@
+<view class="dashboard-container">
+  <!-- 加载状态 -->
+  <view wx:if="{{loading}}" class="loading-container">
+    <view class="loading-spinner"></view>
+    <text class="loading-text">加载中...</text>
+  </view>
+
+  <!-- 仪表盘内容 -->
+  <view wx:else class="dashboard-content">
+    <!-- 数据概览卡片 -->
+    <view class="stats-section">
+      <view class="stats-grid">
+        <!-- 账号总数卡片 -->
+        <view class="stat-card" bindtap="onAccountsCardTap">
+          <view class="stat-icon">📱</view>
+          <view class="stat-number">{{accountCount}}</view>
+          <view class="stat-label">账号总数</view>
+        </view>
+        
+        <!-- 标签总数卡片 -->
+        <view class="stat-card" bindtap="onTagsCardTap">
+          <view class="stat-icon">🏷️</view>
+          <view class="stat-number">{{tagCount}}</view>
+          <view class="stat-label">标签总数</view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 最近活动模块 -->
+    <view class="recent-section">
+      <view class="section-header">
+        <view class="section-title">最近修改</view>
+        <view class="section-subtitle">最近5条账号记录</view>
+      </view>
+      
+      <view wx:if="{{recentAccounts.length === 0}}" class="empty-state">
+        <view class="empty-icon">📝</view>
+        <view class="empty-text">暂无账号记录</view>
+        <view class="empty-hint">点击下方按钮创建您的第一个账号</view>
+      </view>
+      
+      <view wx:else class="recent-list">
+        <view 
+          wx:for="{{recentAccounts}}" 
+          wx:key="id" 
+          class="recent-item"
+          bindtap="onRecentAccountTap"
+          data-id="{{item.id}}"
+        >
+          <view class="recent-item-main">
+            <view class="recent-title">{{item.title}}</view>
+            <view class="recent-time">{{item.formattedTime}}</view>
+          </view>
+          <view class="recent-tags">
+            <view 
+              wx:for="{{item.tags}}" 
+              wx:for-item="tag" 
+              wx:key="*this"
+              class="recent-tag"
+            >
+              {{tag}}
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 快速操作区域 -->
+    <view class="quick-actions">
+      <view class="quick-action-btn primary" bindtap="onAddAccountTap">
+        <view class="action-icon">➕</view>
+        <view class="action-text">新增账号</view>
+      </view>
+      
+      <navigator url="/pages/accounts/index" class="quick-action-btn secondary">
+        <view class="action-icon">🔍</view>
+        <view class="action-text">搜索账号</view>
+      </navigator>
+    </view>
+  </view>
+</view>

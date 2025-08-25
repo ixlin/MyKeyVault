@@ -1,3 +1,106 @@
 <view class="container">
-  <button class="go" bindtap="toCreate">创建一个账号</button>
+  <view class="header">
+    <text class="title">新增账号</text>
+  </view>
+
+  <form bindsubmit="onSubmit">
+    <view class="form-group">
+      <text class="label">账号标题 *</text>
+      <input 
+        class="form-input" 
+        name="title" 
+        placeholder="请输入账号标题" 
+        value="{{title}}"
+        bindinput="onInputChange"
+        data-field="title"
+      />
+    </view>
+
+    <view class="form-group">
+      <text class="label">用户名</text>
+      <input 
+        class="form-input" 
+        name="username" 
+        placeholder="请输入用户名" 
+        value="{{username}}"
+        bindinput="onInputChange"
+        data-field="username"
+      />
+    </view>
+
+    <view class="form-group">
+      <text class="label">密码</text>
+      <input 
+        class="form-input" 
+        name="password" 
+        placeholder="请输入密码" 
+        value="{{password}}"
+        bindinput="onInputChange"
+        data-field="password"
+      />
+    </view>
+
+    <view class="form-group">
+      <text class="label">网址</text>
+      <input 
+        class="form-input" 
+        name="url" 
+        placeholder="请输入网址" 
+        value="{{url}}"
+        bindinput="onInputChange"
+        data-field="url"
+      />
+    </view>
+
+    <view class="form-group">
+      <text class="label">备注</text>
+      <textarea 
+        class="form-textarea" 
+        name="notes" 
+        placeholder="请输入备注信息" 
+        value="{{notes}}"
+        bindinput="onInputChange"
+        data-field="notes"
+        maxlength="500"
+      />
+    </view>
+
+    <view class="form-group">
+      <text class="label">标签</text>
+      <view class="tag-selector-container">
+        <view wx:if="{{availableTags.length === 0}}" class="no-tags-hint">
+          暂无可选标签
+        </view>
+        <view wx:else class="tag-grid">
+          <view 
+            wx:for="{{availableTags}}" 
+            wx:key="id"
+            class="tag-item {{item.isSelected ? 'selected' : ''}}"
+            data-id="{{item.id}}"
+            bindtap="toggleTag"
+          >
+            {{item.name}}
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="form-actions">
+      <button 
+        class="btn btn-cancel" 
+        bindtap="onCancel"
+        type="default"
+      >
+        取消
+      </button>
+      <button 
+        class="btn btn-primary" 
+        formType="submit"
+        loading="{{loading}}"
+        disabled="{{loading}}"
+      >
+        保存
+      </button>
+    </view>
+  </form>
 </view>

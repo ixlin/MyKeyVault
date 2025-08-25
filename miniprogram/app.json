@@ -1,7 +1,8 @@
 {
   "pages": [
     "pages/login/login",
-    "pages/account/index/index",
+    "pages/dashboard/index",
+    "pages/accounts/index",
     "pages/account/detail/detail",
     "pages/account/edit/edit",
     "pages/account/add/add",
@@ -19,8 +20,8 @@
     "custom": true,
     "borderStyle": "black",
     "list": [
-      { "pagePath": "pages/account/index/index", "text": "首页" },
-      { "pagePath": "pages/account/add/add", "text": "新增" },
+      { "pagePath": "pages/dashboard/index", "text": "首页" },
+      { "pagePath": "pages/accounts/index", "text": "账号" },
       { "pagePath": "pages/tags/index/index", "text": "标签" }
     ]
   },
