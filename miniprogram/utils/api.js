@@ -1,5 +1,5 @@
 // 简易 API 封装（适配 Cookie 会话 + 451 条款）
-const BASE = 'http://localhost:5000'; // 体验版部署时替换为公网 HTTPS 域名
+const { BASE } = require('./config');
 
 // 存储会话信息
 let sessionCookie = '';
