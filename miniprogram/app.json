@@ -6,9 +6,7 @@
     "pages/account/detail/detail",
     "pages/account/edit/edit",
     "pages/account/add/add",
-    "pages/tags/index/index",
-    "pages/index/index",
-    "pages/logs/logs"
+    "pages/tags/index/index"
   ],
   "window": {
   "navigationBarTextStyle": "black",

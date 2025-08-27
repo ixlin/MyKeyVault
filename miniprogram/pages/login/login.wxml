@@ -1,6 +1,33 @@
 <view class="container">
   <view class="title">登录</view>
+  
+  <!-- 调试信息面板 -->
+  <view class="debug-panel" wx:if="{{showDebug}}">
+    <view class="debug-title">🔍 调试信息</view>
+    <view class="debug-item">环境: {{debugInfo.env}}</view>
+    <view class="debug-item">API地址: {{debugInfo.baseUrl}}</view>
+    <view class="debug-item">网络状态: {{debugInfo.networkType}}</view>
+    <view class="debug-item">连接测试: {{debugInfo.connectionStatus}}</view>
+    <view class="debug-item" wx:if="{{debugInfo.lastError}}">
+      <text class="error-text">最后错误: {{debugInfo.lastError}}</text>
+    </view>
+    <button class="debug-btn" bindtap="toggleDebug">隐藏调试</button>
+  </view>
+  
+  <!-- 显示/隐藏调试信息按钮 -->
+  <button class="debug-toggle" wx:if="{{!showDebug}}" bindtap="toggleDebug">显示调试信息</button>
+  
   <input class="input" placeholder="邮箱/手机号/用户名" bindinput="onInputId" />
   <input class="input" placeholder="密码" password="true" bindinput="onInputPwd" />
   <button class="btn" loading="{{loading}}" bindtap="onSubmit">登录</button>
+  
+  <view class="links-container">
+    <view class="hint-text">还没有账号？忘记密码？</view>
+    <view class="link-buttons">
+      <text class="link-text" bindtap="onRegisterTap">注册账号</text>
+      <text class="separator">|</text>
+      <text class="link-text" bindtap="onForgotPasswordTap">忘记密码</text>
+    </view>
+    <view class="website-hint">请在电脑浏览器中访问完整功能</view>
+  </view>
 </view>
