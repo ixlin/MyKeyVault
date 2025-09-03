@@ -30,3 +30,4 @@
 ## 注意
 - 请勿把真实的 `appsettings*.json` 或任何包含口令的文件加入版本库。
 - 若需 CI/CD，请在流水线中通过机密变量注入连接字符串或单独的 `appsettings.Production.json`（不提交到仓库）。
+测试部署修复
