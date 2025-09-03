@@ -46,8 +46,8 @@ jobs:
         host: ${{ secrets.SERVER_HOST }}
         username: ${{ secrets.SERVER_USER }}
         key: ${{ secrets.SERVER_SSH_KEY }}
-        source: "./publish/" # 将 publish 文件夹下的所有内容
-        target: "/var/www/mykeyvault" # 复制到服务器的目标目录
+        source: "./publish/*" # 将 publish 文件夹下的所有内容
+        target: "/var/www/mykeyvault/" # 复制到服务器的目标目录
         strip_components: 1 # 移除 publish 这一层目录
 
     # 第六步：在服务器上重启服务
