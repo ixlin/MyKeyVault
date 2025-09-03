@@ -77,6 +77,9 @@ jobs:
         key: ${{ secrets.SERVER_SSH_KEY }}
         script: |
           set -e
+          echo "Setting ownership of application files..."
+          # 修正所有文件的所有权，确保 deployer 用户可以访问
+          sudo chown -R deployer:deployer /var/www/mykeyvault
           echo "Restarting mykeyvault service..."
           # 使用我们之前配置好的免密 sudo 权限来重启服务
           sudo systemctl restart mykeyvault.service
