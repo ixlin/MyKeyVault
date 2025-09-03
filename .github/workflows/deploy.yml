@@ -1,0 +1,85 @@
+# 定义工作流的名称
+name: Deploy MyKeyVault to Aliyun Server
+
+# 定义触发条件：当有代码推送到 main 分支时触发
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build-and-deploy:
+    # 使用最新的 Ubuntu 虚拟机作为运行环境
+    runs-on: ubuntu-latest
+
+    steps:
+    # 第一步：检出代码
+    # 这个操作会将你的仓库代码下载到虚拟机中
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    # 第二步：设置 .NET 环境
+    # 我们需要指定一个 .NET 版本来编译你的项目
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '8.0.x' # 假设你的项目使用 .NET 8, 如果不是，请修改这里
+
+    # 第三步：发布项目
+    # 这会编译你的 ASP.NET Core 项目，并生成可部署的文件
+    # --configuration Release 指定使用发布模式
+    # --output ./publish 指定输出到虚拟机里的 publish 文件夹
+    - name: Publish .NET Project
+      run: dotnet publish src/MyKeyVault.Web/MyKeyVault.Web.csproj --configuration Release --output ./publish
+
+    # 第四步：将编译好的文件部署到服务器
+    # 使用 appleboy/ssh-action 这个成熟的 action 来执行远程命令
+    - name: Deploy to Server
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SERVER_SSH_KEY }}
+        script: |
+          # 使用 rsync 将编译好的文件从 GitHub Runner 同步到服务器
+          # rsync -avz --delete ./publish/ /var/www/mykeyvault/
+          # 注意：上面的 rsync 需要在 runner 和 server 都安装。
+          # 一个更简单的方式是先打包，再解压。
+
+          # 1. 在 GitHub Runner 中创建压缩包
+          cd ./publish
+          tar -czvf ../mykeyvault_publish.tar.gz .
+          cd ..
+          
+          # 2. 将压缩包上传到服务器
+          # 我们需要另一个 action 来做这件事，或者在一个脚本里完成。
+          # 为了简化，我们直接在一个 ssh session 里完成。
+          # 但是 ssh-action 不直接支持文件传输。
+          # 所以我们换用 scp-action 来传输文件，然后用 ssh-action 来执行命令。
+          echo "Deployment script will be executed in the next steps."
+
+    # 第五步：通过 SCP 将发布文件复制到服务器
+    - name: Copy files via SCP
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SERVER_SSH_KEY }}
+        source: "./publish/" # 将 publish 文件夹下的所有内容
+        target: "/var/www/mykeyvault" # 复制到服务器的目标目录
+        strip_components: 1 # 移除 publish 这一层目录
+
+    # 第六步：在服务器上重启服务
+    - name: Restart Service on Server
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SERVER_SSH_KEY }}
+        script: |
+          set -e
+          echo "Restarting mykeyvault service..."
+          # 使用我们之前配置好的免密 sudo 权限来重启服务
+          sudo systemctl restart mykeyvault.service
+          echo "Service restarted successfully!"
+          # 检查一下服务状态，确保它正常运行
+          sudo systemctl status mykeyvault.service
