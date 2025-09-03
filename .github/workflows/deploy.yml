@@ -30,32 +30,14 @@ jobs:
     # --output ./publish 指定输出到虚拟机里的 publish 文件夹
     - name: Publish .NET Project
       run: dotnet publish src/MyKeyVault.Web/MyKeyVault.Web.csproj --configuration Release --output ./publish
+    
+    # 在发布产物中写入当前部署的提交哈希与时间，便于线上核对版本
+    - name: Write deploy version file
+      run: |
+        echo "$GITHUB_SHA" > ./publish/.deploy-version
+        date -u +"%Y-%m-%dT%H:%M:%SZ" > ./publish/.deploy-time-utc
 
     # 第四步：将编译好的文件部署到服务器
-    # 使用 appleboy/ssh-action 这个成熟的 action 来执行远程命令
-    - name: Deploy to Server
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ secrets.SERVER_HOST }}
-        username: ${{ secrets.SERVER_USER }}
-        key: ${{ secrets.SERVER_SSH_KEY }}
-        script: |
-          # 使用 rsync 将编译好的文件从 GitHub Runner 同步到服务器
-          # rsync -avz --delete ./publish/ /var/www/mykeyvault/
-          # 注意：上面的 rsync 需要在 runner 和 server 都安装。
-          # 一个更简单的方式是先打包，再解压。
-
-          # 1. 在 GitHub Runner 中创建压缩包
-          cd ./publish
-          tar -czvf ../mykeyvault_publish.tar.gz .
-          cd ..
-          
-          # 2. 将压缩包上传到服务器
-          # 我们需要另一个 action 来做这件事，或者在一个脚本里完成。
-          # 为了简化，我们直接在一个 ssh session 里完成。
-          # 但是 ssh-action 不直接支持文件传输。
-          # 所以我们换用 scp-action 来传输文件，然后用 ssh-action 来执行命令。
-          echo "Deployment script will be executed in the next steps."
 
     # 第五步：通过 SCP 将发布文件复制到服务器
     - name: Copy files via SCP
@@ -82,7 +64,13 @@ jobs:
           chmod -R o+r /var/www/mykeyvault
           echo "Restarting mykeyvault service..."
           # 使用我们之前配置好的免密 sudo 权限来重启服务
-          sudo systemctl restart mykeyvault.service
+          sudo -n systemctl restart mykeyvault.service
           echo "Service restarted successfully!"
           # 检查一下服务状态，确保它正常运行
-          sudo systemctl status mykeyvault.service
+          sudo systemctl status mykeyvault.service --no-pager
+          echo "Recent service logs:"
+          journalctl -u mykeyvault.service -n 20 --no-pager || true
+          echo "Deployed commit:"
+          cat /var/www/mykeyvault/.deploy-version || true
+          echo "Deploy time (UTC):"
+          cat /var/www/mykeyvault/.deploy-time-utc || true
