@@ -20,5 +20,14 @@
       "Microsoft.AspNetCore": "Warning"
     }
   },
+  "Email": {
+    "SmtpHost": "${SMTP_HOST}",
+    "SmtpPort": "${SMTP_PORT:-587}",
+    "SmtpUser": "${SMTP_USER}",
+    "SmtpPassword": "${SMTP_PASSWORD}",
+    "FromEmail": "${SMTP_FROM_EMAIL}",
+    "FromName": "${SMTP_FROM_NAME:-MyKeyVault}",
+    "ThrowOnError": false
+  },
   "AllowedHosts": "*"
 }

@@ -14,6 +14,15 @@
     "WriteTo": [ { "Name": "Console" } ],
     "Enrich": [ "FromLogContext" ]
   },
+  "Email": {
+    "SmtpHost": "",
+    "SmtpPort": 587,
+    "SmtpUser": "",
+    "SmtpPassword": "",
+    "FromEmail": "",
+    "FromName": "MyKeyVault Development",
+    "ThrowOnError": false
+  },
   "Logging": {
     "LogLevel": {
       "Default": "Information",

@@ -15,7 +15,10 @@ Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
     .Enrich.FromLogContext()
     .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}")
-    .MinimumLevel.Debug() // 在开发环境下显示更多日志
+    .MinimumLevel.Information() // 减少日志输出，只显示信息级别以上
+    .MinimumLevel.Override("MyKeyVault.Web.Services.EmailSender", LogEventLevel.Debug) // 邮件服务显示详细日志
+    .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning) // 减少ASP.NET Core框架日志
+    .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Warning) // 减少EF Core日志
     .CreateLogger();
 builder.Host.UseSerilog();
 
@@ -48,6 +51,9 @@ builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
         options.User.RequireUniqueEmail = false; // 邮箱或手机号二选一，允许邮箱非唯一，登录逻辑后续自定义
     })
     .AddEntityFrameworkStores<ApplicationDbContext>();
+
+// 注册邮件发送服务
+builder.Services.AddTransient<Microsoft.AspNetCore.Identity.UI.Services.IEmailSender, MyKeyVault.Web.Services.EmailSender>();
 // Cookie 设置：支持小程序 HTTPS 跨域携带与 API 直接返回 401/403
 builder.Services.ConfigureApplicationCookie(options =>
 {
