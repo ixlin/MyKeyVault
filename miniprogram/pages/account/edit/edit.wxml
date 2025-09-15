@@ -10,7 +10,10 @@
     </view>
     <view class="field">
       <text class="label">密码</text>
-      <input class="input" placeholder="请输入密码" data-k="encryptedPassword" bindinput="onInput" value="{{encryptedPassword}}"/>
+      <view class="input-wrapper">
+        <input class="input with-eye" placeholder="请输入密码" password="{{!passwordVisible}}" data-k="encryptedPassword" bindinput="onInput" value="{{encryptedPassword}}"/>
+        <text class="eye" bindtap="togglePassword">{{ passwordVisible ? '🙈' : '👁️' }}</text>
+      </view>
     </view>
     <view class="field">
       <text class="label">网址</text>

@@ -91,8 +91,8 @@
           </view>
           
           <view class="card-tags" wx:if="{{item.tags && item.tags.length}}">
-            <block wx:for="{{item.tags}}" wx:key="id" wx:for-item="tag">
-              <text class="account-tag">{{tag.name}}</text>
+            <block wx:for="{{item.tags}}" wx:key="*this" wx:for-item="tag">
+              <text class="account-tag">{{tag}}</text>
             </block>
           </view>
         </view>

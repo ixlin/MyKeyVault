@@ -10,7 +10,10 @@
     </view>
     <view class="field">
       <text class="label">密码</text>
-      <view class="value">{{item.encryptedPassword || '未设置'}}</view>
+      <view class="value value-with-icon">
+        <text class="password-text">{{ passwordVisible ? (item.encryptedPassword || item.password) : ((item.encryptedPassword || item.password) ? '********' : '未设置') }}</text>
+        <text class="eye" bindtap="togglePassword">{{ passwordVisible ? '🙈' : '👁️' }}</text>
+      </view>
     </view>
     <view class="field">
       <text class="label">网址</text>

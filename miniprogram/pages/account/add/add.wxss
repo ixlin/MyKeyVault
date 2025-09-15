@@ -31,6 +31,10 @@
   color: #333;
   box-sizing: border-box;
 }
+.with-eye{padding-right:72rpx}
+.input-wrapper{position:relative}
+.eye{position:absolute;right:16rpx;top:50%;transform:translateY(-50%);font-size:32rpx;color:#888;padding:8rpx 10rpx;border-radius:8rpx}
+.eye:active{background:#eee}
 
 .form-input:focus {
   border-color: #007aff;

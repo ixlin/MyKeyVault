@@ -60,7 +60,7 @@ public class MpVaultAccountsController : ControllerBase
                 id = a.AccountId,
                 title = a.Title,
                 username = a.AccountNameEncrypted,
-                password = a.PasswordEncrypted,
+                encryptedPassword = a.PasswordEncrypted,
                 website = a.Url,
                 note = a.NoteEncrypted,
                 createdAt = a.CreatedAt,
@@ -113,7 +113,11 @@ public class MpVaultAccountsController : ControllerBase
 
         account.Title = req.Title.Trim();
         account.AccountNameEncrypted = req.Username ?? string.Empty;
-        account.PasswordEncrypted = req.EncryptedPassword ?? string.Empty;
+        // 仅当请求体显式提供了非空的 EncryptedPassword 时才更新，避免小程序未修改时清空
+        if (req.EncryptedPassword is not null)
+        {
+            account.PasswordEncrypted = req.EncryptedPassword;
+        }
         account.Url = req.Website?.Trim();
         account.NoteEncrypted = req.Note;
         account.UpdatedAt = DateTime.UtcNow;

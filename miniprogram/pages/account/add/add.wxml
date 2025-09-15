@@ -30,14 +30,18 @@
 
     <view class="form-group">
       <text class="label">密码</text>
-      <input 
-        class="form-input" 
-        name="password" 
-        placeholder="请输入密码" 
-        value="{{password}}"
-        bindinput="onInputChange"
-        data-field="password"
-      />
+      <view class="input-wrapper">
+        <input 
+          class="form-input with-eye" 
+          name="password" 
+          placeholder="请输入密码" 
+          password="{{!passwordVisible}}"
+          value="{{password}}"
+          bindinput="onInputChange"
+          data-field="password"
+        />
+        <text class="eye" bindtap="togglePassword">{{ passwordVisible ? '🙈' : '👁️' }}</text>
+      </view>
     </view>
 
     <view class="form-group">

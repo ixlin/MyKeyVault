@@ -9,7 +9,8 @@ Page({
     notes: '',
     loading: false,
     availableTags: [],
-    selectedTagIds: []
+    selectedTagIds: [],
+    passwordVisible: false
   },
 
   onLoad() {
@@ -101,6 +102,10 @@ Page({
   // 取消操作
   onCancel() {
     wx.navigateBack();
+  },
+
+  togglePassword(){
+    this.setData({ passwordVisible: !this.data.passwordVisible });
   },
 
   // 表单提交

@@ -19,19 +19,43 @@ Page({
       this.getTabBar().setData({ selected: 0 });
     }
     
-    // 先显示基本页面，然后再加载数据
-    this.setData({ loading: false });
-    console.log('📊 [DASHBOARD] Set loading to false');
-    
-    // 延迟加载数据，避免阻塞页面显示
-    setTimeout(() => {
+    // 如果数据还没有加载过，则显示加载状态；否则直接刷新数据
+    if (this.data.accountCount === 0 && this.data.recentAccounts.length === 0) {
+      // 首次加载，显示loading
+      this.setData({ loading: true });
       this.ensureLoginThenLoad();
-    }, 100);
+    } else {
+      // 已有数据，静默刷新
+      this.setData({ loading: false });
+      // 延迟刷新数据，避免阻塞页面显示
+      setTimeout(() => {
+        this.silentRefresh();
+      }, 100);
+    }
+  },
+
+  async silentRefresh() {
+    console.log('🔄 [DASHBOARD] Silent refresh starting...');
+    try {
+      // 检查登录状态
+      const me = await api.me();
+      if (!me.isAuthenticated) {
+        console.log('🚪 [DASHBOARD] Not authenticated, redirecting to login');
+        wx.reLaunch({ url: '/pages/login/login' });
+        return;
+      }
+
+      console.log('✅ [DASHBOARD] User is authenticated, refreshing dashboard data...');
+      await this.loadDashboardData();
+    } catch (e) {
+      console.error('❌ [DASHBOARD] Error in silentRefresh:', e);
+      // 静默刷新失败时不显示错误，保持现有数据
+    }
   },
 
   async ensureLoginThenLoad() {
     console.log('🔍 [DASHBOARD] ensureLoginThenLoad starting...');
-    this.setData({ loading: true });
+    // 注意：loading状态已在onShow中设置，这里不再重复设置
     
     try {
       // 检查登录状态
