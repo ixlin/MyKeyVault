@@ -297,6 +297,26 @@ app.MapControllerRoute(
     pattern: "{controller=Home}/{action=Index}/{id?}");
 app.MapRazorPages();
 
+// 在生产环境自动应用数据库迁移
+if (!app.Environment.IsDevelopment())
+{
+    using (var scope = app.Services.CreateScope())
+    {
+        try
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            Log.Information("🗄️ Applying database migrations...");
+            await db.Database.MigrateAsync();
+            Log.Information("✅ Database migrations applied successfully");
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "❌ Error applying database migrations");
+            throw;
+        }
+    }
+}
+
 // 初始化管理员
 using (var scope = app.Services.CreateScope())
 {

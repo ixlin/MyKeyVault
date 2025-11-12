@@ -51,6 +51,7 @@ jobs:
         strip_components: 1 # 移除 publish 这一层目录
 
     # 第六步：在服务器上重启服务
+    # 数据库迁移会在应用启动时自动执行（参见 Program.cs）
     - name: Restart Service on Server
       uses: appleboy/ssh-action@master
       with:
@@ -69,7 +70,7 @@ jobs:
           # 检查一下服务状态，确保它正常运行
           sudo systemctl status mykeyvault.service --no-pager
           echo "Recent service logs:"
-          journalctl -u mykeyvault.service -n 20 --no-pager || true
+          journalctl -u mykeyvault.service -n 30 --no-pager || true
           echo "Deployed commit:"
           cat /var/www/mykeyvault/.deploy-version || true
           echo "Deploy time (UTC):"
