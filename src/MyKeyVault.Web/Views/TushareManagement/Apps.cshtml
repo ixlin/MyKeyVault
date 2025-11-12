@@ -1,0 +1,340 @@
+@model List<MyKeyVault.Web.Models.TushareApp>
+@{
+    ViewData["Title"] = "Tushare 应用管理";
+}
+
+<link rel="stylesheet" href="~/css/sap-ui.css" />
+
+<div class="sap-page">
+    <div class="container">
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="sap-message-strip sap-message-strip-success">
+                @TempData["SuccessMessage"]
+            </div>
+        }
+
+        @if (TempData["NewAppId"] != null)
+        {
+            <div class="sap-message-strip sap-message-strip-warning">
+                <strong>新应用凭证（请妥善保存，AppSecret 仅显示一次）：</strong><br/>
+                <div style="margin-top: 0.5rem;">
+                    <div class="sap-info-label">App ID</div>
+                    <div class="sap-info-value">@TempData["NewAppId"]</div>
+                </div>
+                <div style="margin-top: 0.5rem;">
+                    <div class="sap-info-label">App Secret</div>
+                    <div class="sap-info-value">@TempData["NewAppSecret"]</div>
+                </div>
+            </div>
+        }
+
+        <div class="sap-object-page">
+            <div class="sap-object-header">
+                <h2>Tushare 应用管理</h2>
+                <div class="subtitle">管理您的 Tushare API 应用凭证</div>
+            </div>
+
+            <div class="sap-toolbar">
+                <div>
+                    <span style="font-size: 14px; color: #6a6d70;">共 @Model.Count 个应用</span>
+                </div>
+                <div>
+                    <button type="button" class="sap-button sap-button-secondary" onclick="showCreateDialog()">创建新应用</button>
+                    <a href="@Url.Action("TestTool")" class="sap-button sap-button-secondary">测试工具</a>
+                    <a href="@Url.Action("ApiDocs")" class="sap-button sap-button-secondary">API 文档</a>
+                    <a href="@Url.Action("Stats")" class="sap-button sap-button-secondary">数据统计</a>
+                    <a href="@Url.Action("Logs")" class="sap-button sap-button-secondary">调用日志</a>
+                    <a href="@Url.Action("Settings")" class="sap-button sap-button-secondary">系统设置</a>
+                </div>
+            </div>
+
+            <table class="sap-table">
+                <thead>
+                    <tr>
+                        <th style="width: 280px;">App ID</th>
+                        <th style="width: 80px;">状态</th>
+                        <th style="width: 200px;">备注</th>
+                        <th style="width: 90px; text-align: right;">调用次数</th>
+                        <th style="width: 140px;">最后使用</th>
+                        <th style="width: 140px;">创建时间</th>
+                        <th style="text-align: right; width: 180px;">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="7" style="text-align: center; color: #6a6d70; padding: 2rem;">
+                                暂无应用，点击上方"创建新应用"按钮开始
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var app in Model)
+                        {
+                            <tr>
+                                <td>
+                                    <span style="font-family: monospace; font-size: 13px;">@app.AppId</span>
+                                </td>
+                                <td>
+                                    @if (app.Status == "active")
+                                    {
+                                        <span class="sap-badge sap-badge-success">已启用</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="sap-badge sap-badge-danger">已禁用</span>
+                                    }
+                                </td>
+                                <td>
+                                    <span style="color: #32363a; font-size: 13px;" title="@app.Description">
+                                        @(string.IsNullOrEmpty(app.Description) ? "-" : (app.Description.Length > 20 ? app.Description.Substring(0, 20) + "..." : app.Description))
+                                    </span>
+                                </td>
+                                <td style="text-align: right;">
+                                    <span class="sap-badge" style="background: #e5f4f2; color: #107e3e; font-family: monospace;">@app.CallCount</span>
+                                </td>
+                                <td>
+                                    <span style="color: #6a6d70; font-size: 13px;">
+                                        @if (app.LastUsedAt.HasValue)
+                                        {
+                                            var diff = DateTime.UtcNow - app.LastUsedAt.Value;
+                                            if (diff.TotalMinutes < 60)
+                                            {
+                                                @($"{(int)diff.TotalMinutes} 分钟前")
+                                            }
+                                            else if (diff.TotalHours < 24)
+                                            {
+                                                @($"{(int)diff.TotalHours} 小时前")
+                                            }
+                                            else if (diff.TotalDays < 30)
+                                            {
+                                                @($"{(int)diff.TotalDays} 天前")
+                                            }
+                                            else
+                                            {
+                                                @app.LastUsedAt.Value.ToLocalTime().ToString("MM-dd HH:mm")
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <span>从未使用</span>
+                                        }
+                                    </span>
+                                </td>
+                                <td>
+                                    <span style="color: #6a6d70; font-size: 13px;">@app.CreatedAt.ToLocalTime().ToString("MM-dd HH:mm")</span>
+                                </td>
+                                <td style="text-align: right;">
+                                    <button type="button" class="sap-button sap-button-sm" style="margin-right: 4px;"
+                                            data-id="@app.Id" data-desc="@app.Description"
+                                            onclick="showEditDialog(this.dataset.id, this.dataset.desc)">编辑</button>
+                                    @if (app.Status == "active")
+                                    {
+                                        <form asp-action="DisableApp" asp-route-id="@app.Id" method="post" style="display: inline;">
+                                            <button type="submit" class="sap-button sap-button-sm" style="margin-right: 4px;">禁用</button>
+                                        </form>
+                                    }
+                                    else
+                                    {
+                                        <form asp-action="EnableApp" asp-route-id="@app.Id" method="post" style="display: inline;">
+                                            <button type="submit" class="sap-button sap-button-sm" style="margin-right: 4px;">启用</button>
+                                        </form>
+                                    }
+                    <button type="button" class="sap-button sap-button-danger sap-button-sm"
+                        data-id="@app.Id" data-appid="@app.AppId"
+                        onclick="confirmDelete(this.dataset.id, this.dataset.appid)">删除</button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- 创建应用对话框 -->
+<div id="createDialog" class="sap-dialog-overlay" style="display: none;">
+    <div class="sap-dialog">
+        <div class="sap-dialog-header">
+            <h3>创建新应用</h3>
+            <button type="button" class="sap-dialog-close" onclick="closeCreateDialog()">&times;</button>
+        </div>
+        <div class="sap-dialog-content">
+            <form id="createForm" asp-action="CreateApp" method="post">
+                <div class="sap-form-group">
+                    <label class="sap-info-label">备注说明（可选）</label>
+                    <textarea name="description" class="form-control" rows="3" maxlength="500" 
+                              placeholder="例如：分配给张三用于项目A数据分析"></textarea>
+                    <small style="color: #6a6d70; font-size: 12px;">用途、分配对象等信息，最多500字符</small>
+                </div>
+            </form>
+        </div>
+        <div class="sap-dialog-footer">
+            <button type="button" class="sap-button sap-button-secondary" onclick="closeCreateDialog()">取消</button>
+            <button type="button" class="sap-button" onclick="submitCreate()">创建</button>
+        </div>
+    </div>
+</div>
+
+<!-- 编辑应用对话框 -->
+<div id="editDialog" class="sap-dialog-overlay" style="display: none;">
+    <div class="sap-dialog">
+        <div class="sap-dialog-header">
+            <h3>编辑应用备注</h3>
+            <button type="button" class="sap-dialog-close" onclick="closeEditDialog()">&times;</button>
+        </div>
+        <div class="sap-dialog-content">
+            <form id="editForm" method="post">
+                <input type="hidden" id="editAppId" name="id" />
+                <div class="sap-form-group">
+                    <label class="sap-info-label">备注说明</label>
+                    <textarea id="editDescription" name="description" class="form-control" rows="3" maxlength="500" 
+                              placeholder="例如：分配给张三用于项目A数据分析"></textarea>
+                    <small style="color: #6a6d70; font-size: 12px;">用途、分配对象等信息，最多500字符</small>
+                </div>
+            </form>
+        </div>
+        <div class="sap-dialog-footer">
+            <button type="button" class="sap-button sap-button-secondary" onclick="closeEditDialog()">取消</button>
+            <button type="button" class="sap-button" onclick="submitEdit()">保存</button>
+        </div>
+    </div>
+</div>
+
+<style>
+    .sap-dialog-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    }
+
+    .sap-dialog {
+        background: white;
+        border-radius: 4px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+        min-width: 500px;
+        max-width: 600px;
+    }
+
+    .sap-dialog-header {
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid #e5e5e5;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .sap-dialog-header h3 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 600;
+        color: #32363a;
+    }
+
+    .sap-dialog-close {
+        background: none;
+        border: none;
+        font-size: 24px;
+        color: #6a6d70;
+        cursor: pointer;
+        padding: 0;
+        width: 24px;
+        height: 24px;
+        line-height: 20px;
+    }
+
+    .sap-dialog-close:hover {
+        color: #32363a;
+    }
+
+    .sap-dialog-content {
+        padding: 1.5rem;
+    }
+
+    .sap-form-group {
+        margin-bottom: 1rem;
+    }
+
+    .sap-form-group:last-child {
+        margin-bottom: 0;
+    }
+
+    .sap-dialog-footer {
+        padding: 1rem 1.5rem;
+        border-top: 1px solid #e5e5e5;
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.5rem;
+    }
+</style>
+
+<script>
+    function showCreateDialog() {
+        document.getElementById('createDialog').style.display = 'flex';
+    }
+
+    function closeCreateDialog() {
+        document.getElementById('createDialog').style.display = 'none';
+        document.getElementById('createForm').reset();
+    }
+
+    function submitCreate() {
+        document.getElementById('createForm').submit();
+    }
+
+    function showEditDialog(appId, description) {
+        document.getElementById('editAppId').value = appId;
+        document.getElementById('editDescription').value = description;
+        document.getElementById('editForm').action = '/tushare/management/apps/' + appId + '/edit';
+        document.getElementById('editDialog').style.display = 'flex';
+    }
+
+    function closeEditDialog() {
+        document.getElementById('editDialog').style.display = 'none';
+        document.getElementById('editForm').reset();
+    }
+
+    function submitEdit() {
+        document.getElementById('editForm').submit();
+    }
+
+    function confirmDelete(appId, appIdDisplay) {
+        if (confirm('确定要删除应用 ' + appIdDisplay + ' 吗？\n\n删除后该应用将无法使用，但调用历史记录会保留。')) {
+            var form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '/tushare/management/apps/' + appId + '/delete';
+            
+            var csrfToken = document.querySelector('input[name="__RequestVerificationToken"]');
+            if (csrfToken) {
+                var tokenInput = document.createElement('input');
+                tokenInput.type = 'hidden';
+                tokenInput.name = '__RequestVerificationToken';
+                tokenInput.value = csrfToken.value;
+                form.appendChild(tokenInput);
+            }
+            
+            document.body.appendChild(form);
+            form.submit();
+        }
+    }
+
+    // ESC 键关闭对话框
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeCreateDialog();
+            closeEditDialog();
+        }
+    });
+</script>
+

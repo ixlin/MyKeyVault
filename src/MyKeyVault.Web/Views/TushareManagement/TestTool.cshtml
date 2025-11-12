@@ -1,0 +1,300 @@
+@{
+    ViewData["Title"] = "API 测试工具";
+}
+
+<link rel="stylesheet" href="~/css/sap-ui.css" />
+
+<div class="sap-page">
+    <div class="container">
+        <div class="sap-object-page">
+            <div class="sap-object-header">
+                <h2>API 测试工具</h2>
+                <div class="subtitle">在线测试 Tushare API 调用</div>
+            </div>
+
+            <div class="sap-toolbar">
+                <div></div>
+                <div>
+                    <a href="@Url.Action("Apps")" class="sap-button sap-button-secondary">返回应用管理</a>
+                </div>
+            </div>
+
+            <div style="padding: 2rem;">
+                <!-- 步骤1：获取 Token -->
+                <div class="sap-card">
+                    <div class="sap-card-header">步骤 1：获取访问令牌</div>
+                    
+                    <div style="margin-top: 1rem;">
+                        <label class="sap-info-label">App ID</label>
+                        <input type="text" id="appId" class="form-control" placeholder="app_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" style="margin-bottom: 1rem;" />
+                        
+                        <label class="sap-info-label">App Secret</label>
+                        <input type="password" id="appSecret" class="form-control" placeholder="输入 AppSecret" style="margin-bottom: 1rem;" />
+                        
+                        <button onclick="getToken()" class="sap-button">获取 Token</button>
+                        
+                        <div id="tokenResult" style="margin-top: 1rem; display: none;">
+                            <label class="sap-info-label">访问令牌（有效期 2 小时）</label>
+                            <textarea id="accessToken" class="form-control" rows="3" readonly style="font-family: monospace; font-size: 12px;"></textarea>
+                        </div>
+                        
+                        <div id="tokenError" style="margin-top: 1rem; display: none; padding: 1rem; background: #ffeef0; border-left: 4px solid #b00; border-radius: 4px;"></div>
+
+                        <div id="tokenDebug" style="margin-top: 0.75rem; display: none;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                                <label class="sap-info-label" style="margin: 0;">调试信息</label>
+                                <button onclick="copyDebugInfo('tokenDebugText')" class="sap-button sap-button-sm" style="padding: 0.25rem 0.75rem; font-size: 12px;">复制</button>
+                            </div>
+                            <pre id="tokenDebugText" style="background: #f7f7f7; padding: 0.75rem; border-radius: 4px; overflow-x: auto; white-space: pre-wrap;"></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 步骤2：调用接口 -->
+                <div class="sap-card">
+                    <div class="sap-card-header">步骤 2：调用数据接口</div>
+                    
+                    <div style="margin-top: 1rem;">
+                        <label class="sap-info-label">选择接口</label>
+                        <select id="apiName" class="form-control" onchange="updateParams()" style="margin-bottom: 1rem;">
+                            <option value="stock_basic">stock_basic - 股票列表</option>
+                            <option value="daily">daily - 日线行情</option>
+                            <option value="income">income - 利润表</option>
+                            <option value="balancesheet">balancesheet - 资产负债表</option>
+                            <option value="cashflow">cashflow - 现金流量表</option>
+                        </select>
+                        
+                        <label class="sap-info-label">请求参数（JSON 格式）</label>
+                        <textarea id="params" class="form-control" rows="5" style="font-family: monospace; margin-bottom: 1rem;">{"list_status": "L"}</textarea>
+                        
+                        <label style="display: flex; align-items: center; margin-bottom: 1rem;">
+                            <input type="checkbox" id="forceRefresh" style="margin-right: 0.5rem;" />
+                            <span>强制刷新（忽略缓存）</span>
+                        </label>
+                        
+                        <button onclick="queryData()" class="sap-button">查询数据</button>
+                        
+                        <div id="queryResult" style="margin-top: 1rem; display: none;">
+                            <label class="sap-info-label">响应结果</label>
+                            <pre id="responseData" style="background: #f7f7f7; padding: 1rem; border-radius: 4px; overflow-x: auto; max-height: 500px; overflow-y: auto;"></pre>
+                        </div>
+                        
+                        <div id="queryError" style="margin-top: 1rem; display: none; padding: 1rem; background: #ffeef0; border-left: 4px solid #b00; border-radius: 4px;"></div>
+
+                        <div id="queryDebug" style="margin-top: 0.75rem; display: none;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                                <label class="sap-info-label" style="margin: 0;">调试信息</label>
+                                <button onclick="copyDebugInfo('queryDebugText')" class="sap-button sap-button-sm" style="padding: 0.25rem 0.75rem; font-size: 12px;">复制</button>
+                            </div>
+                            <pre id="queryDebugText" style="background: #f7f7f7; padding: 0.75rem; border-radius: 4px; overflow-x: auto; white-space: pre-wrap;"></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const baseUrl = '@Url.Content("~")';
+    
+    const paramTemplates = {
+        stock_basic: '{"list_status": "L"}',
+        daily: '{"ts_code": "000001.SZ", "start_date": "20250101", "end_date": "20250110"}',
+        income: '{"ts_code": "600519.SH", "period": "20241231"}',
+        balancesheet: '{"ts_code": "600519.SH", "period": "20240630"}',
+        cashflow: '{"ts_code": "600519.SH", "start_date": "20240101", "end_date": "20241231"}'
+    };
+    
+    function updateParams() {
+        const apiName = document.getElementById('apiName').value;
+        document.getElementById('params').value = paramTemplates[apiName];
+    }
+    
+    async function getToken() {
+        const appId = document.getElementById('appId').value.trim();
+        const appSecret = document.getElementById('appSecret').value.trim();
+        
+        if (!appId || !appSecret) {
+            alert('请输入 App ID 和 App Secret');
+            return;
+        }
+        
+        document.getElementById('tokenResult').style.display = 'none';
+        document.getElementById('tokenError').style.display = 'none';
+        
+        try {
+            const url = new URL((baseUrl || '/') + 'api/tushare/auth/token', window.location.origin).toString();
+            const started = Date.now();
+            const payload = { appId, appSecret };
+            const payloadMasked = { appId, appSecret: `***(${appSecret.length})` };
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            
+            // 优先尝试解析 JSON，不可解析时读取纯文本并展示
+            let data;
+            let textBody = '';
+            try {
+                data = await response.clone().json();
+            } catch (_) {
+                textBody = await response.text();
+                data = {};
+            }
+
+            if (response.ok && data.accessToken) {
+                document.getElementById('accessToken').value = data.accessToken;
+                document.getElementById('tokenResult').style.display = 'block';
+            } else {
+                const msg = data.error_description || data.message || textBody || ('HTTP ' + response.status);
+                document.getElementById('tokenError').textContent = '获取 Token 失败: ' + msg;
+                document.getElementById('tokenError').style.display = 'block';
+            }
+
+            // 调试信息输出
+            const elapsed = Date.now() - started;
+            const contentType = response.headers.get('content-type') || '';
+            const debugBody = data && Object.keys(data).length ? JSON.stringify(data, null, 2) : (textBody || '(empty)');
+            const headersDump = Array.from(response.headers.entries()).map(([k,v]) => `${k}: ${v}`).join('\n');
+            const dbg = [
+                `Time: ${new Date().toISOString()}`,
+                `URL: ${url}`,
+                `Method: POST`,
+                `Status: ${response.status} ${response.statusText}`,
+                `Duration: ${elapsed} ms`,
+                `Request: ${JSON.stringify(payloadMasked)}`,
+                `Headers:\n${headersDump}`,
+                `Body:\n${debugBody}`
+            ].join('\n');
+            document.getElementById('tokenDebugText').textContent = dbg;
+            document.getElementById('tokenDebug').style.display = 'block';
+        } catch (error) {
+            document.getElementById('tokenError').textContent = '请求失败: ' + error.message;
+            document.getElementById('tokenError').style.display = 'block';
+
+            // 调试信息（异常）
+            const dbg = [
+                `Time: ${new Date().toISOString()}`,
+                `URL: ${(baseUrl || '/') + 'api/tushare/auth/token'}`,
+                `Method: POST`,
+                `Error: ${error && error.message ? error.message : error}`
+            ].join('\n');
+            document.getElementById('tokenDebugText').textContent = dbg;
+            document.getElementById('tokenDebug').style.display = 'block';
+        }
+    }
+    
+    async function queryData() {
+        const token = document.getElementById('accessToken').value.trim();
+        const apiName = document.getElementById('apiName').value;
+        const paramsText = document.getElementById('params').value.trim();
+        const forceRefresh = document.getElementById('forceRefresh').checked;
+        
+        if (!token) {
+            alert('请先获取访问令牌');
+            return;
+        }
+        
+        let params;
+        try {
+            params = JSON.parse(paramsText);
+        } catch (e) {
+            alert('参数格式错误，请输入有效的 JSON');
+            return;
+        }
+        
+        document.getElementById('queryResult').style.display = 'none';
+        document.getElementById('queryError').style.display = 'none';
+        
+        try {
+            const url = new URL((baseUrl || '/') + 'api/tushare/query', window.location.origin).toString();
+            const started = Date.now();
+            const payload = { apiName, params, forceRefresh };
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token
+                },
+                body: JSON.stringify(payload)
+            });
+            
+            // 优先尝试解析 JSON，不可解析时读取纯文本
+            let data;
+            let textBody = '';
+            try {
+                data = await response.clone().json();
+            } catch (_) {
+                textBody = await response.text();
+                data = {};
+            }
+
+            if (response.ok && data.code === 0) {
+                document.getElementById('responseData').textContent = JSON.stringify(data, null, 2);
+                document.getElementById('queryResult').style.display = 'block';
+            } else {
+                let msg = data.message || textBody || ('HTTP ' + response.status);
+                
+                // 特殊处理 401 Token 过期
+                if (response.status === 401) {
+                    const authHeader = response.headers.get('www-authenticate') || '';
+                    if (authHeader.includes('expired')) {
+                        msg = 'Token 已过期（有效期 2 小时），请重新获取访问令牌';
+                        document.getElementById('accessToken').value = ''; // 清空过期 Token
+                    } else {
+                        msg = 'Token 无效或已失效，请重新获取访问令牌';
+                    }
+                }
+                
+                document.getElementById('queryError').textContent = '查询失败: ' + msg;
+                document.getElementById('queryError').style.display = 'block';
+            }
+
+            // 调试信息输出
+            const elapsed = Date.now() - started;
+            const contentType = response.headers.get('content-type') || '';
+            const debugBody = data && Object.keys(data).length ? JSON.stringify(data, null, 2) : (textBody || '(empty)');
+            const headersDump = Array.from(response.headers.entries()).map(([k,v]) => `${k}: ${v}`).join('\n');
+            const tokenMasked = token.substring(0, 20) + '...' + token.substring(token.length - 20);
+            const dbg = [
+                `Time: ${new Date().toISOString()}`,
+                `URL: ${url}`,
+                `Method: POST`,
+                `Status: ${response.status} ${response.statusText}`,
+                `Duration: ${elapsed} ms`,
+                `Token: ${tokenMasked}`,
+                `Request: ${JSON.stringify(payload, null, 2)}`,
+                `Headers:\n${headersDump}`,
+                `Body:\n${debugBody}`
+            ].join('\n');
+            document.getElementById('queryDebugText').textContent = dbg;
+            document.getElementById('queryDebug').style.display = 'block';
+        } catch (error) {
+            document.getElementById('queryError').textContent = '请求失败: ' + error.message;
+            document.getElementById('queryError').style.display = 'block';
+
+            // 调试信息（异常）
+            const dbg = [
+                `Time: ${new Date().toISOString()}`,
+                `URL: ${(baseUrl || '/') + 'api/tushare/query'}`,
+                `Method: POST`,
+                `Error: ${error && error.message ? error.message : error}`
+            ].join('\n');
+            document.getElementById('queryDebugText').textContent = dbg;
+            document.getElementById('queryDebug').style.display = 'block';
+        }
+    }
+
+    function copyDebugInfo(elementId) {
+        const text = document.getElementById(elementId).textContent;
+        navigator.clipboard.writeText(text).then(() => {
+            alert('调试信息已复制到剪贴板');
+        }).catch(err => {
+            alert('复制失败: ' + err);
+        });
+    }
+</script>

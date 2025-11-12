@@ -6,7 +6,10 @@ using Serilog;
 using Serilog.Events;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.AspNetCore.Http;
+using MyKeyVault.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -50,10 +53,45 @@ builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
         // 用户名允许邮箱或手机号（Identity 自带 Email 与 PhoneNumber 字段）
         options.User.RequireUniqueEmail = false; // 邮箱或手机号二选一，允许邮箱非唯一，登录逻辑后续自定义
     })
+    .AddRoles<IdentityRole>() // 添加角色支持
     .AddEntityFrameworkStores<ApplicationDbContext>();
 
 // 注册邮件发送服务
 builder.Services.AddTransient<Microsoft.AspNetCore.Identity.UI.Services.IEmailSender, MyKeyVault.Web.Services.EmailSender>();
+
+// 缩短 SecurityStamp 校验间隔，便于角色变更后尽快生效（默认30分钟）
+builder.Services.Configure<Microsoft.AspNetCore.Identity.SecurityStampValidatorOptions>(o =>
+{
+    o.ValidationInterval = TimeSpan.FromMinutes(1);
+});
+
+// Tushare 服务配置
+builder.Services.Configure<MyKeyVault.Web.Services.TushareOptions>(
+    builder.Configuration.GetSection(MyKeyVault.Web.Services.TushareOptions.SectionName));
+builder.Services.AddHttpClient<MyKeyVault.Web.Services.TushareApiService>();
+builder.Services.AddScoped<MyKeyVault.Web.Services.TushareAuthService>();
+builder.Services.AddScoped<MyKeyVault.Web.Services.TushareDataService>();
+
+// JWT 认证（用于 Tushare API）
+builder.Services.AddAuthentication()
+    .AddJwtBearer("TushareBearer", options =>
+    {
+        var tushareConfig = builder.Configuration.GetSection(MyKeyVault.Web.Services.TushareOptions.SectionName);
+        var jwtSecret = tushareConfig.GetValue<string>("JwtSecret") ?? throw new InvalidOperationException("Tushare:JwtSecret not configured");
+        
+        options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = "MyKeyVault.Tushare",
+            ValidAudience = "TushareClient",
+            IssuerSigningKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(
+                System.Text.Encoding.UTF8.GetBytes(jwtSecret))
+        };
+    });
+
 // Cookie 设置：支持小程序 HTTPS 跨域携带与 API 直接返回 401/403
 builder.Services.ConfigureApplicationCookie(options =>
 {
@@ -258,5 +296,11 @@ app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
 app.MapRazorPages();
+
+// 初始化管理员
+using (var scope = app.Services.CreateScope())
+{
+    await AdminInitializer.InitializeAsync(scope.ServiceProvider);
+}
 
 app.Run();

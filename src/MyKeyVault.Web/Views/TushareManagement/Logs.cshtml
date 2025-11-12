@@ -1,0 +1,102 @@
+@model List<MyKeyVault.Web.Models.CallLog>
+@{
+    ViewData["Title"] = "调用日志";
+    var page = (int)ViewBag.Page;
+    var totalPages = (int)ViewBag.TotalPages;
+    var total = (int)ViewBag.Total;
+}
+
+<link rel="stylesheet" href="~/css/sap-ui.css" />
+
+<div class="sap-page">
+    <div class="container">
+        <div class="sap-object-page">
+            <div class="sap-object-header">
+                <h2>调用日志</h2>
+                <div class="subtitle">查看 Tushare API 调用记录</div>
+            </div>
+
+            <div class="sap-toolbar">
+                <div>
+                    <span style="font-size: 14px; color: #6a6d70;">共 @total 条记录</span>
+                </div>
+                <div>
+                    <a href="@Url.Action("Apps")" class="sap-button sap-button-secondary">返回应用管理</a>
+                </div>
+            </div>
+
+            <table class="sap-table">
+                <thead>
+                    <tr>
+                        <th>时间</th>
+                        <th>App ID</th>
+                        <th>接口</th>
+                        <th>耗时(ms)</th>
+                        <th>状态</th>
+                        <th>请求ID</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="6" style="text-align: center; color: #6a6d70; padding: 2rem;">
+                                暂无调用记录
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var log in Model)
+                        {
+                            <tr>
+                                <td>@log.RequestAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</td>
+                                <td><span style="font-family: monospace; font-size: 12px;">@log.AppId</span></td>
+                                <td><strong>@log.ApiName</strong></td>
+                                <td>@log.DurationMs</td>
+                                <td>
+                                    @if (log.StatusCode == 200)
+                                    {
+                                        <span class="sap-badge sap-badge-success">成功</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="sap-badge sap-badge-danger">@log.StatusCode</span>
+                                    }
+                                </td>
+                                <td><span style="font-family: monospace; font-size: 11px;">@log.RequestId</span></td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+
+            @if (totalPages > 1)
+            {
+                <div class="sap-pagination">
+                    @if (page > 1)
+                    {
+                        <a href="?page=@(page - 1)">上一页</a>
+                    }
+
+                    @for (int i = Math.Max(1, page - 2); i <= Math.Min(totalPages, page + 2); i++)
+                    {
+                        if (i == page)
+                        {
+                            <span class="active">@i</span>
+                        }
+                        else
+                        {
+                            <a href="?page=@i">@i</a>
+                        }
+                    }
+
+                    @if (page < totalPages)
+                    {
+                        <a href="?page=@(page + 1)">下一页</a>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>

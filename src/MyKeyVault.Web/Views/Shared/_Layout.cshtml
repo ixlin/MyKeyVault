@@ -28,6 +28,12 @@
                         <li class="nav-item">
                             <a class="nav-link text-dark" asp-area="" asp-controller="Tags" asp-action="Index">标签</a>
                         </li>
+                        @if (User?.Identity?.IsAuthenticated == true && User.IsInRole("Admin"))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-controller="TushareManagement" asp-action="Apps">上市公司数据</a>
+                            </li>
+                        }
                     </ul>
                     @* 移除解锁区域 *@
                     <partial name="_LoginPartial" />

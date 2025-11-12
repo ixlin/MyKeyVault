@@ -17,6 +17,15 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<UserKeys> UserKeys => Set<UserKeys>();
     public DbSet<TermsAcceptance> TermsAcceptances => Set<TermsAcceptance>();
 
+    // Tushare 数据表
+    public DbSet<TushareApp> TushareApps => Set<TushareApp>();
+    public DbSet<CallLog> CallLogs => Set<CallLog>();
+    public DbSet<StockBasic> StockBasics => Set<StockBasic>();
+    public DbSet<StockDaily> StockDailies => Set<StockDaily>();
+    public DbSet<IncomeStatement> IncomeStatements => Set<IncomeStatement>();
+    public DbSet<BalanceSheet> BalanceSheets => Set<BalanceSheet>();
+    public DbSet<CashflowStatement> CashflowStatements => Set<CashflowStatement>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -55,6 +64,19 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
         {
             e.HasIndex(x => new { x.UserId, x.Version }).IsUnique();
             e.Property(x => x.Version).HasMaxLength(64).IsRequired();
+        });
+
+        // Tushare 表配置
+        builder.Entity<TushareApp>(e =>
+        {
+            e.HasIndex(x => x.AppId).IsUnique();
+            e.HasIndex(x => x.UserId);
+        });
+
+        builder.Entity<CallLog>(e =>
+        {
+            e.HasIndex(x => new { x.AppId, x.RequestAt });
+            e.HasIndex(x => x.ApiName);
         });
     }
 }

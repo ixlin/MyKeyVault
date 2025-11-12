@@ -29,5 +29,12 @@
     "FromName": "${SMTP_FROM_NAME:-MyKeyVault}",
     "ThrowOnError": false
   },
+  "Tushare": {
+    "Token": "${TUSHARE_TOKEN}",
+    "BaseUrl": "http://api.tushare.pro",
+    "JwtSecret": "${TUSHARE_JWT_SECRET}",
+    "JwtExpiresInSeconds": 7200,
+    "EncryptionKey": "${TUSHARE_ENCRYPTION_KEY}"
+  },
   "AllowedHosts": "*"
 }

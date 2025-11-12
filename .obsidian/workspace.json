@@ -4,21 +4,19 @@
     "type": "split",
     "children": [
       {
-        "id": "76082a522f6fcdda",
+        "id": "1cc2841ecfd77549",
         "type": "tabs",
         "children": [
           {
-            "id": "98791d39ecbac056",
+            "id": "125e66f8b3df73d2",
             "type": "leaf",
             "state": {
-              "type": "markdown",
+              "type": "release-notes",
               "state": {
-                "file": "release/渐进式加密方案_v2.md",
-                "mode": "source",
-                "source": false
+                "currentVersion": "1.9.14"
               },
-              "icon": "lucide-file",
-              "title": "渐进式加密方案_v2"
+              "icon": "lucide-book-up",
+              "title": "版本说明 1.9.14"
             }
           }
         ]
@@ -169,9 +167,10 @@
       "bases:创建新数据库": false
     }
   },
-  "active": "98791d39ecbac056",
+  "active": "125e66f8b3df73d2",
   "lastOpenFiles": [
-    "release/E2EE_端到端加密方案_v1.md",
-    "release/渐进式加密方案_v2.md"
+    "release/简化加密方案.md",
+    "release/渐进式加密方案_v2.md",
+    "release/E2EE_端到端加密方案_v1.md"
   ]
 }

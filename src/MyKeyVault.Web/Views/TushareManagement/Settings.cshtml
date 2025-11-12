@@ -1,0 +1,80 @@
+@{
+    ViewData["Title"] = "系统设置";
+}
+
+<link rel="stylesheet" href="~/css/sap-ui.css" />
+
+<div class="sap-page">
+    <div class="container">
+        <div class="sap-object-page">
+            <div class="sap-object-header">
+                <h2>系统设置</h2>
+                <div class="subtitle">Tushare API Token 配置</div>
+            </div>
+
+            <div class="sap-toolbar">
+                <div></div>
+                <div>
+                    <a href="@Url.Action("Apps")" class="sap-button sap-button-secondary">返回应用管理</a>
+                </div>
+            </div>
+
+            <div style="padding: 2rem;">
+                <div id="result-message" style="margin-bottom: 15px; display: none;"></div>
+                
+                <div class="sap-card">
+                    <div class="sap-card-header">Tushare Token</div>
+                    
+                    <div style="margin-top: 1rem;">
+                        <div class="sap-form-group">
+                            <label class="sap-label">Token</label>
+                            <textarea id="token-input" class="sap-input" placeholder="请输入 Tushare Token" 
+                                      style="width: 100%; max-width: 820px; height: 96px; font-family: Menlo, Monaco, Consolas, 'Courier New', monospace;">@((ViewBag.TushareToken ?? "") as string)</textarea>
+                        </div>
+
+                        <div class="sap-form-group" style="margin-top: 1.5rem;">
+                            <button onclick="saveToken()" class="sap-button">保存</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    async function saveToken() {
+        const token = document.getElementById('token-input').value.trim();
+        if (!token) {
+            showMessage('请输入 Token', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch('@Url.Action("SaveToken", "TushareManagement")', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ token: token })
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                showMessage(result.message, 'success');
+                document.getElementById('token-input').value = '';
+            } else {
+                showMessage(result.message || '保存失败', 'error');
+            }
+        } catch (error) {
+            showMessage('请求失败: ' + error.message, 'error');
+        }
+    }
+
+    function showMessage(message, type) {
+        const div = document.getElementById('result-message');
+        div.className = type === 'success' ? 'sap-message sap-message-success' : 'sap-message sap-message-error';
+        div.textContent = message;
+        div.style.display = 'block';
+    }
+</script>

@@ -1,0 +1,62 @@
+@{
+    ViewData["Title"] = "数据统计";
+}
+
+<link rel="stylesheet" href="~/css/sap-ui.css" />
+
+<div class="sap-page">
+    <div class="container">
+        <div class="sap-object-page">
+            <div class="sap-object-header">
+                <h2>数据统计</h2>
+                <div class="subtitle">Tushare 本地数据库统计信息</div>
+            </div>
+
+            <div class="sap-toolbar">
+                <div></div>
+                <div>
+                    <a href="@Url.Action("Apps")" class="sap-button sap-button-secondary">返回应用管理</a>
+                </div>
+            </div>
+
+            <div style="padding: 2rem;">
+                <div class="sap-stats-grid">
+                    <div class="sap-stat-card">
+                        <div class="sap-stat-value">@ViewBag.StockBasicCount</div>
+                        <div class="sap-stat-label">股票列表</div>
+                    </div>
+
+                    <div class="sap-stat-card">
+                        <div class="sap-stat-value">@ViewBag.StockDailyCount</div>
+                        <div class="sap-stat-label">日线数据</div>
+                    </div>
+
+                    <div class="sap-stat-card">
+                        <div class="sap-stat-value">@ViewBag.IncomeCount</div>
+                        <div class="sap-stat-label">利润表</div>
+                    </div>
+
+                    <div class="sap-stat-card">
+                        <div class="sap-stat-value">@ViewBag.BalanceCount</div>
+                        <div class="sap-stat-label">资产负债表</div>
+                    </div>
+
+                    <div class="sap-stat-card">
+                        <div class="sap-stat-value">@ViewBag.CashflowCount</div>
+                        <div class="sap-stat-label">现金流量表</div>
+                    </div>
+                </div>
+
+                <div class="sap-card" style="margin-top: 2rem;">
+                    <div class="sap-card-header">说明</div>
+                    <ul style="color: #6a6d70; font-size: 14px; line-height: 1.8;">
+                        <li>以上数据为本地数据库中已缓存的记录数量</li>
+                        <li>首次调用 API 时会自动从 Tushare 拉取数据并持久化</li>
+                        <li>后续相同查询将直接从本地数据库返回，无需重复调用 Tushare</li>
+                        <li>历史数据（如已过交易日的日线）将永久保存</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
