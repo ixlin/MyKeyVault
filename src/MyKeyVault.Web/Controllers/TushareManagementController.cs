@@ -201,60 +201,91 @@ public class TushareManagementController : Controller
     }
 
     /// <summary>
-    /// Tushare Token 配置
+    /// Tushare 配置页面
     /// </summary>
     [HttpGet("settings")]
     public IActionResult Settings()
     {
-        // 优先读取环境变量（生产可通过环境变量覆盖）
-        var envToken = Environment.GetEnvironmentVariable("TUSHARE__TOKEN");
-        string token = string.Empty;
+        var config = new TushareConfigViewModel
+        {
+            Token = string.Empty,
+            BaseUrl = "http://api.tushare.pro",
+            JwtSecret = string.Empty,
+            JwtExpiresInSeconds = 7200,
+            EncryptionKey = string.Empty
+        };
 
-        if (!string.IsNullOrWhiteSpace(envToken))
+        try
         {
-            token = envToken.Trim();
-        }
-        else
-        {
-            try
+            var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production";
+            // 读取文件优先级：
+            // Development: appsettings.Development.json -> appsettings.json
+            // Production:  appsettings.Production.json  -> appsettings.json
+            var candidates = env == "Development"
+                ? new[] { "appsettings.Development.json", "appsettings.json" }
+                : new[] { "appsettings.Production.json", "appsettings.json" };
+
+            foreach (var file in candidates)
             {
-                var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production";
-                var fileName = env == "Development" ? "appsettings.Development.json" : "appsettings.json";
-                var filePath = Path.Combine(Directory.GetCurrentDirectory(), fileName);
+                var filePath = Path.Combine(Directory.GetCurrentDirectory(), file);
+                if (!System.IO.File.Exists(filePath)) continue;
 
-                if (System.IO.File.Exists(filePath))
+                var json = System.IO.File.ReadAllText(filePath);
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                if (doc.RootElement.TryGetProperty("Tushare", out var tushareElem)
+                    && tushareElem.ValueKind == System.Text.Json.JsonValueKind.Object)
                 {
-                    var json = System.IO.File.ReadAllText(filePath);
-                    using var doc = System.Text.Json.JsonDocument.Parse(json);
-                    if (doc.RootElement.TryGetProperty("Tushare", out var tushareElem)
-                        && tushareElem.ValueKind == System.Text.Json.JsonValueKind.Object
-                        && tushareElem.TryGetProperty("Token", out var tokenElem)
-                        && tokenElem.ValueKind == System.Text.Json.JsonValueKind.String)
-                    {
-                        token = tokenElem.GetString() ?? string.Empty;
-                    }
+                    if (tushareElem.TryGetProperty("Token", out var tokenElem))
+                        config.Token = tokenElem.GetString() ?? string.Empty;
+                    
+                    if (tushareElem.TryGetProperty("BaseUrl", out var baseUrlElem))
+                        config.BaseUrl = baseUrlElem.GetString() ?? "http://api.tushare.pro";
+                    
+                    if (tushareElem.TryGetProperty("JwtSecret", out var jwtSecretElem))
+                        config.JwtSecret = jwtSecretElem.GetString() ?? string.Empty;
+                    
+                    if (tushareElem.TryGetProperty("JwtExpiresInSeconds", out var expiresElem))
+                        config.JwtExpiresInSeconds = expiresElem.TryGetInt32(out var exp) ? exp : 7200;
+                    
+                    if (tushareElem.TryGetProperty("EncryptionKey", out var encKeyElem))
+                        config.EncryptionKey = encKeyElem.GetString() ?? string.Empty;
+                    
+                    break;
                 }
             }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "读取已保存的 Tushare Token 失败");
-            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "读取已保存的 Tushare 配置失败");
         }
 
-        ViewBag.TushareToken = token; // 传递到视图用于预填充
+        ViewBag.TushareConfig = config;
         return View();
     }
 
     /// <summary>
-    /// 保存 Tushare Token
+    /// 保存 Tushare 配置
     /// </summary>
-    [HttpPost("settings/save-token")]
-    public async Task<IActionResult> SaveToken([FromBody] SaveTokenRequest request)
+    [HttpPost("settings/save")]
+    public async Task<IActionResult> SaveSettings([FromBody] SaveTushareConfigRequest request)
     {
         try
         {
             var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production";
-            var fileName = env == "Development" ? "appsettings.Development.json" : "appsettings.json";
+            // 写入文件优先级：
+            // Development: appsettings.Development.json
+            // Production:  appsettings.Production.json（若不存在则回落到 appsettings.json）
+            string fileName;
+            if (env == "Development")
+            {
+                fileName = "appsettings.Development.json";
+            }
+            else
+            {
+                var prodPath = Path.Combine(Directory.GetCurrentDirectory(), "appsettings.Production.json");
+                fileName = System.IO.File.Exists(prodPath) ? "appsettings.Production.json" : "appsettings.json";
+            }
+
             var filePath = Path.Combine(Directory.GetCurrentDirectory(), fileName);
 
             string json;
@@ -293,18 +324,30 @@ public class TushareManagementController : Controller
                 tushareDict = new Dictionary<string, object>();
             }
 
-            // 更新 Token
-            tushareDict["Token"] = request.Token;
-
-            // 设置默认值（若缺失）
-            if (!tushareDict.ContainsKey("BaseUrl"))
-                tushareDict["BaseUrl"] = "http://api.tushare.pro";
-            if (!tushareDict.ContainsKey("JwtSecret"))
+            // 更新配置项
+            tushareDict["Token"] = request.Token ?? string.Empty;
+            tushareDict["BaseUrl"] = request.BaseUrl ?? "http://api.tushare.pro";
+            tushareDict["JwtExpiresInSeconds"] = request.JwtExpiresInSeconds;
+            
+            // 如果用户输入了 JwtSecret，使用用户输入；否则生成新的（如果不存在）
+            if (!string.IsNullOrWhiteSpace(request.JwtSecret))
+            {
+                tushareDict["JwtSecret"] = request.JwtSecret;
+            }
+            else if (!tushareDict.ContainsKey("JwtSecret") || string.IsNullOrWhiteSpace(tushareDict["JwtSecret"]?.ToString()))
+            {
                 tushareDict["JwtSecret"] = GenerateRandomKey();
-            if (!tushareDict.ContainsKey("JwtExpiresInSeconds"))
-                tushareDict["JwtExpiresInSeconds"] = 7200;
-            if (!tushareDict.ContainsKey("EncryptionKey"))
+            }
+            
+            // 如果用户输入了 EncryptionKey，使用用户输入；否则生成新的（如果不存在）
+            if (!string.IsNullOrWhiteSpace(request.EncryptionKey))
+            {
+                tushareDict["EncryptionKey"] = request.EncryptionKey;
+            }
+            else if (!tushareDict.ContainsKey("EncryptionKey") || string.IsNullOrWhiteSpace(tushareDict["EncryptionKey"]?.ToString()))
+            {
                 tushareDict["EncryptionKey"] = GenerateRandomKey();
+            }
 
             settings["Tushare"] = tushareDict;
 
@@ -321,9 +364,18 @@ public class TushareManagementController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "保存 Tushare Token 失败");
+            _logger.LogError(ex, "保存 Tushare 配置失败");
             return BadRequest(new { success = false, message = $"保存失败: {ex.Message}" });
         }
+    }
+
+    /// <summary>
+    /// 生成随机密钥（用于表单上的生成按钮）
+    /// </summary>
+    [HttpPost("settings/generate-key")]
+    public IActionResult GenerateKey()
+    {
+        return Ok(new { key = GenerateRandomKey() });
     }
 
     private string GenerateRandomKey()
@@ -356,7 +408,20 @@ public class TushareManagementController : Controller
     }
 }
 
-public class SaveTokenRequest
+public class SaveTushareConfigRequest
+{
+    public string? Token { get; set; }
+    public string? BaseUrl { get; set; }
+    public string? JwtSecret { get; set; }
+    public int JwtExpiresInSeconds { get; set; } = 7200;
+    public string? EncryptionKey { get; set; }
+}
+
+public class TushareConfigViewModel
 {
     public string Token { get; set; } = string.Empty;
+    public string BaseUrl { get; set; } = string.Empty;
+    public string JwtSecret { get; set; } = string.Empty;
+    public int JwtExpiresInSeconds { get; set; }
+    public string EncryptionKey { get; set; } = string.Empty;
 }
