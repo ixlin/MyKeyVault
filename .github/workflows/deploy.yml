@@ -39,18 +39,53 @@ jobs:
 
     # 第四步：将编译好的文件部署到服务器
 
-    # 第五步：通过 SCP 将发布文件复制到服务器
-    - name: Copy files via SCP
+    # 第五步：通过 SCP 将发布文件复制到服务器的临时目录（避免目标目录权限问题）
+    - name: Copy files to temp via SCP
       uses: appleboy/scp-action@master
       with:
         host: ${{ secrets.SERVER_HOST }}
         username: ${{ secrets.SERVER_USER }}
         key: ${{ secrets.SERVER_SSH_KEY }}
         source: "./publish/*" # 将 publish 文件夹下的所有内容
-        target: "/var/www/mykeyvault/" # 复制到服务器的目标目录
+        target: "/tmp/mykv_release_${{ github.sha }}" # 复制到服务器的临时目录
         strip_components: 1 # 移除 publish 这一层目录
 
-    # 第六步：在服务器上重启服务
+    # 第六步：在服务器上用 rsync 同步到正式目录，并保护配置文件
+    - name: Sync release to target via rsync
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SERVER_SSH_KEY }}
+        script: |
+          set -e
+          SRC_DIR="/tmp/mykv_release_${GITHUB_SHA}"
+          DEST_DIR="/var/www/mykeyvault/"
+          echo "Source: $SRC_DIR"
+          echo "Destination: $DEST_DIR"
+          
+          # 确保目标目录存在
+          sudo -n mkdir -p "$DEST_DIR"
+          
+          # 校验 rsync 是否可用
+          if ! command -v rsync >/dev/null 2>&1; then
+            echo "ERROR: rsync not installed on remote host" >&2
+            exit 1
+          fi
+          
+          # 同步文件到正式目录，排除本地可变配置，避免覆盖线上通过后台保存的配置
+          # --delete 保持目录一致；如需保留历史文件，可移除此参数
+          sudo -n rsync -a --delete \
+            --exclude 'appsettings*.json' \
+            "$SRC_DIR/" "$DEST_DIR/"
+          
+          # 为所有文件提供只读兜底权限（确保服务账户可读）
+          sudo -n chmod -R o+r "$DEST_DIR"
+          
+          # 清理临时目录
+          rm -rf "$SRC_DIR"
+
+    # 第七步：在服务器上重启服务
     # 数据库迁移会在应用启动时自动执行（参见 Program.cs）
     - name: Restart Service on Server
       uses: appleboy/ssh-action@master
@@ -60,9 +95,6 @@ jobs:
         key: ${{ secrets.SERVER_SSH_KEY }}
         script: |
           set -e
-          echo "Setting read permissions for application files..."
-          # 赋予其他用户读取文件的权限，这样无论服务以何用户运行都能读取配置
-          chmod -R o+r /var/www/mykeyvault
           echo "Restarting mykeyvault service..."
           # 使用我们之前配置好的免密 sudo 权限来重启服务
           sudo -n systemctl restart mykeyvault.service
