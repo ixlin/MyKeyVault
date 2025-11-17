@@ -59,7 +59,8 @@ jobs:
         key: ${{ secrets.SERVER_SSH_KEY }}
         script: |
           set -e
-          SRC_DIR="/tmp/mykv_release_${GITHUB_SHA}"
+          # 注意：这里必须在工作流渲染阶段注入 SHA，而不是依赖远端环境变量
+          SRC_DIR="/tmp/mykv_release_${{ github.sha }}"
           DEST_DIR="/var/www/mykeyvault/"
           echo "Source: $SRC_DIR"
           echo "Destination: $DEST_DIR"
@@ -67,17 +68,20 @@ jobs:
           # 确保目标目录存在
           sudo -n mkdir -p "$DEST_DIR"
           
-          # 校验 rsync 是否可用
-          if ! command -v rsync >/dev/null 2>&1; then
-            echo "ERROR: rsync not installed on remote host" >&2
-            exit 1
+          if command -v rsync >/dev/null 2>&1; then
+            echo "Using rsync for synchronization"
+            # 同步文件到正式目录，排除本地可变配置，避免覆盖线上通过后台保存的配置
+            # --delete 保持目录一致；如需保留历史文件，可移除此参数
+            sudo -n rsync -a --delete \
+              --exclude 'appsettings*.json' \
+              "$SRC_DIR/" "$DEST_DIR/"
+          else
+            echo "rsync not found on remote host, falling back to tar+find copy"
+            # 1) 删除目标目录中除 appsettings*.json 以外的所有内容，达到“删除同步”效果
+            sudo -n find "$DEST_DIR" -mindepth 1 -not -name 'appsettings*.json' -exec rm -rf {} +
+            # 2) 将发布产物打包流式传输到目标目录，同时排除 appsettings*.json，避免覆盖线上配置
+            sudo -n tar -C "$SRC_DIR" --exclude='appsettings*.json' -cf - . | sudo -n tar -C "$DEST_DIR" -xpf -
           fi
-          
-          # 同步文件到正式目录，排除本地可变配置，避免覆盖线上通过后台保存的配置
-          # --delete 保持目录一致；如需保留历史文件，可移除此参数
-          sudo -n rsync -a --delete \
-            --exclude 'appsettings*.json' \
-            "$SRC_DIR/" "$DEST_DIR/"
           
           # 为所有文件提供只读兜底权限（确保服务账户可读）
           sudo -n chmod -R o+r "$DEST_DIR"
