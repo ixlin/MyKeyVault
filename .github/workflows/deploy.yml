@@ -85,6 +85,22 @@ jobs:
           
           # 为所有文件提供只读兜底权限（确保服务账户可读）
           sudo -n chmod -R o+r "$DEST_DIR"
+
+          # 确保后台可写配置文件：appsettings.Production.json
+          # 自动探测运行 mykeyvault.service 的用户，优先使用单元文件中的 User=
+          SERVICE_USER=$(systemctl show -p User mykeyvault.service | cut -d= -f2)
+          if [ -z "$SERVICE_USER" ]; then
+            # 若未显式设置，尝试常见的 www-data，否则退回当前用户
+            if id www-data >/dev/null 2>&1; then SERVICE_USER=www-data; else SERVICE_USER=$(whoami); fi
+          fi
+          echo "Service will own config as: $SERVICE_USER"
+
+          CFG_FILE="$DEST_DIR/appsettings.Production.json"
+          # 如果文件不存在则创建；不覆盖内容，仅保证存在与权限
+          sudo -n touch "$CFG_FILE"
+          # 将文件属主设为服务账户，并授予可写权限（rw-rw-r--）
+          sudo -n chown "$SERVICE_USER":"$SERVICE_USER" "$CFG_FILE" || true
+          sudo -n chmod 664 "$CFG_FILE" || true
           
           # 清理临时目录
           rm -rf "$SRC_DIR"
