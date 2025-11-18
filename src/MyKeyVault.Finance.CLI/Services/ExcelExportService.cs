@@ -1,55 +1,42 @@
-using OfficeOpenXml;
+using ClosedXML.Excel;
 using System.Text.Json;
 
 namespace MyKeyVault.Finance.CLI.Services;
 
 public class ExcelExportService
 {
-    public ExcelExportService()
-    {
-        // EPPlus 8 不再需要在代码中设置许可证，而是在创建 ExcelPackage 时传递参数
-    }
-
-    /// <summary>
-    /// 导出三大财报到 Excel
-    /// </summary>
     public void ExportFinancialStatements(
         string filePath,
         JsonElement? balanceSheetData,
         JsonElement? incomeStatementData,
         JsonElement? cashflowData)
     {
-        // EPPlus 8 使用新的方式设置许可证
-        using var package = new ExcelPackage(new FileInfo(filePath));
+        using var workbook = new XLWorkbook();
 
-        // 创建三个 Sheet
         if (balanceSheetData.HasValue && balanceSheetData.Value.ValueKind != JsonValueKind.Null)
         {
-            CreateBalanceSheetWorksheet(package, balanceSheetData.Value);
+            CreateBalanceSheetWorksheet(workbook, balanceSheetData.Value);
         }
 
         if (incomeStatementData.HasValue && incomeStatementData.Value.ValueKind != JsonValueKind.Null)
         {
-            CreateIncomeStatementWorksheet(package, incomeStatementData.Value);
+            CreateIncomeStatementWorksheet(workbook, incomeStatementData.Value);
         }
 
         if (cashflowData.HasValue && cashflowData.Value.ValueKind != JsonValueKind.Null)
         {
-            CreateCashflowWorksheet(package, cashflowData.Value);
+            CreateCashflowWorksheet(workbook, cashflowData.Value);
         }
 
-        // 保存文件
-        package.Save();
+        workbook.SaveAs(filePath);
     }
 
-    private void CreateBalanceSheetWorksheet(ExcelPackage package, JsonElement data)
+    private void CreateBalanceSheetWorksheet(XLWorkbook workbook, JsonElement data)
     {
-        var worksheet = package.Workbook.Worksheets.Add("资产负债表");
-        
-        // 定义字段映射 (API字段名 -> 中文名称)
+        var worksheet = workbook.Worksheets.Add("资产负债表");
         var fieldMappings = new Dictionary<string, string>
         {
-            { "ts_code", "股票代码" },
+            { "ts_code", "TS股票代码" },
             { "ann_date", "公告日期" },
             { "f_ann_date", "实际公告日期" },
             { "end_date", "报告期" },
@@ -101,26 +88,126 @@ public class ExcelExportService
             { "decr_in_disbur", "发放贷款及垫款" },
             { "oth_nca", "其他非流动资产" },
             { "total_nca", "非流动资产合计" },
+            { "cash_reser_cb", "现金及存放中央银行款项" },
+            { "depos_in_oth_bfi", "存放同业和其它金融机构款项" },
+            { "prec_metals", "贵金属" },
+            { "deriv_assets", "衍生金融资产" },
+            { "rr_reins_une_prem", "应收分保未到期责任准备金" },
+            { "rr_reins_outstd_cla", "应收分保未决赔款准备金" },
+            { "rr_reins_lins_liab", "应收分保寿险责任准备金" },
+            { "rr_reins_lthins_liab", "应收分保长期健康险责任准备金" },
+            { "refund_depos", "存出保证金" },
+            { "ph_pledge_loans", "保户质押贷款" },
+            { "refund_cap_depos", "存出资本保证金" },
+            { "indep_acct_assets", "独立账户资产" },
+            { "client_depos", "其中:客户资金存款" },
+            { "client_prov", "其中:客户备付金" },
+            { "transac_seat_fee", "其中:交易席位费" },
+            { "invest_as_receiv", "应收款项类投资" },
             { "total_assets", "资产总计" },
+            { "lt_borr", "长期借款" },
+            { "st_borr", "短期借款" },
+            { "cb_borr", "向中央银行借款" },
+            { "depos_ib_deposits", "吸收存款及同业存放" },
+            { "loan_oth_bank", "拆入资金" },
+            { "trading_fl", "交易性金融负债" },
+            { "notes_payable", "应付票据" },
+            { "acct_payable", "应付账款" },
+            { "adv_receipts", "预收款项" },
+            { "sold_for_repur_fa", "卖出回购金融资产款" },
+            { "comm_payable", "应付手续费及佣金" },
+            { "payroll_payable", "应付职工薪酬" },
+            { "taxes_payable", "应交税费" },
+            { "int_payable", "应付利息" },
+            { "div_payable", "应付股利" },
+            { "oth_payable", "其他应付款" },
+            { "acc_exp", "预提费用" },
+            { "deferred_inc", "递延收益" },
+            { "st_bonds_payable", "应付短期债券" },
+            { "payable_to_reinsurer", "应付分保账款" },
+            { "rsrv_insur_cont", "保险合同准备金" },
+            { "acting_trading_sec", "代理买卖证券款" },
+            { "acting_uw_sec", "代理承销证券款" },
+            { "non_cur_liab_due_1y", "一年内到期的非流动负债" },
+            { "oth_cur_liab", "其他流动负债" },
+            { "total_cur_liab", "流动负债合计" },
+            { "bond_payable", "应付债券" },
+            { "lt_payable", "长期应付款" },
+            { "specific_payables", "专项应付款" },
+            { "estimated_liab", "预计负债" },
+            { "defer_tax_liab", "递延所得税负债" },
+            { "defer_inc_non_cur_liab", "递延收益-非流动负债" },
+            { "oth_ncl", "其他非流动负债" },
+            { "total_ncl", "非流动负债合计" },
+            { "depos_oth_bfi", "同业和其它金融机构存放款项" },
+            { "deriv_liab", "衍生金融负债" },
+            { "depos", "吸收存款" },
+            { "agency_bus_liab", "代理业务负债" },
+            { "oth_liab", "其他负债" },
+            { "prem_receiv_adva", "预收保费" },
+            { "depos_received", "存入保证金" },
+            { "ph_invest", "保户储金及投资款" },
+            { "reser_une_prem", "未到期责任准备金" },
+            { "reser_outstd_claims", "未决赔款准备金" },
+            { "reser_lins_liab", "寿险责任准备金" },
+            { "reser_lthins_liab", "长期健康险责任准备金" },
+            { "indept_acc_liab", "独立账户负债" },
+            { "pledge_borr", "其中:质押借款" },
+            { "indem_payable", "应付赔付款" },
+            { "policy_div_payable", "应付保单红利" },
             { "total_liab", "负债合计" },
+            { "treasury_share", "减:库存股" },
+            { "ordin_risk_reser", "一般风险准备" },
+            { "forex_differ", "外币报表折算差额" },
+            { "invest_loss_unconf", "未确认的投资损失" },
+            { "minority_int", "少数股东权益" },
             { "total_hldr_eqy_exc_min_int", "股东权益合计(不含少数股东权益)" },
-            { "total_hldr_eqy_inc_min_int", "股东权益合计(含少数股东权益)" }
+            { "total_hldr_eqy_inc_min_int", "股东权益合计(含少数股东权益)" },
+            { "total_liab_hldr_eqy", "负债及股东权益总计" },
+            { "lt_payroll_payable", "长期应付职工薪酬" },
+            { "oth_comp_income", "其他综合收益" },
+            { "oth_eqt_tools", "其他权益工具" },
+            { "oth_eqt_tools_p_shr", "其他权益工具(优先股)" },
+            { "lending_funds", "融出资金" },
+            { "acc_receivable", "应收款项" },
+            { "st_fin_payable", "应付短期融资款" },
+            { "payables", "应付款项" },
+            { "hfs_assets", "持有待售的资产" },
+            { "hfs_sales", "持有待售的负债" },
+            { "cost_fin_assets", "以摊余成本计量的金融资产" },
+            { "fair_value_fin_assets", "以公允价值计量且其变动计入其他综合收益的金融资产" },
+            { "cip_total", "在建工程(合计)" },
+            { "oth_pay_total", "其他应付款(合计)" },
+            { "long_pay_total", "长期应付款(合计)" },
+            { "debt_invest", "债权投资" },
+            { "oth_debt_invest", "其他债权投资" },
+            { "oth_eq_invest", "其他权益工具投资" },
+            { "oth_illiq_fin_assets", "其他非流动金融资产" },
+            { "oth_eq_ppbond", "其他权益工具:永续债" },
+            { "receiv_financing", "应收款项融资" },
+            { "use_right_assets", "使用权资产" },
+            { "lease_liab", "租赁负债" },
+            { "contract_assets", "合同资产" },
+            { "contract_liab", "合同负债" },
+            { "accounts_receiv_bill", "应收票据及应收账款" },
+            { "accounts_pay", "应付票据及应付账款" },
+            { "oth_rcv_total", "其他应收款(合计)" },
+            { "fix_assets_total", "固定资产(合计)" },
+            { "update_flag", "更新标识" }
         };
-
         WriteDataToWorksheet(worksheet, data, fieldMappings);
     }
 
-    private void CreateIncomeStatementWorksheet(ExcelPackage package, JsonElement data)
+    private void CreateIncomeStatementWorksheet(XLWorkbook workbook, JsonElement data)
     {
-        var worksheet = package.Workbook.Worksheets.Add("利润表");
-        
+        var worksheet = workbook.Worksheets.Add("利润表");
         var fieldMappings = new Dictionary<string, string>
         {
-            { "ts_code", "股票代码" },
+            { "ts_code", "TS代码" },
             { "ann_date", "公告日期" },
             { "f_ann_date", "实际公告日期" },
             { "end_date", "报告期" },
-            { "report_type", "报表类型" },
+            { "report_type", "报告类型" },
             { "comp_type", "公司类型" },
             { "end_type", "报告期类型" },
             { "basic_eps", "基本每股收益" },
@@ -132,42 +219,42 @@ public class ExcelExportService
             { "comm_income", "手续费及佣金收入" },
             { "n_commis_income", "手续费及佣金净收入" },
             { "n_oth_income", "其他经营净收益" },
-            { "n_oth_b_income", "其他业务净收益" },
+            { "n_oth_b_income", "加:其他业务净收益" },
             { "prem_income", "保险业务收入" },
-            { "out_prem", "分出保费" },
+            { "out_prem", "减:分出保费" },
             { "une_prem_reser", "提取未到期责任准备金" },
-            { "reins_income", "分保费收入" },
+            { "reins_income", "其中:分保费收入" },
             { "n_sec_tb_income", "代理买卖证券业务净收入" },
             { "n_sec_uw_income", "证券承销业务净收入" },
             { "n_asset_mg_income", "受托客户资产管理业务净收入" },
             { "oth_b_income", "其他业务收入" },
-            { "fv_value_chg_gain", "公允价值变动净收益" },
-            { "invest_income", "投资净收益" },
-            { "ass_invest_income", "对联营企业和合营企业的投资收益" },
-            { "forex_gain", "汇兑净收益" },
+            { "fv_value_chg_gain", "加:公允价值变动净收益" },
+            { "invest_income", "加:投资净收益" },
+            { "ass_invest_income", "其中:对联营企业和合营企业的投资收益" },
+            { "forex_gain", "加:汇兑净收益" },
             { "total_cogs", "营业总成本" },
-            { "oper_cost", "营业成本" },
-            { "int_exp", "利息支出" },
-            { "comm_exp", "手续费及佣金支出" },
-            { "biz_tax_surchg", "营业税金及附加" },
-            { "sell_exp", "销售费用" },
-            { "admin_exp", "管理费用" },
-            { "fin_exp", "财务费用" },
-            { "assets_impair_loss", "资产减值损失" },
+            { "oper_cost", "减:营业成本" },
+            { "int_exp", "减:利息支出" },
+            { "comm_exp", "减:手续费及佣金支出" },
+            { "biz_tax_surchg", "减:营业税金及附加" },
+            { "sell_exp", "减:销售费用" },
+            { "admin_exp", "减:管理费用" },
+            { "fin_exp", "减:财务费用" },
+            { "assets_impair_loss", "减:资产减值损失" },
             { "prem_refund", "退保金" },
             { "compens_payout", "赔付总支出" },
             { "reser_insur_liab", "提取保险责任准备金" },
             { "div_payt", "保户红利支出" },
             { "reins_exp", "分保费用" },
             { "oper_exp", "营业支出" },
-            { "compens_payout_refu", "摊回赔付支出" },
-            { "insur_reser_refu", "摊回保险责任准备金" },
-            { "reins_cost_refund", "摊回分保费用" },
+            { "compens_payout_refu", "减:摊回赔付支出" },
+            { "insur_reser_refu", "减:摊回保险责任准备金" },
+            { "reins_cost_refund", "减:摊回分保费用" },
             { "other_bus_cost", "其他业务成本" },
             { "operate_profit", "营业利润" },
-            { "non_oper_income", "营业外收入" },
-            { "non_oper_exp", "营业外支出" },
-            { "nca_disploss", "非流动资产处置净损失" },
+            { "non_oper_income", "加:营业外收入" },
+            { "non_oper_exp", "减:营业外支出" },
+            { "nca_disploss", "其中:减:非流动资产处置净损失" },
             { "total_profit", "利润总额" },
             { "income_tax", "所得税费用" },
             { "n_income", "净利润(含少数股东损益)" },
@@ -175,19 +262,51 @@ public class ExcelExportService
             { "minority_gain", "少数股东损益" },
             { "oth_compr_income", "其他综合收益" },
             { "t_compr_income", "综合收益总额" },
-            { "compr_inc_attr_p", "归属于母公司的综合收益总额" }
+            { "compr_inc_attr_p", "归属于母公司(或股东)的综合收益总额" },
+            { "compr_inc_attr_m_s", "归属于少数股东的综合收益总额" },
+            { "ebit", "息税前利润" },
+            { "ebitda", "息税折旧摊销前利润" },
+            { "insurance_exp", "保险业务支出" },
+            { "undist_profit", "年初未分配利润" },
+            { "distable_profit", "可分配利润" },
+            { "rd_exp", "研发费用" },
+            { "fin_exp_int_exp", "财务费用:利息费用" },
+            { "fin_exp_int_inc", "财务费用:利息收入" },
+            { "transfer_surplus_rese", "盈余公积转入" },
+            { "transfer_housing_imprest", "住房周转金转入" },
+            { "transfer_oth", "其他转入" },
+            { "adj_lossgain", "调整以前年度损益" },
+            { "withdra_legal_surplus", "提取法定盈余公积" },
+            { "withdra_legal_pubfund", "提取法定公益金" },
+            { "withdra_biz_devfund", "提取企业发展基金" },
+            { "withdra_rese_fund", "提取储备基金" },
+            { "withdra_oth_ersu", "提取任意盈余公积金" },
+            { "workers_welfare", "职工奖金福利" },
+            { "distr_profit_shrhder", "可供股东分配的利润" },
+            { "prfshare_payable_dvd", "应付优先股股利" },
+            { "comshare_payable_dvd", "应付普通股股利" },
+            { "capit_comstock_div", "转作股本的普通股股利" },
+            { "net_after_nr_lp_correct", "扣除非经常性损益后的净利润(更正前)" },
+            { "credit_impa_loss", "信用减值损失" },
+            { "net_expo_hedging_benefits", "净敞口套期收益" },
+            { "oth_impair_loss_assets", "其他资产减值损失" },
+            { "total_opcost", "营业总成本(二)" },
+            { "amodcost_fin_assets", "以摊余成本计量的金融资产终止确认收益" },
+            { "oth_income", "其他收益" },
+            { "asset_disp_income", "资产处置收益" },
+            { "continued_net_profit", "持续经营净利润" },
+            { "end_net_profit", "终止经营净利润" },
+            { "update_flag", "更新标识" }
         };
-
         WriteDataToWorksheet(worksheet, data, fieldMappings);
     }
 
-    private void CreateCashflowWorksheet(ExcelPackage package, JsonElement data)
+    private void CreateCashflowWorksheet(XLWorkbook workbook, JsonElement data)
     {
-        var worksheet = package.Workbook.Worksheets.Add("现金流量表");
-        
+        var worksheet = workbook.Worksheets.Add("现金流量表");
         var fieldMappings = new Dictionary<string, string>
         {
-            { "ts_code", "股票代码" },
+            { "ts_code", "TS股票代码" },
             { "ann_date", "公告日期" },
             { "f_ann_date", "实际公告日期" },
             { "end_date", "报告期" },
@@ -225,10 +344,10 @@ public class ExcelExportService
             { "oth_recp_ral_inv_act", "收到其他与投资活动有关的现金" },
             { "c_disp_withdrwl_invest", "收回投资收到的现金" },
             { "c_recp_return_invest", "取得投资收益收到的现金" },
-            { "n_recp_disp_filta", "处置固定资产、无形资产和其他长期资产收回的现金净额" },
+            { "n_recp_disp_fiolta", "处置固定资产、无形资产和其他长期资产收回的现金净额" },
             { "n_recp_disp_sobu", "处置子公司及其他营业单位收到的现金净额" },
             { "stot_inflows_inv_act", "投资活动现金流入小计" },
-            { "c_pay_acq_const_filta", "购建固定资产、无形资产和其他长期资产支付的现金" },
+            { "c_pay_acq_const_fiolta", "购建固定资产、无形资产和其他长期资产支付的现金" },
             { "c_paid_invest", "投资支付的现金" },
             { "n_disp_subs_oth_biz", "取得子公司及其他营业单位支付的现金净额" },
             { "oth_pay_ral_inv_act", "支付其他与投资活动有关的现金" },
@@ -242,71 +361,176 @@ public class ExcelExportService
             { "free_cashflow", "企业自由现金流量" },
             { "c_prepay_amt_borr", "偿还债务支付的现金" },
             { "c_pay_dist_dpcp_int_exp", "分配股利、利润或偿付利息支付的现金" },
-            { "incl_dvd_profit_paid_sc_ms", "子公司支付给少数股东的股利、利润" },
+            { "incl_dvd_profit_paid_sc_ms", "其中:子公司支付给少数股东的股利、利润" },
             { "oth_cashpay_ral_fnc_act", "支付其他与筹资活动有关的现金" },
             { "stot_cashout_fnc_act", "筹资活动现金流出小计" },
             { "n_cash_flows_fnc_act", "筹资活动产生的现金流量净额" },
             { "eff_fx_flu_cash", "汇率变动对现金的影响" },
             { "n_incr_cash_cash_equ", "现金及现金等价物净增加额" },
             { "c_cash_equ_beg_period", "期初现金及现金等价物余额" },
-            { "c_cash_equ_end_period", "期末现金及现金等价物余额" }
+            { "c_cash_equ_end_period", "期末现金及现金等价物余额" },
+            { "c_recp_cap_contrib", "吸收投资收到的现金" },
+            { "incl_cash_rec_saims", "其中:子公司吸收少数股东投资收到的现金" },
+            { "uncon_invest_loss", "未确认投资损失" },
+            { "prov_depr_assets", "加:资产减值准备" },
+            { "depr_fa_coga_dpba", "固定资产折旧、油气资产折耗、生产性生物资产折旧" },
+            { "amort_intang_assets", "无形资产摊销" },
+            { "lt_amort_deferred_exp", "长期待摊费用摊销" },
+            { "decr_deferred_exp", "待摊费用减少" },
+            { "incr_acc_exp", "预提费用增加" },
+            { "loss_disp_fiolta", "处置固定、无形资产和其他长期资产的损失" },
+            { "loss_scr_fa", "固定资产报废损失" },
+            { "loss_fv_chg", "公允价值变动损失" },
+            { "invest_loss", "投资损失" },
+            { "decr_def_inc_tax_assets", "递延所得税资产减少" },
+            { "incr_def_inc_tax_liab", "递延所得税负债增加" },
+            { "decr_inventories", "存货的减少" },
+            { "decr_oper_payable", "经营性应收项目的减少" },
+            { "incr_oper_payable", "经营性应付项目的增加" },
+            { "others", "其他" },
+            { "im_net_cashflow_oper_act", "经营活动产生的现金流量净额(间接法)" },
+            { "conv_debt_into_cap", "债务转为资本" },
+            { "conv_copbonds_due_within_1y", "一年内到期的可转换公司债券" },
+            { "fa_fnc_leases", "融资租入固定资产" },
+            { "im_n_incr_cash_equ", "现金及现金等价物净增加额(间接法)" },
+            { "net_dism_capital_add", "拆出资金净增加额" },
+            { "net_cash_rece_sec", "代理买卖证券收到的现金净额" },
+            { "credit_impa_loss", "信用减值损失" },
+            { "use_right_asset_dep", "使用权资产折旧" },
+            { "oth_loss_asset", "其他资产减值损失" },
+            { "end_bal_cash", "现金的期末余额" },
+            { "beg_bal_cash", "减:现金的期初余额" },
+            { "end_bal_cash_equ", "加:现金等价物的期末余额" },
+            { "beg_bal_cash_equ", "减:现金等价物的期初余额" },
+            { "update_flag", "更新标志" }
         };
-
         WriteDataToWorksheet(worksheet, data, fieldMappings);
     }
 
-    private void WriteDataToWorksheet(ExcelWorksheet worksheet, JsonElement data, Dictionary<string, string> fieldMappings)
+    private void WriteDataToWorksheet(IXLWorksheet worksheet, JsonElement data, Dictionary<string, string> fieldMappings)
     {
-        // 检查数据是否为数组
         if (data.ValueKind != JsonValueKind.Array)
         {
-            worksheet.Cells[1, 1].Value = "数据格式错误";
+            worksheet.Cell(1, 1).Value = "数据格式错误";
             return;
         }
 
         var dataArray = data.EnumerateArray().ToList();
         if (dataArray.Count == 0)
         {
-            worksheet.Cells[1, 1].Value = "无数据";
+            worksheet.Cell(1, 1).Value = "无数据";
             return;
         }
 
-        // 获取第一条数据来确定列
-        var firstItem = dataArray[0];
-        var columns = new List<(string key, string name)>();
+        // 去重：基于关键业务字段进行去重（兼容驼峰/下划线）
+        // 关键字段：ts_code、end_date、report_type、comp_type、end_type
+        var uniqueDataArray = dataArray
+            .GroupBy(item => BuildBusinessKey(item))
+            .Select(group => group.First())
+            .ToList();
+        // 始终使用去重后的集合（即便数量未变化也保持一致的来源）
+        dataArray = uniqueDataArray;
 
-        // 根据第一条数据的字段和映射表生成列
+        var firstItem = dataArray[0];
+        
+        // 提取元数据信息
+        string stockCode = ExtractStockCode(firstItem);
+        string exportTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+        string reportYear = ExtractReportYear(firstItem);
+        string reportPeriod = ExtractReportPeriod(firstItem);
+        
+        // 写入元数据（前4行）
+        int currentRow = 1;
+        worksheet.Cell(currentRow, 1).Value = "导出股票代码";
+        worksheet.Cell(currentRow, 1).Style.Font.Bold = true;
+        worksheet.Cell(currentRow, 2).Value = stockCode;
+        currentRow++;
+        
+        worksheet.Cell(currentRow, 1).Value = "导出时间";
+        worksheet.Cell(currentRow, 1).Style.Font.Bold = true;
+        worksheet.Cell(currentRow, 2).Value = exportTime;
+        currentRow++;
+        
+        worksheet.Cell(currentRow, 1).Value = "报告年度";
+        worksheet.Cell(currentRow, 1).Style.Font.Bold = true;
+        worksheet.Cell(currentRow, 2).Value = reportYear;
+        currentRow++;
+        
+        worksheet.Cell(currentRow, 1).Value = "报告周期";
+        worksheet.Cell(currentRow, 1).Style.Font.Bold = true;
+        worksheet.Cell(currentRow, 2).Value = reportPeriod;
+        currentRow++;
+        
+        // 空一行
+        currentRow++;
+        
+        // 收集所有字段（过滤掉不需要的字段）
+        var excludedKeys = new HashSet<string> { "id", "tsCode", "ts_code", "updateFlag", "update_flag" };
+        var fields = new List<(string key, string name)>();
+        
         foreach (var property in firstItem.EnumerateObject())
         {
             var key = property.Name;
-            var name = fieldMappings.ContainsKey(key) ? fieldMappings[key] : key;
-            columns.Add((key, name));
-        }
-
-        // 写入表头
-        for (int i = 0; i < columns.Count; i++)
-        {
-            worksheet.Cells[1, i + 1].Value = columns[i].name;
-            worksheet.Cells[1, i + 1].Style.Font.Bold = true;
-        }
-
-        // 写入数据
-        int row = 2;
-        foreach (var item in dataArray)
-        {
-            for (int col = 0; col < columns.Count; col++)
+            
+            // 跳过排除的字段
+            if (excludedKeys.Contains(key))
+                continue;
+            
+            var snakeKey = ConvertToSnakeCase(key);
+            if (excludedKeys.Contains(snakeKey))
+                continue;
+            
+            // 先尝试直接匹配，如果不存在则尝试转换为下划线格式
+            string name;
+            if (fieldMappings.ContainsKey(key))
             {
-                var key = columns[col].key;
+                name = fieldMappings[key];
+            }
+            else
+            {
+                // 将驼峰式转换为下划线式后再查找
+                name = fieldMappings.ContainsKey(snakeKey) ? fieldMappings[snakeKey] : key;
+            }
+            fields.Add((key, name));
+        }
+
+        // 标题行：A列是"报表项目"，B列及之后是"项目值"或"项目值1"、"项目值2"等
+        worksheet.Cell(currentRow, 1).Value = "报表项目";
+        worksheet.Cell(currentRow, 1).Style.Font.Bold = true;
+        worksheet.Cell(currentRow, 1).Style.Fill.BackgroundColor = XLColor.LightGray;
+        
+        for (int i = 0; i < dataArray.Count; i++)
+        {
+            // 如果只有一条记录，列标题为"项目值"；多条记录时为"项目值1"、"项目值2"等
+            string columnHeader = dataArray.Count == 1 ? "项目值" : $"项目值{i + 1}";
+            worksheet.Cell(currentRow, i + 2).Value = columnHeader;
+            worksheet.Cell(currentRow, i + 2).Style.Font.Bold = true;
+            worksheet.Cell(currentRow, i + 2).Style.Fill.BackgroundColor = XLColor.LightGray;
+        }
+        currentRow++;
+
+        // 每行显示一个字段
+        for (int fieldIndex = 0; fieldIndex < fields.Count; fieldIndex++)
+        {
+            int row = currentRow + fieldIndex;
+            var (key, name) = fields[fieldIndex];
+            
+            // A列：字段名（中文）
+            worksheet.Cell(row, 1).Value = name;
+            worksheet.Cell(row, 1).Style.Font.Bold = true;
+            
+            // B列及之后：每条记录的该字段值
+            for (int dataIndex = 0; dataIndex < dataArray.Count; dataIndex++)
+            {
+                var item = dataArray[dataIndex];
                 if (item.TryGetProperty(key, out var value))
                 {
-                    worksheet.Cells[row, col + 1].Value = GetValueAsString(value);
+                    worksheet.Cell(row, dataIndex + 2).Value = GetValueAsString(value);
                 }
             }
-            row++;
         }
 
-        // 自动调整列宽
-        worksheet.Cells[worksheet.Dimension.Address].AutoFitColumns();
+        worksheet.Columns().AdjustToContents();
     }
 
     private string? GetValueAsString(JsonElement element)
@@ -320,5 +544,110 @@ public class ExcelExportService
             JsonValueKind.Null => null,
             _ => element.ToString()
         };
+    }
+
+    // 读取第一个可用的字符串字段（兼容驼峰/下划线键名）
+    private static string GetString(JsonElement item, params string[] names)
+    {
+        foreach (var name in names)
+        {
+            if (item.TryGetProperty(name, out var el))
+            {
+                if (el.ValueKind == JsonValueKind.String)
+                    return el.GetString() ?? string.Empty;
+                // 非字符串也转成字符串比较，确保稳定
+                return el.ToString();
+            }
+        }
+        return string.Empty;
+    }
+
+    // 构建财报记录的业务唯一键，用于语义去重
+    private static string BuildBusinessKey(JsonElement item)
+    {
+        // 关键维度：股票、报告期、报表类型、公司类型、报告期类型
+        var tsCode = GetString(item, "tsCode", "ts_code");
+        var endDate = GetString(item, "endDate", "end_date", "period");
+        var reportType = GetString(item, "reportType", "report_type");
+        var compType = GetString(item, "compType", "comp_type");
+        var endType = GetString(item, "endType", "end_type");
+        return string.Join("|", tsCode, endDate, reportType, compType, endType);
+    }
+
+    private string ConvertToSnakeCase(string camelCase)
+    {
+        if (string.IsNullOrEmpty(camelCase))
+            return camelCase;
+
+        var result = new System.Text.StringBuilder();
+        result.Append(char.ToLower(camelCase[0]));
+
+        for (int i = 1; i < camelCase.Length; i++)
+        {
+            char c = camelCase[i];
+            if (char.IsUpper(c))
+            {
+                result.Append('_');
+                result.Append(char.ToLower(c));
+            }
+            else
+            {
+                result.Append(c);
+            }
+        }
+
+        return result.ToString();
+    }
+
+    private string ExtractStockCode(JsonElement item)
+    {
+        // 尝试获取 tsCode 或 ts_code 字段
+        if (item.TryGetProperty("tsCode", out var tsCodeElement) ||
+            item.TryGetProperty("ts_code", out tsCodeElement))
+        {
+            var fullCode = tsCodeElement.GetString() ?? "";
+            // 去掉 .SH 或 .SZ 后缀
+            var dotIndex = fullCode.IndexOf('.');
+            return dotIndex > 0 ? fullCode.Substring(0, dotIndex) : fullCode;
+        }
+        return "未知";
+    }
+
+    private string ExtractReportYear(JsonElement item)
+    {
+        // 尝试获取 endDate 或 end_date 字段（格式如 20241231）
+        if (item.TryGetProperty("endDate", out var endDateElement) ||
+            item.TryGetProperty("end_date", out endDateElement))
+        {
+            var endDate = endDateElement.GetString() ?? "";
+            if (endDate.Length >= 4)
+            {
+                return endDate.Substring(0, 4) + "年";
+            }
+        }
+        return "未知";
+    }
+
+    private string ExtractReportPeriod(JsonElement item)
+    {
+        // 尝试获取 endDate 或 end_date 字段（格式如 20241231）
+        if (item.TryGetProperty("endDate", out var endDateElement) ||
+            item.TryGetProperty("end_date", out endDateElement))
+        {
+            var endDate = endDateElement.GetString() ?? "";
+            if (endDate.Length >= 8)
+            {
+                var month = endDate.Substring(4, 2);
+                return month switch
+                {
+                    "03" => "第一季度",
+                    "06" => "第二季度（半年报）",
+                    "09" => "第三季度",
+                    "12" => "第四季度（年报）",
+                    _ => endDate
+                };
+            }
+        }
+        return "未知";
     }
 }

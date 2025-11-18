@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace MyKeyVault.Finance.CLI.Models;
 
 public class AuthTokenRequest
@@ -24,5 +26,6 @@ public class TushareQueryResponse
 {
     public int Code { get; set; }
     public string? Message { get; set; }
-    public dynamic? Data { get; set; }
+    // 使用 JsonElement? 明确类型，避免 dynamic 比较导致运行时绑定错误
+    public JsonElement? Data { get; set; }
 }
