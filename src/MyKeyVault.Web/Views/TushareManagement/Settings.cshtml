@@ -76,6 +76,7 @@
                         <!-- 保存按钮 -->
                         <div class="sap-form-group" style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #e0e0e0;">
                             <button onclick="saveSettings()" class="sap-button">保存配置</button>
+                            <button onclick="saveAndRestart()" class="sap-button sap-button-secondary" style="margin-left: 12px;">保存并重启</button>
                             <small class="sap-form-text" style="margin-left: 10px; color: #f57c00;">保存后需要重启服务才能生效</small>
                         </div>
                     </div>
@@ -144,6 +145,42 @@
             }
         } catch (error) {
             showMessage('生成密钥失败: ' + error.message, 'error');
+        }
+    }
+
+    async function saveAndRestart() {
+        const token = document.getElementById('token-input').value.trim();
+        const baseUrl = document.getElementById('baseurl-input').value.trim();
+        const jwtSecret = document.getElementById('jwtsecret-input').value.trim();
+        const expires = parseInt(document.getElementById('expires-input').value) || 7200;
+        const encKey = document.getElementById('enckey-input').value.trim();
+
+        if (!token) { showMessage('请输入 Tushare Token', 'error'); return; }
+        if (!baseUrl) { showMessage('请输入 Base URL', 'error'); return; }
+
+        try {
+            const response = await fetch('@Url.Action("SaveSettingsAndRestart", "TushareManagement")', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    token: token,
+                    baseUrl: baseUrl,
+                    jwtSecret: jwtSecret || null,
+                    jwtExpiresInSeconds: expires,
+                    encryptionKey: encKey || null
+                })
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                showMessage(result.message || '配置已保存，服务即将重启…', 'success');
+                // 给出温馨提示：几秒后刷新
+                setTimeout(() => { window.location.reload(); }, 6000);
+            } else {
+                showMessage(result.message || '保存失败', 'error');
+            }
+        } catch (error) {
+            showMessage('请求失败: ' + error.message, 'error');
         }
     }
 

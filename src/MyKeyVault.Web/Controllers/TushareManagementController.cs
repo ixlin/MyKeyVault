@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MyKeyVault.Web.Data;
 using MyKeyVault.Web.Services;
+using Microsoft.Extensions.Hosting;
 
 namespace MyKeyVault.Web.Controllers;
 
@@ -269,6 +270,41 @@ public class TushareManagementController : Controller
     [HttpPost("settings/save")]
     public async Task<IActionResult> SaveSettings([FromBody] SaveTushareConfigRequest request)
     {
+        var (success, message) = await SaveSettingsInternal(request);
+        if (success) return Ok(new { success = true, message = message });
+        return BadRequest(new { success = false, message });
+    }
+
+    /// <summary>
+    /// 保存并重启（通过停止当前进程，交由 systemd 重启）
+    /// </summary>
+    [HttpPost("settings/save-and-restart")]
+    public async Task<IActionResult> SaveSettingsAndRestart([FromBody] SaveTushareConfigRequest request)
+    {
+        var (success, message) = await SaveSettingsInternal(request);
+        if (!success) return BadRequest(new { success = false, message });
+
+        // 异步延迟后优雅停止应用，期望由 systemd 接管重启
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(1200);
+                var lifetime = HttpContext.RequestServices.GetRequiredService<IHostApplicationLifetime>();
+                _logger.LogWarning("[ADMIN] Save-and-restart requested by {User}. Stopping application...", User?.Identity?.Name);
+                lifetime.StopApplication();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "StopApplication failed in save-and-restart");
+            }
+        });
+
+        return Ok(new { success = true, message = "配置已保存，正在重启服务...（约数秒内恢复）" });
+    }
+
+    private async Task<(bool success, string message)> SaveSettingsInternal(SaveTushareConfigRequest request)
+    {
         try
         {
             var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production";
@@ -277,9 +313,7 @@ public class TushareManagementController : Controller
             // Production:  appsettings.Production.json（若不存在则回落到 appsettings.json）
             string fileName;
             if (env == "Development")
-            {
                 fileName = "appsettings.Development.json";
-            }
             else
             {
                 var prodPath = Path.Combine(Directory.GetCurrentDirectory(), "appsettings.Production.json");
@@ -288,15 +322,9 @@ public class TushareManagementController : Controller
 
             var filePath = Path.Combine(Directory.GetCurrentDirectory(), fileName);
 
-            string json;
-            if (System.IO.File.Exists(filePath))
-            {
-                json = await System.IO.File.ReadAllTextAsync(filePath);
-            }
-            else
-            {
-                json = "{}";
-            }
+            string json = System.IO.File.Exists(filePath)
+                ? await System.IO.File.ReadAllTextAsync(filePath)
+                : "{}";
 
             var settings = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(json)
                 ?? new Dictionary<string, object>();
@@ -306,18 +334,12 @@ public class TushareManagementController : Controller
             if (settings.TryGetValue("Tushare", out var existing))
             {
                 if (existing is System.Text.Json.JsonElement je && je.ValueKind == System.Text.Json.JsonValueKind.Object)
-                {
                     tushareDict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(je.GetRawText())
                                   ?? new Dictionary<string, object>();
-                }
                 else if (existing is Dictionary<string, object> d)
-                {
                     tushareDict = new Dictionary<string, object>(d);
-                }
                 else
-                {
                     tushareDict = new Dictionary<string, object>();
-                }
             }
             else
             {
@@ -328,44 +350,33 @@ public class TushareManagementController : Controller
             tushareDict["Token"] = request.Token ?? string.Empty;
             tushareDict["BaseUrl"] = request.BaseUrl ?? "http://api.tushare.pro";
             tushareDict["JwtExpiresInSeconds"] = request.JwtExpiresInSeconds;
-            
-            // 如果用户输入了 JwtSecret，使用用户输入；否则生成新的（如果不存在）
+
             if (!string.IsNullOrWhiteSpace(request.JwtSecret))
-            {
                 tushareDict["JwtSecret"] = request.JwtSecret;
-            }
             else if (!tushareDict.ContainsKey("JwtSecret") || string.IsNullOrWhiteSpace(tushareDict["JwtSecret"]?.ToString()))
-            {
                 tushareDict["JwtSecret"] = GenerateRandomKey();
-            }
-            
-            // 如果用户输入了 EncryptionKey，使用用户输入；否则生成新的（如果不存在）
+
             if (!string.IsNullOrWhiteSpace(request.EncryptionKey))
-            {
                 tushareDict["EncryptionKey"] = request.EncryptionKey;
-            }
             else if (!tushareDict.ContainsKey("EncryptionKey") || string.IsNullOrWhiteSpace(tushareDict["EncryptionKey"]?.ToString()))
-            {
                 tushareDict["EncryptionKey"] = GenerateRandomKey();
-            }
 
             settings["Tushare"] = tushareDict;
 
-            var options = new System.Text.Json.JsonSerializerOptions 
-            { 
+            var options = new System.Text.Json.JsonSerializerOptions
+            {
                 WriteIndented = true,
                 Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
             };
             json = System.Text.Json.JsonSerializer.Serialize(settings, options);
 
             await System.IO.File.WriteAllTextAsync(filePath, json);
-
-            return Ok(new { success = true, message = "配置已保存，请重启应用使配置生效" });
+            return (true, "配置已保存，请重启应用使配置生效");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "保存 Tushare 配置失败");
-            return BadRequest(new { success = false, message = $"保存失败: {ex.Message}" });
+            return (false, $"保存失败: {ex.Message}");
         }
     }
 

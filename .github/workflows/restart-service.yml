@@ -1,0 +1,28 @@
+name: Restart MyKeyVault Service
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Why restarting (optional)'
+        required: false
+        default: ''
+
+jobs:
+  restart:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Restart service over SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            set -e
+            echo "Restarting mykeyvault.service ..."
+            sudo -n systemctl restart mykeyvault.service
+            echo "Service restarted, showing status and recent logs..."
+            sudo systemctl status mykeyvault.service --no-pager || true
+            journalctl -u mykeyvault.service -n 50 --no-pager || true
+            echo "Reason: ${{ github.event.inputs.reason }}"
