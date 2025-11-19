@@ -5,11 +5,11 @@
 
 /* 调试信息样式 */
 .debug-panel {
-  background: #f5f5f5;
-  border: 1px solid #ddd;
+  background: #fff3cd;
+  border: 2px solid #ffc107;
   border-radius: 8rpx;
   padding: 20rpx;
-  margin-bottom: 20rpx;
+  margin: 20rpx 0;
   font-size: 24rpx;
 }
 
@@ -18,17 +18,40 @@
   color: #333;
   margin-bottom: 16rpx;
   font-size: 28rpx;
+  text-align: center;
 }
 
 .debug-item {
-  margin-bottom: 8rpx;
-  color: #666;
-  word-break: break-all;
+  display: flex;
+  margin-bottom: 12rpx;
+  color: #333;
+  line-height: 1.6;
 }
 
-.error-text {
+.debug-label {
+  font-weight: bold;
+  min-width: 120rpx;
+  color: #666;
+}
+
+.debug-value {
+  flex: 1;
+  word-break: break-all;
+  color: #333;
+}
+
+.debug-item.error {
+  background: #fff1f0;
+  border: 1px solid #ff4d4f;
+  padding: 10rpx;
+  border-radius: 4rpx;
+  flex-direction: column;
+}
+
+.debug-item.error .debug-value {
   color: #ff4d4f;
   font-weight: bold;
+  margin-top: 6rpx;
 }
 
 .debug-btn {

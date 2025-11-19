@@ -5,6 +5,34 @@
   <input class="input" placeholder="密码" password="true" bindinput="onInputPwd" />
   <button class="btn" loading="{{loading}}" bindtap="onSubmit">登录</button>
   
+  <!-- 调试信息面板 -->
+  <view wx:if="{{showDebug}}" class="debug-panel">
+    <view class="debug-title" bindtap="toggleDebug">🔍 调试信息 (点击收起)</view>
+    <view class="debug-item">
+      <text class="debug-label">环境:</text>
+      <text class="debug-value">{{debugInfo.env}}</text>
+    </view>
+    <view class="debug-item">
+      <text class="debug-label">后端:</text>
+      <text class="debug-value">{{debugInfo.baseUrl}}</text>
+    </view>
+    <view class="debug-item">
+      <text class="debug-label">网络:</text>
+      <text class="debug-value">{{debugInfo.networkType}}</text>
+    </view>
+    <view class="debug-item">
+      <text class="debug-label">连接状态:</text>
+      <text class="debug-value">{{debugInfo.connectionStatus}}</text>
+    </view>
+    <view wx:if="{{debugInfo.lastError}}" class="debug-item error">
+      <text class="debug-label">错误:</text>
+      <text class="debug-value">{{debugInfo.lastError}}</text>
+    </view>
+  </view>
+  <view wx:else class="debug-toggle" bindtap="toggleDebug">
+    🔍 显示调试信息
+  </view>
+  
   <view class="links-container">
     <view class="hint-text">还没有账号？忘记密码？</view>
     <view class="link-buttons">
