@@ -18,8 +18,11 @@ function getBaseUrl() {
     if (override && typeof override === 'string') return override;
   } catch (_) {}
   const env = detectEnv();
-  if (env === 'develop') return 'http://localhost:5158';
-  // trial / release
+  // 真机调试时使用线上服务器，避免 localhost 无法访问
+  // 如需本地开发，在开发者工具的「详情」→「本地设置」→勾选「不校验合法域名」
+  // if (env === 'develop') return 'http://localhost:5158';
+  
+  // 统一使用线上服务器（支持真机调试）
   return 'https://mykeyvault.cn';
 }
 
