@@ -5,7 +5,7 @@ Page({
     identifier: '',
     password: '',
     loading: false,
-    showDebug: true,  // 临时开启调试，方便排查 SSL 问题
+    showDebug: false,  // 正式环境关闭调试面板
     debugInfo: {
       env: '',
       baseUrl: '',
