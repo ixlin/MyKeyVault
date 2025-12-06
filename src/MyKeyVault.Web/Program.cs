@@ -72,6 +72,12 @@ builder.Services.AddHttpClient<MyKeyVault.Web.Services.TushareApiService>();
 builder.Services.AddScoped<MyKeyVault.Web.Services.TushareAuthService>();
 builder.Services.AddScoped<MyKeyVault.Web.Services.TushareDataService>();
 
+// 微信文章爬虫服务配置
+builder.Services.Configure<WechatScraperOptions>(
+    builder.Configuration.GetSection("WechatScraper"));
+builder.Services.AddHttpClient<WechatScraperService>();
+builder.Services.AddScoped<WechatScraperService>();
+
 // JWT 认证（用于 Tushare API）
 builder.Services.AddAuthentication()
     .AddJwtBearer("TushareBearer", options =>

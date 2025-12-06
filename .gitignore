@@ -73,3 +73,16 @@ cookies.txt
 # macOS系统文件
 .DS_Store
 Thumbs.db
+
+# Python
+**/venv/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/.pytest_cache/
+**/output/
+**/*.egg-info/
+
+# Scraped articles (runtime artifacts)
+src/MyKeyVault.Web/wwwroot/wechat-articles/*
+!src/MyKeyVault.Web/wwwroot/wechat-articles/.gitkeep

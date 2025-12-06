@@ -1,0 +1,255 @@
+@model MyKeyVault.Web.Services.TaskStatusResponseDto
+@{
+    ViewData["Title"] = "任务进度";
+    var taskId = (string)ViewBag.TaskId;
+}
+
+<div class="container" style="max-width: 800px;">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-arrow-repeat"></i> 任务进度</h2>
+        <a asp-action="Index" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> 返回列表
+        </a>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>任务 ID: <code>@taskId</code></span>
+            <span id="taskStatus" class="badge @GetStatusBadgeClass(Model.Status)">@GetStatusText(Model.Status)</span>
+        </div>
+        <div class="card-body">
+            <div class="mb-3">
+                <label class="form-label">进度</label>
+                <div class="progress" style="height: 25px;">
+                    <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                         role="progressbar" 
+                         style="width: @GetProgressPercent(Model)%;"
+                         aria-valuenow="@Model.CompletedCount" 
+                         aria-valuemin="0" 
+                         aria-valuemax="@Model.TotalCount">
+                        <span id="progressText">@Model.CompletedCount / @Model.TotalCount</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <i class="bi bi-list-check"></i> 文章列表
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>文章</th>
+                        <th>状态</th>
+                        <th>图片</th>
+                    </tr>
+                </thead>
+                <tbody id="articleList">
+                    @foreach (var article in Model.Articles)
+                    {
+                        <tr data-article-id="@article.ArticleId">
+                            <td>
+                                @if (!string.IsNullOrEmpty(article.Title))
+                                {
+                                    <div>
+                                        <strong>@article.Title</strong>
+                                        @if (!string.IsNullOrEmpty(article.Author))
+                                        {
+                                            <br><small class="text-muted">@article.Author</small>
+                                        }
+                                    </div>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">处理中...</span>
+                                    <br><small class="text-muted">@article.SourceUrl</small>
+                                }
+                            </td>
+                            <td class="article-status">
+                                @Html.Raw(GetStatusHtml(article.Status, article.ErrorMessage))
+                                @if (!string.IsNullOrEmpty(article.ErrorMessage))
+                                {
+                                    <div class="text-danger small mt-1" style="white-space: pre-wrap;">
+                                        @article.ErrorMessage
+                                    </div>
+                                }
+                            </td>
+                            <td class="article-images">@article.ImagesCount</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="mt-4 text-center" id="actionButtons">
+        @if (Model.Status == "completed" || Model.Status == "partial")
+        {
+            <a asp-action="Index" class="btn btn-primary">
+                <i class="bi bi-check-circle"></i> 查看全部文章
+            </a>
+        }
+        else
+        {
+            <p class="text-muted">
+                <span class="spinner-border spinner-border-sm"></span>
+                正在爬取中，请稍候...
+            </p>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <script>
+        const taskId = '@taskId';
+        let pollInterval = null;
+        
+        function updateUI(data) {
+            // 更新状态徽章
+            const statusBadge = document.getElementById('taskStatus');
+            statusBadge.className = 'badge ' + getStatusBadgeClass(data.status);
+            statusBadge.textContent = getStatusText(data.status);
+            
+            // 更新进度条
+            const percent = data.total_count > 0 ? Math.round(data.completed_count / data.total_count * 100) : 0;
+            const progressBar = document.getElementById('progressBar');
+            progressBar.style.width = percent + '%';
+            document.getElementById('progressText').textContent = data.completed_count + ' / ' + data.total_count;
+            
+            // 更新文章列表
+            data.articles.forEach(article => {
+                const row = document.querySelector(`tr[data-article-id="${article.article_id}"]`);
+                if (row) {
+                    const titleCell = row.querySelector('td:first-child');
+                    if (article.title) {
+                        titleCell.innerHTML = `<div><strong>${article.title}</strong>${article.author ? '<br><small class="text-muted">' + article.author + '</small>' : ''}</div>`;
+                    }
+                    
+                    row.querySelector('.article-status').innerHTML = getStatusHtml(article.status, article.error_message);
+                    row.querySelector('.article-images').textContent = article.images_count;
+                }
+            });
+            
+            // 完成时停止轮询
+            if (data.status === 'completed' || data.status === 'failed' || data.status === 'partial') {
+                if (pollInterval) {
+                    clearInterval(pollInterval);
+                    pollInterval = null;
+                }
+                
+                // 更新按钮
+                const actionButtons = document.getElementById('actionButtons');
+                actionButtons.innerHTML = '<a href="/WechatArticle" class="btn btn-primary"><i class="bi bi-check-circle"></i> 查看全部文章</a>';
+                
+                // 移除进度条动画
+                progressBar.classList.remove('progress-bar-striped', 'progress-bar-animated');
+            }
+        }
+        
+        function getStatusBadgeClass(status) {
+            switch (status) {
+                case 'completed': return 'bg-success';
+                case 'processing': return 'bg-primary';
+                case 'pending': return 'bg-secondary';
+                case 'failed': return 'bg-danger';
+                case 'partial': return 'bg-warning';
+                default: return 'bg-secondary';
+            }
+        }
+        
+        function getStatusText(status) {
+            switch (status) {
+                case 'completed': return '已完成';
+                case 'processing': return '处理中';
+                case 'pending': return '等待中';
+                case 'failed': return '失败';
+                case 'partial': return '部分完成';
+                default: return status;
+            }
+        }
+        
+        function getStatusHtml(status, errorMessage) {
+            switch (status) {
+                case 'completed': 
+                    return '<span class="badge bg-success">已完成</span>';
+                case 'processing': 
+                    return '<span class="badge bg-primary"><span class="spinner-border spinner-border-sm"></span> 处理中</span>';
+                case 'pending': 
+                    return '<span class="badge bg-secondary">等待中</span>';
+                case 'failed': 
+                    return `<span class="badge bg-danger" title="${errorMessage || ''}">失败</span>`;
+                default: 
+                    return `<span class="badge bg-secondary">${status}</span>`;
+            }
+        }
+        
+        async function pollStatus() {
+            try {
+                const response = await fetch(`/WechatArticle/GetTaskStatus?taskId=${taskId}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    updateUI(data);
+                }
+            } catch (error) {
+                console.error('获取状态失败:', error);
+            }
+        }
+        
+        // 初始状态检查
+        const initialStatus = '@Model.Status';
+        if (initialStatus !== 'completed' && initialStatus !== 'failed' && initialStatus !== 'partial') {
+            // 每 3 秒轮询一次
+            pollInterval = setInterval(pollStatus, 3000);
+        }
+    </script>
+}
+
+@functions {
+    string GetStatusBadgeClass(string status)
+    {
+        return status switch
+        {
+            "completed" => "bg-success",
+            "processing" => "bg-primary",
+            "pending" => "bg-secondary",
+            "failed" => "bg-danger",
+            "partial" => "bg-warning",
+            _ => "bg-secondary"
+        };
+    }
+    
+    string GetStatusText(string status)
+    {
+        return status switch
+        {
+            "completed" => "已完成",
+            "processing" => "处理中",
+            "pending" => "等待中",
+            "failed" => "失败",
+            "partial" => "部分完成",
+            _ => status
+        };
+    }
+    
+    int GetProgressPercent(MyKeyVault.Web.Services.TaskStatusResponseDto model)
+    {
+        if (model.TotalCount == 0) return 0;
+        return (int)Math.Round((double)model.CompletedCount / model.TotalCount * 100);
+    }
+    
+    string GetStatusHtml(string status, string? errorMessage)
+    {
+        return status switch
+        {
+            "completed" => "<span class=\"badge bg-success\">已完成</span>",
+            "processing" => "<span class=\"badge bg-primary\"><span class=\"spinner-border spinner-border-sm\"></span> 处理中</span>",
+            "pending" => "<span class=\"badge bg-secondary\">等待中</span>",
+            "failed" => $"<span class=\"badge bg-danger\" title=\"{errorMessage ?? ""}\">失败</span>",
+            _ => $"<span class=\"badge bg-secondary\">{status}</span>"
+        };
+    }
+}

@@ -1,0 +1,26 @@
+[Unit]
+Description=MyKeyVault WeChat Scraper Python Service
+After=network.target
+Requires=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/wechat-scraper
+ExecStart=/var/www/wechat-scraper/venv/bin/python -m uvicorn app:app --host 127.0.0.1 --port 5001
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Environment variables
+Environment=PYTHONUNBUFFERED=1
+Environment=PLAYWRIGHT_BROWSERS_PATH=/var/www/wechat-scraper/pw-browsers
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,106 @@
+@{
+    ViewData["Title"] = "新建爬取任务";
+    var serviceAvailable = (bool)ViewBag.ServiceAvailable;
+}
+
+<div class="container" style="max-width: 800px;">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-plus-circle"></i> 新建爬取任务</h2>
+        <a asp-action="Index" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> 返回列表
+        </a>
+    </div>
+
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @if (!serviceAvailable)
+    {
+        <div class="alert alert-danger">
+            <i class="bi bi-exclamation-octagon"></i>
+            <strong>爬虫服务不可用</strong>
+            <p class="mb-0 mt-2">无法创建新任务，请稍后重试或联系管理员。</p>
+        </div>
+    }
+    else
+    {
+        <div class="card">
+            <div class="card-body">
+                <form asp-action="Create" method="post">
+                    @Html.AntiForgeryToken()
+                    
+                    <div class="mb-3">
+                        <label for="urls" class="form-label">
+                            微信公众号文章链接
+                            <small class="text-muted">(每行一个，最多 10 个)</small>
+                        </label>
+                        <textarea class="form-control" id="urls" name="urls" rows="8" 
+                                  placeholder="https://mp.weixin.qq.com/s/xxxxx&#10;https://mp.weixin.qq.com/s/yyyyy&#10;..."
+                                  required></textarea>
+                        <div class="form-text">
+                            <i class="bi bi-info-circle"></i>
+                            支持的链接格式：
+                            <code>https://mp.weixin.qq.com/s/xxxxx</code> 或
+                            <code>https://mp.weixin.qq.com/s?__biz=...</code>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="confirmCheck" required>
+                            <label class="form-check-label" for="confirmCheck">
+                                我确认这些链接是公开可访问的微信公众号文章
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a asp-action="Index" class="btn btn-outline-secondary">取消</a>
+                        <button type="submit" class="btn btn-primary" id="submitBtn">
+                            <i class="bi bi-cloud-download"></i> 开始爬取
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <i class="bi bi-question-circle"></i> 使用说明
+            </div>
+            <div class="card-body">
+                <ul class="mb-0">
+                    <li>每次最多提交 <strong>10 个</strong> 链接</li>
+                    <li>爬取过程可能需要 1-2 分钟，请耐心等待</li>
+                    <li>爬取完成后，可以预览文章或下载完整文件包</li>
+                    <li>下载包包含 HTML 文件和所有图片资源</li>
+                    <li>请遵守微信公众平台使用条款，仅用于个人学习</li>
+                </ul>
+            </div>
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <script>
+        // 验证链接数量
+        document.getElementById('urls')?.addEventListener('input', function() {
+            const lines = this.value.split('\n').filter(l => l.trim().length > 0);
+            const submitBtn = document.getElementById('submitBtn');
+            
+            if (lines.length > 10) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = '超过 10 个链接';
+            } else {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="bi bi-cloud-download"></i> 开始爬取';
+            }
+        });
+    </script>
+}

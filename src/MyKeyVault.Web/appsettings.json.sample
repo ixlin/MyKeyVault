@@ -36,5 +36,10 @@
     "JwtExpiresInSeconds": 7200,
     "EncryptionKey": "${TUSHARE_ENCRYPTION_KEY}"
   },
+  "WechatScraper": {
+    "ServiceUrl": "http://127.0.0.1:5001",
+    "OutputPath": "wechat-articles",
+    "MaxArticlesPerRequest": 10
+  },
   "AllowedHosts": "*"
 }

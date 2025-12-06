@@ -28,5 +28,10 @@
       "Default": "Information",
       "Microsoft.AspNetCore": "Warning"
     }
+  },
+  "WechatScraper": {
+    "ServiceUrl": "http://127.0.0.1:5001",
+    "OutputPath": "wechat-articles",
+    "MaxArticlesPerRequest": 10
   }
 }

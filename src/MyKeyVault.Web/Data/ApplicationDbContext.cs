@@ -26,6 +26,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<BalanceSheet> BalanceSheets => Set<BalanceSheet>();
     public DbSet<CashflowStatement> CashflowStatements => Set<CashflowStatement>();
 
+    // 微信图文
+    public DbSet<WechatArticle> WechatArticles => Set<WechatArticle>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -77,6 +80,15 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
         {
             e.HasIndex(x => new { x.AppId, x.RequestAt });
             e.HasIndex(x => x.ApiName);
+        });
+
+        // 微信图文表配置
+        builder.Entity<WechatArticle>(e =>
+        {
+            e.HasIndex(x => x.UserId);
+            e.HasIndex(x => x.ArticleUniqueId);
+            e.HasIndex(x => x.Status);
+            e.HasIndex(x => x.CreatedAt);
         });
     }
 }
