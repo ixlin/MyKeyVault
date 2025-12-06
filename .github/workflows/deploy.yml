@@ -176,6 +176,13 @@ jobs:
           set -e
           SCRAPER_DIR="/var/www/wechat-scraper"
           SRC_DIR="/tmp/wechat_scraper_${{ github.sha }}"
+
+          # 确保 rsync 可用（有的精简镜像未预装）
+          if ! command -v rsync >/dev/null 2>&1; then
+            echo "Installing rsync..."
+            sudo -n apt-get update
+            sudo -n apt-get install -y rsync
+          fi
           
           # 复制文件到正式目录
           sudo -n rsync -av --delete \
