@@ -192,6 +192,12 @@ jobs:
             --exclude '*.pyc' \
             "$SRC_DIR/" "$SCRAPER_DIR/"
           
+          # 检查虚拟环境是否完整，如果不完整则删除
+          if [ -d "$SCRAPER_DIR/venv" ] && [ ! -f "$SCRAPER_DIR/venv/bin/activate" ]; then
+            echo "Virtual environment exists but seems broken (missing activate script). Removing it..."
+            sudo -n rm -rf "$SCRAPER_DIR/venv"
+          fi
+          
           # 创建虚拟环境（如果不存在）
           if [ ! -d "$SCRAPER_DIR/venv" ]; then
             echo "Creating Python virtual environment..."
