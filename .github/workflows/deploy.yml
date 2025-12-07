@@ -177,12 +177,12 @@ jobs:
           SCRAPER_DIR="/var/www/wechat-scraper"
           SRC_DIR="/tmp/wechat_scraper_${{ github.sha }}"
 
-          # 确保 rsync 可用（有的精简镜像未预装）
-          if ! command -v rsync >/dev/null 2>&1; then
-            echo "Installing rsync..."
-            sudo -n apt-get update
-            sudo -n apt-get install -y rsync
-          fi
+          # 确保 rsync 和 python3-venv 可用
+          echo "Installing system dependencies..."
+          sudo -n apt-get update
+          # 强制安装 rsync 和 python3-venv (解决 ensurepip is not available 问题)
+          # 如果默认 python3-venv 不匹配，尝试安装 python3.11-venv
+          sudo -n apt-get install -y rsync python3-venv || sudo -n apt-get install -y rsync python3.11-venv
           
           # 复制文件到正式目录
           sudo -n rsync -av --delete \
