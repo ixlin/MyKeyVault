@@ -64,12 +64,12 @@ class WechatArticleScraper:
         """
         print(f"🚀 开始爬取: {url}")
         
-        # 定义 PDF 输出路径
-        pdf_filename = "article.pdf"
-        pdf_path = os.path.join(self.output_dir, pdf_filename)
+        # 定义临时 PDF 输出路径
+        temp_pdf_filename = "article_temp.pdf"
+        temp_pdf_path = os.path.join(self.output_dir, temp_pdf_filename)
         
         # 使用 Playwright 获取完整渲染后的页面，并保存 PDF
-        html_content = self._fetch_with_playwright(url, pdf_path)
+        html_content = self._fetch_with_playwright(url, temp_pdf_path)
         
         if not html_content:
             raise Exception("无法获取页面内容")
@@ -85,6 +85,15 @@ class WechatArticleScraper:
         
         # 保存文件
         filename = self._save_article(article, output_html)
+        
+        # 重命名 PDF 文件以匹配 HTML 文件名
+        pdf_filename = None
+        if os.path.exists(temp_pdf_path):
+            pdf_filename = filename.replace('.html', '.pdf')
+            pdf_path = os.path.join(self.output_dir, pdf_filename)
+            if os.path.exists(pdf_path):
+                os.remove(pdf_path)
+            os.rename(temp_pdf_path, pdf_path)
         
         print(f"✅ 爬取完成: {filename}")
         
