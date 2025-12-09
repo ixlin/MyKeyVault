@@ -64,8 +64,12 @@ class WechatArticleScraper:
         """
         print(f"🚀 开始爬取: {url}")
         
-        # 使用 Playwright 获取完整渲染后的页面
-        html_content = self._fetch_with_playwright(url)
+        # 定义 PDF 输出路径
+        pdf_filename = "article.pdf"
+        pdf_path = os.path.join(self.output_dir, pdf_filename)
+        
+        # 使用 Playwright 获取完整渲染后的页面，并保存 PDF
+        html_content = self._fetch_with_playwright(url, pdf_path)
         
         if not html_content:
             raise Exception("无法获取页面内容")
@@ -89,11 +93,12 @@ class WechatArticleScraper:
             "author": article["author"],
             "publish_time": article["publish_time"],
             "output_file": filename,
+            "pdf_file": pdf_filename,
             "images_count": len(self.image_map),
             "videos_count": len(article.get("videos", []))
         }
     
-    def _fetch_with_playwright(self, url: str) -> str:
+    def _fetch_with_playwright(self, url: str, pdf_path: Optional[str] = None) -> str:
         """使用 Playwright 获取完整渲染后的页面"""
         print("📖 正在加载页面...")
         
@@ -148,6 +153,15 @@ class WechatArticleScraper:
                 # 等待图片加载
                 page.wait_for_timeout(1500)
                 
+                # 保存 PDF (如果指定了路径)
+                if pdf_path:
+                    print(f"  📄 保存 PDF: {os.path.basename(pdf_path)}...")
+                    try:
+                        page.pdf(path=pdf_path, format="A4", print_background=True, margin={"top": "1cm", "bottom": "1cm", "left": "1cm", "right": "1cm"})
+                        print("  ✓ PDF 保存成功")
+                    except Exception as e:
+                        print(f"  ⚠️ PDF 保存失败: {e}")
+
                 # 获取页面 HTML
                 html_content = page.content()
                 print("  ✓ 页面获取成功")

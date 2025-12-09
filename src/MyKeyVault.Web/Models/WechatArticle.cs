@@ -49,15 +49,21 @@ public class WechatArticle
     public string? PublishTime { get; set; }
 
     /// <summary>
-    /// HTML文件相对路径
+    /// HTML 文件名
     /// </summary>
-    [MaxLength(500)]
+    [MaxLength(200)]
     public string? HtmlFilePath { get; set; }
+
+    /// <summary>
+    /// PDF 文件名
+    /// </summary>
+    [MaxLength(200)]
+    public string? PdfPath { get; set; }
 
     /// <summary>
     /// 图片数量
     /// </summary>
-    public int ImagesCount { get; set; } = 0;
+    public int ImagesCount { get; set; }
 
     /// <summary>
     /// 视频数量

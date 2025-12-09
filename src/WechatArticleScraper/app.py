@@ -53,6 +53,7 @@ class ArticleResult(BaseModel):
     author: Optional[str] = None
     publish_time: Optional[str] = None
     html_file_path: Optional[str] = None
+    pdf_file_path: Optional[str] = None
     images_count: int = 0
     videos_count: int = 0
     status: str = "pending"  # pending, processing, completed, failed
@@ -125,6 +126,7 @@ async def scrape_article(article_result: ArticleResult, output_dir: str):
         article_result.author = result.get("author")
         article_result.publish_time = result.get("publish_time")
         article_result.html_file_path = result.get("output_file")
+        article_result.pdf_file_path = result.get("pdf_file")
         article_result.images_count = result.get("images_count", 0)
         article_result.videos_count = result.get("videos_count", 0)
         article_result.status = "completed"

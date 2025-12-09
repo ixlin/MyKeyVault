@@ -1,4 +1,5 @@
 @model List<MyKeyVault.Web.Models.WechatArticle>
+@inject MyKeyVault.Web.Services.WechatScraperService ScraperService
 @{
     ViewData["Title"] = "微信图文获取";
     var currentPage = (int)ViewBag.CurrentPage;
@@ -58,12 +59,13 @@
             <table class="table table-hover">
                 <thead class="table-light">
                     <tr>
-                        <th style="width: 40%">标题</th>
+                        <th style="width: 30%">标题</th>
                         <th>作者</th>
+                        <th>原文发布时间</th>
                         <th>状态</th>
                         <th>图片</th>
                         <th>创建时间</th>
-                        <th style="width: 180px">操作</th>
+                        <th style="width: 250px">操作</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -73,9 +75,19 @@
                             <td>
                                 @if (!string.IsNullOrEmpty(article.Title))
                                 {
-                                    <span title="@article.Title">
-                                        @(article.Title.Length > 40 ? article.Title.Substring(0, 40) + "..." : article.Title)
-                                    </span>
+                                    @if (article.Status == "completed")
+                                    {
+                                        var previewUrl = ScraperService.GetPreviewUrl(article);
+                                        <a href="@previewUrl" target="_blank" title="@article.Title" class="text-decoration-none fw-bold">
+                                            @(article.Title.Length > 30 ? article.Title.Substring(0, 30) + "..." : article.Title)
+                                        </a>
+                                    }
+                                    else
+                                    {
+                                        <span title="@article.Title">
+                                            @(article.Title.Length > 30 ? article.Title.Substring(0, 30) + "..." : article.Title)
+                                        </span>
+                                    }
                                 }
                                 else
                                 {
@@ -83,6 +95,7 @@
                                 }
                             </td>
                             <td>@(article.Author ?? "-")</td>
+                            <td>@(article.PublishTime ?? "-")</td>
                             <td>
                                 @switch (article.Status)
                                 {
@@ -112,14 +125,13 @@
                                 <div class="btn-group btn-group-sm">
                                     @if (article.Status == "completed")
                                     {
-                                        <a asp-action="Preview" asp-route-id="@article.ArticleId" 
-                                           class="btn btn-outline-primary" target="_blank" title="预览">
-                                            <i class="bi bi-eye"></i>
-                                        </a>
-                                        <a asp-action="Download" asp-route-id="@article.ArticleId" 
-                                           class="btn btn-outline-success" title="下载">
-                                            <i class="bi bi-download"></i>
-                                        </a>
+                                        var pdfUrl = ScraperService.GetPdfUrl(article);
+                                        if (!string.IsNullOrEmpty(pdfUrl))
+                                        {
+                                            <a href="@pdfUrl" class="btn btn-outline-success" target="_blank">下载</a>
+                                        }
+                                        
+                                        <a href="@article.SourceUrl" class="btn btn-outline-secondary" target="_blank">原文链接</a>
                                     }
                                     else if (article.Status == "processing" || article.Status == "pending")
                                     {
@@ -127,7 +139,7 @@
                                         {
                                             <a asp-action="Task" asp-route-id="@article.TaskId" 
                                                class="btn btn-outline-info" title="查看进度">
-                                                <i class="bi bi-arrow-repeat"></i>
+                                                进度
                                             </a>
                                         }
                                     }
@@ -135,9 +147,7 @@
                                           method="post" class="d-inline"
                                           onsubmit="return confirm('确定要删除这篇文章吗？');">
                                         @Html.AntiForgeryToken()
-                                        <button type="submit" class="btn btn-outline-danger" title="删除">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
+                                        <button type="submit" class="btn btn-outline-danger">删除</button>
                                     </form>
                                 </div>
                             </td>

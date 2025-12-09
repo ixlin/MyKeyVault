@@ -115,6 +115,9 @@ public class ArticleResultDto
     [JsonPropertyName("html_file_path")]
     public string? HtmlFilePath { get; set; }
     
+    [JsonPropertyName("pdf_file_path")]
+    public string? PdfFilePath { get; set; }
+    
     [JsonPropertyName("images_count")]
     public int ImagesCount { get; set; }
     
@@ -306,6 +309,7 @@ public class WechatScraperService
                 dbArticle.Author = articleDto.Author;
                 dbArticle.PublishTime = articleDto.PublishTime;
                 dbArticle.HtmlFilePath = articleDto.HtmlFilePath;
+                dbArticle.PdfPath = articleDto.PdfFilePath;
                 dbArticle.ImagesCount = articleDto.ImagesCount;
                 dbArticle.VideosCount = articleDto.VideosCount;
                 dbArticle.Status = articleDto.Status;
@@ -404,6 +408,21 @@ public class WechatScraperService
         // 构建相对 URL: /wechat-articles/{userId}/{articleId}/{htmlFile}
         string EncodeSegment(string segment) => Uri.EscapeDataString(segment);
         return $"/{_options.OutputPath}/{EncodeSegment(article.UserId)}/{EncodeSegment(article.ArticleUniqueId)}/{EncodeSegment(article.HtmlFilePath)}";
+    }
+
+    /// <summary>
+    /// 获取文章 PDF URL
+    /// </summary>
+    public string? GetPdfUrl(WechatArticle article)
+    {
+        if (string.IsNullOrEmpty(article.ArticleUniqueId) || string.IsNullOrEmpty(article.PdfPath))
+        {
+            return null;
+        }
+
+        // 构建相对 URL: /wechat-articles/{userId}/{articleId}/{pdfFile}
+        string EncodeSegment(string segment) => Uri.EscapeDataString(segment);
+        return $"/{_options.OutputPath}/{EncodeSegment(article.UserId)}/{EncodeSegment(article.ArticleUniqueId)}/{EncodeSegment(article.PdfPath)}";
     }
 
     /// <summary>

@@ -29,7 +29,7 @@
                             <a class="nav-link text-dark" asp-area="" asp-controller="Tags" asp-action="Index">标签</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="WechatArticle" asp-action="Index">微信图文</a>
+                            <a class="nav-link text-dark" asp-area="" asp-controller="WechatArticle" asp-action="Index">微信图文转PDF</a>
                         </li>
                         @if (User?.Identity?.IsAuthenticated == true && User.IsInRole("Admin"))
                         {
