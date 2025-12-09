@@ -802,8 +802,18 @@ class WechatArticleScraper:
         """保存文章到文件"""
         # 生成安全的文件名
         title = article['title']
-        # 移除不安全字符
-        safe_title = re.sub(r'[<>:"/\\|?*]', '', title)
+        
+        # 移除不安全字符 (增强版：替换掉所有标点符号和空格，只保留中文、字母、数字、下划线、连字符)
+        # \w 包含 [a-zA-Z0-9_]，\u4e00-\u9fa5 是常用汉字范围
+        safe_title = re.sub(r'[^\w\u4e00-\u9fa5\-]', '_', title)
+        # 合并连续的下划线
+        safe_title = re.sub(r'_+', '_', safe_title)
+        # 去除首尾下划线
+        safe_title = safe_title.strip('_')
+        
+        if not safe_title:
+            safe_title = "article"
+            
         safe_title = safe_title[:50]  # 限制长度
         
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')

@@ -128,7 +128,7 @@
                                         var pdfUrl = ScraperService.GetPdfUrl(article);
                                         if (!string.IsNullOrEmpty(pdfUrl))
                                         {
-                                            <a href="@pdfUrl" class="btn btn-outline-success" target="_blank">下载</a>
+                                            <a href="@pdfUrl" class="btn btn-outline-success" download>下载</a>
                                         }
                                         
                                         <a href="@article.SourceUrl" class="btn btn-outline-secondary" target="_blank">原文链接</a>
