@@ -145,7 +145,19 @@ else
     app.UseHsts();
     app.UseHttpsRedirection();
 }
-app.UseStaticFiles();
+
+// 配置静态文件服务，支持中文文件名
+var provider = new Microsoft.AspNetCore.StaticFiles.FileExtensionContentTypeProvider();
+// 确保 .pdf 和 .html 有正确的 MIME 类型
+provider.Mappings[".pdf"] = "application/pdf";
+provider.Mappings[".html"] = "text/html";
+
+app.UseStaticFiles(new StaticFileOptions
+{
+    ContentTypeProvider = provider,
+    ServeUnknownFileTypes = true, // 允许服务未知类型文件（作为兜底）
+    DefaultContentType = "application/octet-stream"
+});
 
 app.UseRouting();
 

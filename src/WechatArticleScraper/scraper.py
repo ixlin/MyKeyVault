@@ -826,8 +826,12 @@ class WechatArticleScraper:
         safe_title = safe_title[:50]  # 限制长度
         
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        # 确保文件名是 UTF-8 编码安全的（虽然 Python 3 默认是 unicode，但在某些文件系统上可能需要注意）
         filename = f"{safe_title}_{timestamp}.html"
         filepath = os.path.join(self.output_dir, filename)
+        
+        # 打印调试信息
+        print(f"  💾 保存文件: {filepath}")
         
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write(html_content)
