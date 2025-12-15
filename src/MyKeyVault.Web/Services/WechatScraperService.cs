@@ -123,6 +123,12 @@ public class ArticleResultDto
     
     [JsonPropertyName("videos_count")]
     public int VideosCount { get; set; }
+
+    [JsonPropertyName("progress")]
+    public int? Progress { get; set; }
+
+    [JsonPropertyName("stage")]
+    public string? Stage { get; set; }
     
     [JsonPropertyName("status")]
     public string Status { get; set; } = "pending";

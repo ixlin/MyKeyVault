@@ -12,7 +12,7 @@ import sys
 import json
 import hashlib
 import argparse
-from typing import Optional
+from typing import Optional, Callable
 from urllib.parse import urljoin, urlparse, parse_qs
 from datetime import datetime
 
@@ -24,9 +24,10 @@ from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeo
 class WechatArticleScraper:
     """微信公众号文章爬取器"""
     
-    def __init__(self, output_dir: str = "output"):
+    def __init__(self, output_dir: str = "output", progress_callback: Optional[Callable[[int, str], None]] = None):
         self.output_dir = output_dir
         self.images_dir = os.path.join(output_dir, "images")
+        self.videos_dir = os.path.join(output_dir, "videos")
         # 预先计算可公开访问的基础路径（/wechat-articles/.../），用于生成绝对图片链接
         self.public_base_url = self._compute_public_base_url()
         self.session = requests.Session()
@@ -36,9 +37,42 @@ class WechatArticleScraper:
         
         # 创建输出目录
         os.makedirs(self.images_dir, exist_ok=True)
+        os.makedirs(self.videos_dir, exist_ok=True)
         
         # 图片URL映射 (原始URL -> 本地路径)
         self.image_map = {}
+        # 视频URL映射 (视频ID -> 本地路径和信息)
+        self.video_map = {}
+        # 捕获的视频URL列表
+        self.captured_video_urls = []
+
+        # 进度回调（用于 API/前端展示进度；CLI 也可复用）
+        self._progress_callback = progress_callback
+        self._last_progress = -1
+
+    def _set_progress(self, percent: int, message: str):
+        """上报进度：percent 0-100；message 为面向用户的阶段提示。"""
+        try:
+            percent = max(0, min(100, int(percent)))
+        except Exception:
+            percent = 0
+
+        # 避免同一百分比重复刷屏
+        if percent == self._last_progress:
+            return
+        self._last_progress = percent
+
+        if self._progress_callback:
+            try:
+                self._progress_callback(percent, message)
+            except Exception:
+                pass
+        else:
+            # CLI 友好输出（不暴露内部细节）
+            bar_len = 20
+            filled = int(bar_len * percent / 100)
+            bar = "#" * filled + "-" * (bar_len - filled)
+            print(f"[{bar}] {percent:3d}% {message}")
 
     def _compute_public_base_url(self) -> Optional[str]:
         """根据输出目录推导可通过 Web 访问的基础路径。例如 /wechat-articles/{user}/{article}/"""
@@ -63,6 +97,7 @@ class WechatArticleScraper:
             dict: 包含文章信息的字典
         """
         print(f"🚀 开始爬取: {url}")
+        self._set_progress(1, "开始获取文章")
         
         # 定义临时 PDF 输出路径
         temp_pdf_filename = "article_temp.pdf"
@@ -73,18 +108,33 @@ class WechatArticleScraper:
         
         if not html_content:
             raise Exception("无法获取页面内容")
+
+        self._set_progress(40, "页面内容已获取")
         
         # 解析文章内容
         article = self._parse_article(html_content, url)
+
+        self._set_progress(50, "正在下载资源")
         
         # 下载图片
         self._download_images(article)
+
+        self._set_progress(70, "图片处理完成")
+        
+        # 下载视频
+        self._download_videos(article)
+
+        self._set_progress(80, "视频处理完成")
         
         # 生成输出 HTML
         output_html = self._generate_html(article)
+
+        self._set_progress(90, "正在生成本地页面")
         
         # 保存文件
         filename = self._save_article(article, output_html)
+
+        self._set_progress(95, "正在保存文件")
         
         # 重命名 PDF 文件以匹配 HTML 文件名
         pdf_filename = None
@@ -96,6 +146,8 @@ class WechatArticleScraper:
             os.rename(temp_pdf_path, pdf_path)
         
         print(f"✅ 爬取完成: {filename}")
+
+        self._set_progress(100, "完成")
         
         return {
             "title": article["title"],
@@ -110,8 +162,11 @@ class WechatArticleScraper:
     def _fetch_with_playwright(self, url: str, pdf_path: Optional[str] = None) -> str:
         """使用 Playwright 获取完整渲染后的页面"""
         print("📖 正在加载页面...")
+        self._set_progress(5, "启动浏览器")
         
         html_content = None
+        # 重置捕获的视频URL
+        self.captured_video_urls = []
         
         with sync_playwright() as p:
             # 启动浏览器（增加反检测与稳定性参数）
@@ -145,27 +200,48 @@ class WechatArticleScraper:
             )
             page = context.new_page()
             
+            # 设置请求拦截器，捕获视频URL
+            def handle_request(request):
+                req_url = request.url
+                if '.mp4' in req_url and 'mpvideo.qpic.cn' in req_url:
+                    # 提取视频ID
+                    vid_match = re.search(r'vid=([^&]+)', req_url)
+                    vid = vid_match.group(1) if vid_match else None
+                    self.captured_video_urls.append({
+                        'url': req_url,
+                        'vid': vid
+                    })
+            
+            page.on('request', handle_request)
+            
             try:
                 # 访问页面 - 降低超时要求
                 print(f"  访问 URL: {url[:50]}...")
+                self._set_progress(15, "加载页面")
                 page.goto(url, wait_until='domcontentloaded', timeout=30000)
                 print("  页面已加载")
                 
                 # 等待文章内容加载 - 缩短超时
                 print("  等待文章内容...")
+                self._set_progress(25, "等待文章内容")
                 page.wait_for_selector('#js_content', timeout=8000)
                 print("  文章内容已加载")
                 
                 # 滚动页面以触发懒加载
+                self._set_progress(30, "加载图片与视频")
                 self._scroll_page(page)
                 
                 # 等待图片加载
                 page.wait_for_timeout(1500)
                 
+                # 尝试点击视频元素以触发视频URL请求
+                self._trigger_video_urls(page)
+                
                 # 保存 PDF (如果指定了路径)
                 if pdf_path:
                     print(f"  📄 保存 PDF: {os.path.basename(pdf_path)}...")
                     try:
+                        self._set_progress(35, "生成预览文件")
                         page.pdf(path=pdf_path, format="A4", print_background=True, margin={"top": "1cm", "bottom": "1cm", "left": "1cm", "right": "1cm"})
                         print("  ✓ PDF 保存成功")
                     except Exception as e:
@@ -235,6 +311,44 @@ class WechatArticleScraper:
             print("  ✓ 页面滚动完成")
         except Exception as e:
             print(f"  ⚠️ 滚动失败: {e}")
+    
+    def _trigger_video_urls(self, page):
+        """点击视频元素以触发视频URL请求"""
+        try:
+            # 查找视频元素
+            video_spans = page.query_selector_all('span.video_iframe[data-mpvid], span[data-mpvid]')
+            
+            if not video_spans:
+                return
+            
+            print(f"  🎬 发现 {len(video_spans)} 个视频，尝试获取视频链接...")
+            
+            for i, video_span in enumerate(video_spans):
+                try:
+                    # 滚动到视频元素
+                    video_span.scroll_into_view_if_needed()
+                    page.wait_for_timeout(500)
+                    
+                    # 点击视频以触发加载
+                    video_span.click()
+                    page.wait_for_timeout(2000)
+                    
+                    # 尝试关闭可能弹出的视频播放器
+                    try:
+                        close_btn = page.query_selector('.video_close, .close-btn, [class*="close"]')
+                        if close_btn:
+                            close_btn.click()
+                            page.wait_for_timeout(500)
+                    except:
+                        pass
+                    
+                except Exception as e:
+                    print(f"    ⚠️ 视频 {i+1} 点击失败: {e}")
+            
+            print(f"  ✓ 捕获到 {len(self.captured_video_urls)} 个视频URL")
+            
+        except Exception as e:
+            print(f"  ⚠️ 触发视频URL失败: {e}")
     
     def _parse_article(self, html: str, url: str) -> dict:
         """解析文章内容"""
@@ -395,9 +509,46 @@ class WechatArticleScraper:
     def _extract_videos(self, soup: BeautifulSoup) -> list:
         """提取视频信息"""
         videos = []
+        seen_vids = set()  # 避免重复
         
-        # 微信视频通常使用 iframe 或特定的 video 标签
-        # 查找 iframe 视频
+        # 1. 查找带有 data-mpvid 属性的 span 元素（微信原生视频）
+        for elem in soup.find_all(attrs={'data-mpvid': True}):
+            vid = elem.get('data-mpvid') or elem.get('vid')
+            if vid and vid not in seen_vids:
+                seen_vids.add(vid)
+                # 解码封面图URL
+                cover_url = elem.get('data-cover', '')
+                if cover_url:
+                    from urllib.parse import unquote
+                    cover_url = unquote(cover_url)
+                
+                videos.append({
+                    'type': 'wechat_native',
+                    'vid': vid,
+                    'cover_url': cover_url,
+                    'data_src': elem.get('data-src', ''),
+                    'element': elem
+                })
+        
+        # 2. 查找 class 包含 video_iframe 的 span 元素
+        for elem in soup.find_all('span', class_='video_iframe'):
+            vid = elem.get('data-mpvid') or elem.get('vid')
+            if vid and vid not in seen_vids:
+                seen_vids.add(vid)
+                cover_url = elem.get('data-cover', '')
+                if cover_url:
+                    from urllib.parse import unquote
+                    cover_url = unquote(cover_url)
+                
+                videos.append({
+                    'type': 'wechat_native',
+                    'vid': vid,
+                    'cover_url': cover_url,
+                    'data_src': elem.get('data-src', ''),
+                    'element': elem
+                })
+        
+        # 3. 查找 iframe 视频（兼容旧格式）
         for iframe in soup.find_all('iframe', class_='video_iframe'):
             video_url = iframe.get('data-src') or iframe.get('src')
             if video_url:
@@ -407,17 +558,18 @@ class WechatArticleScraper:
                     'element': iframe
                 })
         
-        # 查找腾讯视频
+        # 4. 查找腾讯视频
         for video_wrap in soup.find_all('div', class_='video_wrap'):
             video_id = video_wrap.get('data-mpvid') or video_wrap.get('data-vidtype')
-            if video_id:
+            if video_id and video_id not in seen_vids:
+                seen_vids.add(video_id)
                 videos.append({
                     'type': 'tencent',
                     'video_id': video_id,
                     'element': video_wrap
                 })
         
-        # 查找普通 video 标签
+        # 5. 查找普通 video 标签
         for video in soup.find_all('video'):
             video_url = video.get('src')
             if video_url:
@@ -593,6 +745,142 @@ class WechatArticleScraper:
         
         return '.jpg'  # 默认 jpg
     
+    def _download_videos(self, article: dict):
+        """下载文章中的所有视频"""
+        videos = article.get('videos', [])
+        
+        if not videos:
+            return
+        
+        # 筛选出微信原生视频
+        native_videos = [v for v in videos if v.get('type') == 'wechat_native' and v.get('vid')]
+        
+        if not native_videos:
+            print(f"📹 发现 {len(videos)} 个视频，但无可下载的微信原生视频")
+            return
+        
+        print(f"📹 下载视频 ({len(native_videos)} 个)...")
+        
+        for i, video in enumerate(native_videos, 1):
+            vid = video.get('vid')
+            
+            if vid in self.video_map:
+                continue
+            
+            try:
+                # 查找对应的视频URL
+                video_url = None
+                for captured in self.captured_video_urls:
+                    if captured.get('vid') == vid:
+                        video_url = captured.get('url')
+                        break
+                
+                # 如果没有精确匹配，尝试使用第一个捕获的URL
+                if not video_url and self.captured_video_urls and i == 1:
+                    video_url = self.captured_video_urls[0].get('url')
+                
+                if not video_url:
+                    print(f"  ⚠️ [{i}/{len(native_videos)}] 未找到视频URL (vid: {vid})")
+                    continue
+                
+                # 下载视频
+                local_video_path = self._download_single_video(video_url, vid, i)
+                
+                # 下载封面图
+                local_cover_path = None
+                cover_url = video.get('cover_url')
+                if cover_url:
+                    try:
+                        local_cover_path = self._download_video_cover(cover_url, vid, i)
+                    except Exception as e:
+                        print(f"    ⚠️ 封面下载失败: {e}")
+                
+                self.video_map[vid] = {
+                    'local_video_path': local_video_path,
+                    'local_cover_path': local_cover_path,
+                    'vid': vid
+                }
+                print(f"  ✓ [{i}/{len(native_videos)}] 视频下载成功")
+                
+            except Exception as e:
+                print(f"  ✗ [{i}/{len(native_videos)}] 视频下载失败: {e}")
+    
+    def _download_single_video(self, url: str, vid: str, index: int) -> str:
+        """下载单个视频文件"""
+        # 生成文件名
+        url_hash = hashlib.md5(vid.encode()).hexdigest()[:8]
+        filename = f"video_{index:03d}_{url_hash}.mp4"
+        filepath = os.path.join(self.videos_dir, filename)
+        
+        print(f"    📥 正在下载视频 {index}...")
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Referer': 'https://mp.weixin.qq.com/',
+            'Accept': '*/*',
+            'Accept-Encoding': 'identity',  # 禁用压缩，便于获取准确大小
+            'Range': 'bytes=0-'  # 支持断点续传
+        }
+        
+        # 使用流式下载
+        response = self.session.get(url, headers=headers, timeout=120, stream=True)
+        response.raise_for_status()
+        
+        # 获取文件大小
+        total_size = int(response.headers.get('content-length', 0))
+        
+        downloaded = 0
+        last_reported = -5
+        with open(filepath, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    if total_size > 0:
+                        percent = (downloaded / total_size) * 100
+                        if percent - last_reported >= 5 or percent >= 100:
+                            last_reported = percent
+                            size_mb = total_size / (1024 * 1024)
+                            print(f"    📊 下载进度: {percent:.1f}% ({size_mb:.1f}MB)", end='\r', flush=True)
+                    else:
+                        # 无 content-length 时做轻量提示
+                        mb = downloaded / (1024 * 1024)
+                        if int(mb) != int((downloaded - len(chunk)) / (1024 * 1024)):
+                            print(f"    📊 已下载: {mb:.0f}MB", end='\r', flush=True)
+        
+        print(f"    📊 下载完成: 100%                    ")
+        
+        # 返回相对路径
+        return os.path.join("videos", filename)
+    
+    def _download_video_cover(self, url: str, vid: str, index: int) -> str:
+        """下载视频封面图"""
+        url_hash = hashlib.md5(vid.encode()).hexdigest()[:8]
+        
+        # 从URL获取格式
+        ext = '.jpg'
+        if 'wx_fmt=' in url:
+            fmt_match = re.search(r'wx_fmt=(\w+)', url)
+            if fmt_match:
+                ext = f".{fmt_match.group(1)}"
+        
+        filename = f"cover_{index:03d}_{url_hash}{ext}"
+        filepath = os.path.join(self.images_dir, filename)
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+            'Referer': 'https://mp.weixin.qq.com/',
+            'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8'
+        }
+        
+        response = self.session.get(url, headers=headers, timeout=30)
+        response.raise_for_status()
+        
+        with open(filepath, 'wb') as f:
+            f.write(response.content)
+        
+        return os.path.join("images", filename)
+    
     def _generate_html(self, article: dict) -> str:
         """生成输出 HTML"""
         # 处理内容中的图片路径
@@ -625,12 +913,137 @@ class WechatArticleScraper:
                 # 去掉懒加载类名，避免样式影响
                 if 'class' in img.attrs:
                     img['class'] = [c for c in img['class'] if c not in ['lazyload', 'js_lazy']] or None
-        content = str(soup)
+
+        # 处理视频：在正文中原始位置替换为本地 <video>
+        videos_by_vid = {}
+        for v in article.get('videos', []) or []:
+            vid = v.get('vid')
+            if vid:
+                videos_by_vid[vid] = v
+
+        # 微信文章中视频常见结构：span.video_iframe[data-mpvid] 或任意元素[data-mpvid]
+        video_elems = list(soup.find_all(attrs={'data-mpvid': True}))
+        if video_elems:
+            for elem in video_elems:
+                vid = elem.get('data-mpvid') or elem.get('vid')
+                if not vid:
+                    continue
+
+                local_info = self.video_map.get(vid, {})
+                local_video = local_info.get('local_video_path')
+                local_cover = local_info.get('local_cover_path')
+
+                # 构造替换节点
+                if local_video:
+                    container = soup.new_tag('div')
+                    container['class'] = ['video-container']
+                    container['style'] = 'margin: 15px 0;'
+
+                    video_tag = soup.new_tag('video')
+                    video_tag['controls'] = ''
+                    video_tag['style'] = 'max-width: 100%; border-radius: 8px; background: #000;'
+                    if local_cover:
+                        video_tag['poster'] = local_cover
+
+                    source = soup.new_tag('source')
+                    source['src'] = local_video
+                    source['type'] = 'video/mp4'
+
+                    video_tag.append(source)
+                    video_tag.append('您的浏览器不支持视频播放')
+                    container.append(video_tag)
+                    elem.replace_with(container)
+                else:
+                    # 未下载到视频时：在原位置输出占位链接
+                    v = videos_by_vid.get(vid, {})
+                    data_src = v.get('data_src') or elem.get('data-src') or '#'
+
+                    placeholder = soup.new_tag('div')
+                    placeholder['class'] = ['video-placeholder']
+
+                    p1 = soup.new_tag('p')
+                    p1.string = '🎬 视频'
+                    placeholder.append(p1)
+
+                    p2 = soup.new_tag('p')
+                    a = soup.new_tag('a')
+                    a['href'] = data_src
+                    a['target'] = '_blank'
+                    a.string = '点击观看原视频'
+                    p2.append(a)
+                    placeholder.append(p2)
+
+                    elem.replace_with(placeholder)
+
+        # 处理代码块：规范化微信 code-snippet
+        # 目标：保证行号数量和代码行数一致，同时尽量保留微信原始 DOM（避免把一行命令拆成多行、丢失 span 高亮）。
+        for section in soup.select('section.code-snippet__fix'):
+            try:
+                ul = section.select_one('ul.code-snippet__line-index')
+                pre = section.select_one('pre')
+                if not pre:
+                    continue
+
+                codes = pre.find_all('code', recursive=False)
+                if not codes:
+                    codes = pre.find_all('code')
+                if not codes:
+                    continue
+
+                line_count = 0
+                normalized_codes = []
+                for code in codes:
+                    # 将 <br> 视为真正的换行（不要把 span/空格强行转换为换行）
+                    for br in code.find_all('br'):
+                        br.replace_with('\n')
+
+                    # &nbsp; 还原成普通空格（在文本节点层面替换，保留高亮 span）
+                    for s in code.find_all(string=True):
+                        if '\xa0' in s:
+                            s.replace_with(s.replace('\xa0', ' '))
+
+                    # 统计行数：按当前 code 文本中的换行符计算
+                    text = code.get_text()
+                    line_count += max(1, text.count('\n') + 1)
+                    normalized_codes.append(code)
+
+                # 规范化 pre：只保留 code（移除多余的空白文本节点），但不合并成纯文本
+                pre.clear()
+                for code in normalized_codes:
+                    pre.append(code)
+
+                # 同步行号数量
+                if ul is not None:
+                    ul.clear()
+                    for _ in range(max(1, line_count)):
+                        ul.append(soup.new_tag('li'))
+            except Exception:
+                # 代码块解析失败时不影响正文输出
+                continue
+
+        # 修复：微信正文容器有时带 `visibility:hidden; opacity:0`（用于前端渐显/排版），
+        # 离线 HTML 直接渲染会导致“正文完全不可见”。这里仅移除隐藏相关样式。
+        js_content = soup.select_one('#js_content')
+        if js_content is not None and js_content.has_attr('style'):
+            style = js_content.get('style', '')
+            style = re.sub(r'(?i)\bvisibility\s*:\s*hidden\s*;?', '', style)
+            style = re.sub(r'(?i)\bopacity\s*:\s*0(?:\.0+)?\s*;?', '', style)
+            style = style.strip()
+            if style:
+                js_content['style'] = style
+            else:
+                del js_content['style']
+
+        # 避免把 BeautifulSoup 自动补的 <html><body> 包装串进正文
+        if js_content is not None:
+            content = js_content.decode_contents()
+        elif soup.body is not None:
+            content = soup.body.decode_contents()
+        else:
+            content = soup.decode_contents()
         
-        # 处理视频（第一阶段：保留原始引用）
+        # 视频已内嵌到正文中，避免重复展示
         videos_html = ""
-        if article.get('videos'):
-            videos_html = self._generate_videos_html(article['videos'])
         
         # 如果在 wwwroot 下，添加 <base> 以修正预览时的相对路径；file:// 打开时通过脚本移除
         base_tag = ""
@@ -746,6 +1159,68 @@ class WechatArticleScraper:
         .video-placeholder a {{
             color: #576b95;
         }}
+
+        /* WeChat code snippet blocks */
+        section.code-snippet__fix {{
+            display: flex;
+            border-radius: 8px;
+            overflow: hidden;
+            margin: 15px 0;
+            background: #1f1f1f;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        }}
+        section.code-snippet__fix .code-snippet__line-index {{
+            list-style: none;
+            padding: 12px 10px;
+            margin: 0;
+            background: #1f1f1f;
+            color: rgba(255, 255, 255, 0.55);
+            text-align: right;
+            user-select: none;
+            counter-reset: code_line;
+            flex: 0 0 auto;
+            font-size: 14px;
+            line-height: 1.6;
+        }}
+        section.code-snippet__fix .code-snippet__line-index li {{
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+            counter-increment: code_line;
+        }}
+        section.code-snippet__fix .code-snippet__line-index li::before {{
+            content: counter(code_line);
+            display: block;
+            min-width: 1.5em;
+        }}
+        section.code-snippet__fix pre {{
+            margin: 0;
+            padding: 12px 14px;
+            overflow: auto;
+            background: #1f1f1f;
+            color: #e6e6e6;
+            flex: 1 1 auto;
+            line-height: 1.6;
+            font-size: 14px;
+        }}
+        section.code-snippet__fix pre code {{
+            display: block;
+            white-space: pre;
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }}
+        section.code-snippet__fix pre code span {{
+            line-height: inherit;
+        }}
+        section.code-snippet__fix .code-snippet__meta {{
+            color: rgba(255, 255, 255, 0.7);
+        }}
+        section.code-snippet__fix .code-snippet__keyword {{
+            color: #ff9f43;
+            font-weight: 600;
+        }}
     </style>
 </head>
 <body>
@@ -779,28 +1254,61 @@ class WechatArticleScraper:
         if not videos:
             return ""
         
-        html_parts = ['<div class="videos-section"><h3>视频内容</h3>']
+        html_parts = ['<div class="videos-section" style="margin-top: 20px;"><h3 style="margin-bottom: 15px;">视频内容</h3>']
         
         for i, video in enumerate(videos, 1):
-            if video['type'] == 'iframe':
+            vid = video.get('vid') or video.get('video_id')
+            
+            # 检查是否有本地视频文件
+            if vid and vid in self.video_map:
+                video_info = self.video_map[vid]
+                local_video = video_info.get('local_video_path', '')
+                local_cover = video_info.get('local_cover_path', '')
+                
+                if local_video:
+                    # 使用本地视频文件
+                    poster_attr = f'poster="{local_cover}"' if local_cover else ''
+                    html_parts.append(f'''
+                    <div class="video-container" style="margin: 15px 0;">
+                        <video controls {poster_attr} style="max-width: 100%; border-radius: 8px; background: #000;">
+                            <source src="{local_video}" type="video/mp4">
+                            您的浏览器不支持视频播放
+                        </video>
+                    </div>
+                    ''')
+                    continue
+            
+            # 没有本地文件，显示占位符
+            if video['type'] == 'wechat_native':
+                cover_url = video.get('cover_url', '')
+                cover_html = f'<img src="{cover_url}" style="max-width: 100%; border-radius: 8px;" alt="视频封面">' if cover_url else ''
                 html_parts.append(f'''
-                <div class="video-placeholder">
+                <div class="video-placeholder" style="background: #f0f0f0; padding: 20px; text-align: center; margin: 15px 0; border-radius: 8px;">
+                    {cover_html}
+                    <p style="margin-top: 10px;">🎬 视频 {i} (微信视频)</p>
+                    <p style="color: #999; font-size: 12px;">视频ID: {vid}</p>
+                    <p><a href="{video.get('data_src', '#')}" target="_blank" style="color: #576b95;">点击观看原视频</a></p>
+                </div>
+                ''')
+            elif video['type'] == 'iframe':
+                html_parts.append(f'''
+                <div class="video-placeholder" style="background: #f0f0f0; padding: 20px; text-align: center; margin: 15px 0; border-radius: 8px;">
                     <p>🎬 视频 {i}</p>
-                    <p><a href="{video.get('url', '#')}" target="_blank">点击观看原视频</a></p>
+                    <p><a href="{video.get('url', '#')}" target="_blank" style="color: #576b95;">点击观看原视频</a></p>
                 </div>
                 ''')
             elif video['type'] == 'tencent':
                 html_parts.append(f'''
-                <div class="video-placeholder">
+                <div class="video-placeholder" style="background: #f0f0f0; padding: 20px; text-align: center; margin: 15px 0; border-radius: 8px;">
                     <p>🎬 腾讯视频 {i}</p>
-                    <p>视频ID: {video.get('video_id', '未知')}</p>
+                    <p style="color: #999; font-size: 12px;">视频ID: {video.get('video_id', '未知')}</p>
                 </div>
                 ''')
             else:
                 html_parts.append(f'''
-                <div class="video-placeholder">
+                <div class="video-placeholder" style="background: #f0f0f0; padding: 20px; text-align: center; margin: 15px 0; border-radius: 8px;">
                     <p>🎬 视频 {i}</p>
-                    <p><a href="{video.get('url', '#')}" target="_blank">点击观看</a></p>
+                    <p><a href="{video.get('url', '#')}" target="_blank" style="color: #576b95;">点击观看</a></p>
                 </div>
                 ''')
         

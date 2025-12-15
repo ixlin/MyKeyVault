@@ -56,6 +56,8 @@ class ArticleResult(BaseModel):
     pdf_file_path: Optional[str] = None
     images_count: int = 0
     videos_count: int = 0
+    progress: int = 0  # 0-100
+    stage: str = "等待开始"  # 面向用户的阶段提示
     status: str = "pending"  # pending, processing, completed, failed
     error_message: Optional[str] = None
 
@@ -117,8 +119,15 @@ async def scrape_article(article_result: ArticleResult, output_dir: str):
     """异步爬取单篇文章（在独立线程中运行同步 Playwright，避免事件循环冲突）"""
     try:
         article_result.status = "processing"
+        article_result.progress = 0
+        article_result.stage = "准备中"
+
+        def on_progress(percent: int, message: str):
+            # 只写面向用户的阶段信息，不暴露内部实现细节
+            article_result.progress = int(percent)
+            article_result.stage = message
         
-        scraper = WechatArticleScraper(output_dir=output_dir)
+        scraper = WechatArticleScraper(output_dir=output_dir, progress_callback=on_progress)
         # 在后台线程中执行同步 Playwright，避免 "Sync API inside the asyncio loop" 报错
         result = await asyncio.to_thread(scraper.scrape, article_result.source_url)
         
@@ -130,9 +139,14 @@ async def scrape_article(article_result: ArticleResult, output_dir: str):
         article_result.images_count = result.get("images_count", 0)
         article_result.videos_count = result.get("videos_count", 0)
         article_result.status = "completed"
+        article_result.progress = 100
+        article_result.stage = "完成"
         
     except Exception as e:
         article_result.status = "failed"
+        # 尽量让前端看到“卡在哪一步”
+        if article_result.progress < 100:
+            article_result.stage = article_result.stage or "失败"
         # 将错误信息缩短并明确，便于前端展示与调试
         msg = str(e)
         if len(msg) > 500:

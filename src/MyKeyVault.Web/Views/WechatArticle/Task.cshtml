@@ -2,6 +2,7 @@
 @{
     ViewData["Title"] = "任务进度";
     var taskId = (string)ViewBag.TaskId;
+    var currentStage = Model.Articles.FirstOrDefault(a => a.Status == "processing" && !string.IsNullOrWhiteSpace(a.Stage));
 }
 
 <div class="container" style="max-width: 800px;">
@@ -23,13 +24,14 @@
                 <div class="progress" style="height: 25px;">
                     <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
                          role="progressbar" 
-                         style="width: @GetProgressPercent(Model)%;"
+                         style="width: @GetOverallProgressPercent(Model)%;"
                          aria-valuenow="@Model.CompletedCount" 
                          aria-valuemin="0" 
                          aria-valuemax="@Model.TotalCount">
-                        <span id="progressText">@Model.CompletedCount / @Model.TotalCount</span>
+                        <span id="progressText">@GetOverallProgressPercent(Model)% (@Model.CompletedCount / @Model.TotalCount)</span>
                     </div>
                 </div>
+                <div id="taskStage" class="small text-muted mt-1">@(currentStage != null ? $"当前：{(currentStage.Title ?? currentStage.SourceUrl ?? currentStage.ArticleId)} - {currentStage.Stage}" : "")</div>
             </div>
         </div>
     </div>
@@ -70,6 +72,10 @@
                             </td>
                             <td class="article-status">
                                 @Html.Raw(GetStatusHtml(article.Status, article.ErrorMessage))
+                                @if (!string.IsNullOrWhiteSpace(article.Stage))
+                                {
+                                    <div class="small text-muted mt-1">@article.Stage</div>
+                                }
                                 @if (!string.IsNullOrEmpty(article.ErrorMessage))
                                 {
                                     <div class="text-danger small mt-1" style="white-space: pre-wrap;">
@@ -115,10 +121,20 @@
             statusBadge.textContent = getStatusText(data.status);
             
             // 更新进度条
-            const percent = data.total_count > 0 ? Math.round(data.completed_count / data.total_count * 100) : 0;
+            const percent = getOverallProgressPercent(data);
             const progressBar = document.getElementById('progressBar');
             progressBar.style.width = percent + '%';
-            document.getElementById('progressText').textContent = data.completed_count + ' / ' + data.total_count;
+            document.getElementById('progressText').textContent = percent + '% (' + data.completed_count + ' / ' + data.total_count + ')';
+
+            // 更新任务阶段（取第一篇 processing 且有 stage 的文章）
+            const taskStage = document.getElementById('taskStage');
+            const processing = (data.articles || []).find(a => a.status === 'processing' && a.stage);
+            if (processing && processing.stage) {
+                const who = processing.title || processing.source_url || processing.article_id;
+                taskStage.textContent = `当前：${who} - ${processing.stage}`;
+            } else {
+                taskStage.textContent = '';
+            }
             
             // 更新文章列表
             data.articles.forEach(article => {
@@ -126,10 +142,12 @@
                 if (row) {
                     const titleCell = row.querySelector('td:first-child');
                     if (article.title) {
-                        titleCell.innerHTML = `<div><strong>${article.title}</strong>${article.author ? '<br><small class="text-muted">' + article.author + '</small>' : ''}</div>`;
+                        const title = escapeHtml(article.title);
+                        const author = article.author ? escapeHtml(article.author) : '';
+                        titleCell.innerHTML = `<div><strong>${title}</strong>${author ? '<br><small class="text-muted">' + author + '</small>' : ''}</div>`;
                     }
                     
-                    row.querySelector('.article-status').innerHTML = getStatusHtml(article.status, article.error_message);
+                    row.querySelector('.article-status').innerHTML = renderArticleStatus(article);
                     row.querySelector('.article-images').textContent = article.images_count;
                 }
             });
@@ -148,6 +166,46 @@
                 // 移除进度条动画
                 progressBar.classList.remove('progress-bar-striped', 'progress-bar-animated');
             }
+        }
+
+        function escapeHtml(str) {
+            if (str === null || str === undefined) return '';
+            return String(str)
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#39;');
+        }
+
+        function getOverallProgressPercent(data) {
+            const total = Number(data.total_count || 0);
+            const articles = Array.isArray(data.articles) ? data.articles : [];
+            if (total <= 0) return 0;
+
+            // 用每篇文章进度的平均值做总进度（这样中间会持续增长）
+            // completed/failed 视为 100；pending 无 progress 视为 0。
+            let sum = 0;
+            for (const a of articles) {
+                if (a.status === 'completed' || a.status === 'failed') {
+                    sum += 100;
+                    continue;
+                }
+                const pRaw = a.progress;
+                const p = (pRaw === null || pRaw === undefined) ? 0 : Number(pRaw);
+                if (Number.isNaN(p)) {
+                    sum += 0;
+                } else {
+                    sum += Math.max(0, Math.min(100, p));
+                }
+            }
+
+            // 兼容后端偶尔不返回 articles 的情况
+            if (articles.length === 0) {
+                return Math.round((Number(data.completed_count || 0) / total) * 100);
+            }
+
+            return Math.round(sum / total);
         }
         
         function getStatusBadgeClass(status) {
@@ -181,10 +239,24 @@
                 case 'pending': 
                     return '<span class="badge bg-secondary">等待中</span>';
                 case 'failed': 
-                    return `<span class="badge bg-danger" title="${errorMessage || ''}">失败</span>`;
+                    return `<span class="badge bg-danger" title="${escapeHtml(errorMessage || '')}">失败</span>`;
                 default: 
                     return `<span class="badge bg-secondary">${status}</span>`;
             }
+        }
+
+        function renderArticleStatus(article) {
+            const statusHtml = getStatusHtml(article.status, article.error_message);
+
+            const stageHtml = article.stage
+                ? `<div class="small text-muted mt-1">${escapeHtml(article.stage)}</div>`
+                : '';
+
+            const errorHtml = article.error_message
+                ? `<div class="text-danger small mt-1" style="white-space: pre-wrap;">${escapeHtml(article.error_message)}</div>`
+                : '';
+
+            return statusHtml + stageHtml + errorHtml;
         }
         
         async function pollStatus() {
@@ -239,6 +311,33 @@
     {
         if (model.TotalCount == 0) return 0;
         return (int)Math.Round((double)model.CompletedCount / model.TotalCount * 100);
+    }
+
+    int GetOverallProgressPercent(MyKeyVault.Web.Services.TaskStatusResponseDto model)
+    {
+        if (model.TotalCount == 0) return 0;
+
+        if (model.Articles == null || model.Articles.Count == 0)
+        {
+            return GetProgressPercent(model);
+        }
+
+        var sum = 0;
+        foreach (var a in model.Articles)
+        {
+            if (a.Status == "completed" || a.Status == "failed")
+            {
+                sum += 100;
+                continue;
+            }
+
+            if (a.Progress.HasValue)
+            {
+                sum += Math.Clamp(a.Progress.Value, 0, 100);
+            }
+        }
+
+        return (int)Math.Round((double)sum / model.TotalCount);
     }
     
     string GetStatusHtml(string status, string? errorMessage)
