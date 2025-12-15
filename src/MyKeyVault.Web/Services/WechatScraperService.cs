@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using MyKeyVault.Web.Data;
@@ -180,6 +181,156 @@ public class WechatScraperService
             _logger.LogWarning(ex, "Python 爬虫服务不可用");
             return false;
         }
+    }
+
+    /// <summary>
+    /// 检查URL是否已被爬取（仅限当前用户）
+    /// </summary>
+    public async Task<Dictionary<string, WechatArticle?>> CheckUrlsExistAsync(string userId, List<string> urls)
+    {
+        var result = new Dictionary<string, WechatArticle?>();
+
+        foreach (var originalUrl in urls)
+        {
+            if (!TryParseWechatArticleKey(originalUrl, out var key))
+            {
+                result[originalUrl] = null;
+                continue;
+            }
+
+            // 先用 SQL 做“缩小范围”的筛选，再在内存里做精确解析比对，避免前缀误判。
+            var query = _context.WechatArticles
+                .AsNoTracking()
+                .Where(a => a.UserId == userId);
+
+            query = key.Type switch
+            {
+                WechatArticleKeyType.SPathToken => query
+                    .Where(a => a.SourceUrl.Contains("mp.weixin.qq.com") && a.SourceUrl.Contains($"/s/{key.Token}")),
+
+                WechatArticleKeyType.Sn => query
+                    .Where(a => a.SourceUrl.Contains("mp.weixin.qq.com") && a.SourceUrl.Contains("/s?") && a.SourceUrl.Contains($"sn={key.Token}")),
+
+                WechatArticleKeyType.BizMidIdx => query
+                    .Where(a => a.SourceUrl.Contains("mp.weixin.qq.com")
+                                && a.SourceUrl.Contains($"__biz={key.Biz}")
+                                && a.SourceUrl.Contains($"mid={key.Mid}")
+                                && a.SourceUrl.Contains($"idx={key.Idx}")),
+
+                _ => query
+            };
+
+            // 候选集不需要太大；最终精确匹配靠解析。
+            var candidates = await query
+                .OrderByDescending(a => a.CreatedAt)
+                .Take(50)
+                .ToListAsync();
+
+            WechatArticle? matched = null;
+            foreach (var candidate in candidates)
+            {
+                if (string.IsNullOrWhiteSpace(candidate.SourceUrl))
+                {
+                    continue;
+                }
+
+                if (!TryParseWechatArticleKey(candidate.SourceUrl, out var candidateKey))
+                {
+                    continue;
+                }
+
+                if (candidateKey.Equals(key))
+                {
+                    matched = candidate;
+                    break;
+                }
+            }
+
+            result[originalUrl] = matched;
+        }
+
+        return result;
+    }
+
+    private enum WechatArticleKeyType
+    {
+        SPathToken,
+        Sn,
+        BizMidIdx
+    }
+
+    private readonly record struct WechatArticleKey(WechatArticleKeyType Type, string Token, string? Biz, string? Mid, string? Idx);
+
+    /// <summary>
+    /// 解析微信文章链接，提取“稳定标识”，用于精确判重。
+    /// 支持：
+    /// - https://mp.weixin.qq.com/s/xxxxxx  -> Token=xxxxxx
+    /// - https://mp.weixin.qq.com/s?sn=xxx  -> Token=sn
+    /// - https://mp.weixin.qq.com/s?__biz=...&mid=...&idx=... -> Biz/Mid/Idx
+    /// </summary>
+    private static bool TryParseWechatArticleKey(string url, out WechatArticleKey key)
+    {
+        key = default;
+
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return false;
+        }
+
+        if (!Uri.TryCreate(url.Trim(), UriKind.Absolute, out var uri))
+        {
+            return false;
+        }
+
+        if (string.IsNullOrEmpty(uri.Host) || !uri.Host.Contains("mp.weixin.qq.com", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var path = uri.AbsolutePath ?? string.Empty;
+
+        if (path.StartsWith("/s/", StringComparison.OrdinalIgnoreCase))
+        {
+            var token = path.Substring(3);
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                return false;
+            }
+
+            // 防止多余的“/”或空白
+            token = token.Trim('/').Trim();
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                return false;
+            }
+
+            key = new WechatArticleKey(WechatArticleKeyType.SPathToken, token, null, null, null);
+            return true;
+        }
+
+        if (path.Equals("/s", StringComparison.OrdinalIgnoreCase))
+        {
+            var query = QueryHelpers.ParseQuery(uri.Query ?? string.Empty);
+
+            if (query.TryGetValue("sn", out var sn) && !string.IsNullOrWhiteSpace(sn.ToString()))
+            {
+                key = new WechatArticleKey(WechatArticleKeyType.Sn, sn.ToString(), null, null, null);
+                return true;
+            }
+
+            if (query.TryGetValue("__biz", out var biz)
+                && query.TryGetValue("mid", out var mid)
+                && query.TryGetValue("idx", out var idx)
+                && !string.IsNullOrWhiteSpace(biz.ToString())
+                && !string.IsNullOrWhiteSpace(mid.ToString())
+                && !string.IsNullOrWhiteSpace(idx.ToString()))
+            {
+                key = new WechatArticleKey(WechatArticleKeyType.BizMidIdx, "", biz.ToString(), mid.ToString(), idx.ToString());
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>

@@ -144,6 +144,56 @@ public class WechatArticleController : Controller
     }
 
     /// <summary>
+    /// 验证URL是否已被爬取（AJAX）
+    /// </summary>
+    [HttpPost]
+    [IgnoreAntiforgeryToken]
+    public async Task<IActionResult> CheckUrls([FromBody] CheckUrlsRequestDto request)
+    {
+        if (request?.Urls == null || !request.Urls.Any())
+        {
+            return BadRequest(new { error = "URL列表不能为空" });
+        }
+
+        // 过滤出微信公众号链接
+        var wechatUrls = request.Urls
+            .Where(url => !string.IsNullOrWhiteSpace(url) && url.Contains("mp.weixin.qq.com"))
+            .ToList();
+
+        if (!wechatUrls.Any())
+        {
+            return Ok(new { results = new Dictionary<string, object>() });
+        }
+
+        var userId = CurrentUserId;
+        var existingArticles = await _scraperService.CheckUrlsExistAsync(userId, wechatUrls);
+        
+        var results = existingArticles.Select(kv => new
+        {
+            url = kv.Key,
+            exists = kv.Value != null,
+            article = kv.Value != null ? new
+            {
+                id = kv.Value.ArticleId,
+                title = kv.Value.Title,
+                status = kv.Value.Status,
+                completedAt = (kv.Value.CompletedAt ?? kv.Value.CreatedAt).ToString("yyyy-MM-dd HH:mm"),
+                author = kv.Value.Author
+            } : null
+        }).ToDictionary(x => x.url, x => (object)new { x.exists, x.article });
+
+        return Ok(new { results });
+    }
+
+    /// <summary>
+    /// 检查URL请求DTO
+    /// </summary>
+    public class CheckUrlsRequestDto
+    {
+        public List<string> Urls { get; set; } = new();
+    }
+
+    /// <summary>
     /// 预览文章（重定向到静态文件）
     /// </summary>
     public async Task<IActionResult> Preview(long id)
