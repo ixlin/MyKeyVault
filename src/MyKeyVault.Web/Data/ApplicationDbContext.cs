@@ -28,6 +28,11 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
 
     // 微信图文
     public DbSet<WechatArticle> WechatArticles => Set<WechatArticle>();
+    public DbSet<WechatArticleExtraction> WechatArticleExtractions => Set<WechatArticleExtraction>();
+    public DbSet<WechatScrapeLog> WechatScrapeLogs => Set<WechatScrapeLog>();
+
+    // AI 配置
+    public DbSet<AIConfig> AIConfigs => Set<AIConfig>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -89,6 +94,26 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             e.HasIndex(x => x.ArticleUniqueId);
             e.HasIndex(x => x.Status);
             e.HasIndex(x => x.CreatedAt);
+        });
+
+        builder.Entity<WechatArticleExtraction>(e =>
+        {
+            e.HasIndex(x => x.ArticleId);
+            e.HasIndex(x => x.UserId);
+            e.HasIndex(x => x.CreatedAt);
+        });
+
+        builder.Entity<WechatScrapeLog>(e =>
+        {
+            e.HasIndex(x => x.UserId);
+            e.HasIndex(x => x.Action);
+            e.HasIndex(x => x.CreatedAt);
+        });
+
+        // AI 配置表配置
+        builder.Entity<AIConfig>(e =>
+        {
+            e.HasIndex(x => x.UserId).IsUnique();
         });
     }
 }

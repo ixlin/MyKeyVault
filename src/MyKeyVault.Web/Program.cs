@@ -78,6 +78,11 @@ builder.Services.Configure<WechatScraperOptions>(
 builder.Services.AddHttpClient<WechatScraperService>();
 builder.Services.AddScoped<WechatScraperService>();
 
+// AI 萃取服务配置
+builder.Services.AddHttpClient();
+builder.Services.AddScoped<AIExtractionService>();
+builder.Services.AddScoped<PptGenerationService>();
+
 // JWT 认证（用于 Tushare API）
 builder.Services.AddAuthentication()
     .AddJwtBearer("TushareBearer", options =>

@@ -1,0 +1,413 @@
+@model List<MyKeyVault.Web.Models.WechatArticle>
+@{
+    ViewData["Title"] = "抓取任务管理";
+    var currentPage = (int)ViewBag.CurrentPage;
+    var totalPages = (int)ViewBag.TotalPages;
+    var totalCount = (int)ViewBag.TotalCount;
+    var serviceAvailable = (bool)ViewBag.ServiceAvailable;
+}
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-list-task"></i> 抓取任务管理</h2>
+        <div>
+            <a asp-action="Index" class="btn btn-outline-secondary me-2">
+                <i class="bi bi-arrow-left"></i> 返回文章列表
+            </a>
+            @if (serviceAvailable)
+            {
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createTaskModal">
+                    <i class="bi bi-plus-circle"></i> 新建任务
+                </button>
+            }
+            else
+            {
+                <button type="button" class="btn btn-secondary" disabled title="爬虫服务不可用">
+                    <i class="bi bi-plus-circle"></i> 新建任务
+                </button>
+            }
+        </div>
+    </div>
+
+    @if (!serviceAvailable)
+    {
+        <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle"></i> Python 爬虫服务当前不可用，无法创建新任务。请检查服务是否已启动。
+        </div>
+    }
+
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-table"></i> 任务列表 (共 @totalCount 条)</span>
+            <button type="button" class="btn btn-sm btn-outline-primary" onclick="refreshList()">
+                <i class="bi bi-arrow-clockwise"></i> 刷新
+            </button>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover table-striped mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 80px;">数据库ID</th>
+                            <th style="width: 200px;">Python Task ID</th>
+                            <th>文章标题/链接</th>
+                            <th style="width: 100px;">状态</th>
+                            <th style="width: 60px;">图片</th>
+                            <th style="width: 150px;">创建时间</th>
+                            <th style="width: 120px;">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="taskListBody">
+                        @if (Model.Any())
+                        {
+                            @foreach (var article in Model)
+                            {
+                                <tr data-article-id="@article.ArticleId">
+                                    <td><code>@article.ArticleId</code></td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(article.TaskId))
+                                        {
+                                            <code class="text-muted" style="font-size: 0.75rem;">@article.TaskId</code>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(article.Title))
+                                        {
+                                            <div>
+                                                <strong title="@article.SourceUrl">@article.Title</strong>
+                                                @if (!string.IsNullOrEmpty(article.Author))
+                                                {
+                                                    <br><small class="text-muted">@article.Author</small>
+                                                }
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">处理中...</span>
+                                            <br><small class="text-muted text-truncate d-inline-block" style="max-width: 300px;" title="@article.SourceUrl">@article.SourceUrl</small>
+                                        }
+                                    </td>
+                                    <td>
+                                        @{
+                                            var badgeClass = article.Status switch
+                                            {
+                                                "completed" => "bg-success",
+                                                "processing" => "bg-primary",
+                                                "failed" => "bg-danger",
+                                                "cancelled" => "bg-secondary",
+                                                _ => "bg-warning"
+                                            };
+                                            var statusText = article.Status switch
+                                            {
+                                                "completed" => "已完成",
+                                                "processing" => "进行中",
+                                                "failed" => "失败",
+                                                "cancelled" => "已取消",
+                                                "pending" => "等待中",
+                                                _ => article.Status
+                                            };
+                                        }
+                                        <span class="badge @badgeClass">@statusText</span>
+                                        @if (!string.IsNullOrEmpty(article.ErrorMessage))
+                                        {
+                                            <i class="bi bi-info-circle text-danger ms-1" 
+                                               data-bs-toggle="tooltip" 
+                                               title="@article.ErrorMessage"></i>
+                                        }
+                                    </td>
+                                    <td>@article.ImagesCount</td>
+                                    <td>
+                                        <small>@article.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</small>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            @if (!string.IsNullOrEmpty(article.TaskId))
+                                            {
+                                                <a asp-action="Task" asp-route-id="@article.TaskId" class="btn btn-outline-primary">
+                                                    <i class="bi bi-box-arrow-up-right"></i> 查看任务
+                                                </a>
+                                            }
+                                            else
+                                            {
+                                                <button type="button" class="btn btn-outline-secondary" disabled title="任务ID不存在">
+                                                    <i class="bi bi-box-arrow-up-right"></i> 查看任务
+                                                </button>
+                                            }
+                                            <button type="button" class="btn btn-outline-danger" 
+                                                    onclick="confirmDelete(@article.ArticleId, '@(article.Title?.Replace("'", "\\'") ?? "未知")')">
+                                                <i class="bi bi-trash"></i> 删除
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="7" class="text-center text-muted py-5">
+                                    <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                                    <p class="mt-3">暂无任务记录</p>
+                                    @if (serviceAvailable)
+                                    {
+                                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createTaskModal">
+                                            <i class="bi bi-plus-circle"></i> 创建第一个任务
+                                        </button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        @if (totalPages > 1)
+        {
+            <div class="card-footer">
+                <nav>
+                    <ul class="pagination pagination-sm mb-0 justify-content-center">
+                        @if (currentPage > 1)
+                        {
+                            <li class="page-item">
+                                <a class="page-link" asp-action="TaskManagement" asp-route-page="@(currentPage - 1)">上一页</a>
+                            </li>
+                        }
+                        @for (var i = Math.Max(1, currentPage - 2); i <= Math.Min(totalPages, currentPage + 2); i++)
+                        {
+                            <li class="page-item @(i == currentPage ? "active" : "")">
+                                <a class="page-link" asp-action="TaskManagement" asp-route-page="@i">@i</a>
+                            </li>
+                        }
+                        @if (currentPage < totalPages)
+                        {
+                            <li class="page-item">
+                                <a class="page-link" asp-action="TaskManagement" asp-route-page="@(currentPage + 1)">下一页</a>
+                            </li>
+                        }
+                    </ul>
+                </nav>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- 新建任务弹窗 -->
+<div class="modal fade" id="createTaskModal" tabindex="-1" aria-labelledby="createTaskModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createTaskModalLabel">
+                    <i class="bi bi-plus-circle"></i> 新建抓取任务
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="urlsInput" class="form-label">
+                        微信文章链接 <small class="text-muted">(每行一个，最多 10 个)</small>
+                    </label>
+                    <textarea class="form-control" id="urlsInput" rows="6" 
+                              placeholder="https://mp.weixin.qq.com/s/xxxxx&#10;https://mp.weixin.qq.com/s/yyyyy"></textarea>
+                </div>
+                <div class="alert alert-info mb-0">
+                    <i class="bi bi-info-circle"></i> 
+                    支持以下格式的链接：
+                    <ul class="mb-0 mt-2">
+                        <li><code>https://mp.weixin.qq.com/s/xxxxx</code></li>
+                        <li><code>https://mp.weixin.qq.com/s?__biz=xxx&mid=xxx&idx=xxx&sn=xxx</code></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" id="submitTaskBtn" onclick="submitTask()">
+                    <i class="bi bi-cloud-upload"></i> 提交任务
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 删除确认弹窗 -->
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-labelledby="deleteConfirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteConfirmModalLabel">
+                    <i class="bi bi-exclamation-triangle"></i> 确认删除
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>确定要删除任务 <strong id="deleteTaskTitle"></strong> 吗？</p>
+                <p class="text-danger mb-0">
+                    <i class="bi bi-exclamation-circle"></i> 此操作将：
+                </p>
+                <ul class="text-danger">
+                    <li>强制停止正在运行的抓取进程</li>
+                    <li>删除已下载的文件和目录</li>
+                    <li>删除数据库记录</li>
+                    <li>记录此操作到审计日志</li>
+                </ul>
+                <p class="mb-0"><strong>此操作不可恢复！</strong></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn" onclick="executeDelete()">
+                    <i class="bi bi-trash"></i> 确认删除
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    var deleteArticleId = null;
+    var autoRefreshInterval = null;
+
+    // 初始化 Tooltip
+    document.addEventListener('DOMContentLoaded', function() {
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.forEach(function(tooltipTriggerEl) {
+            new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+        
+        // 检查是否有进行中的任务，如果有则启动自动刷新
+        checkAndStartAutoRefresh();
+    });
+
+    // 检查是否有进行中的任务
+    function checkAndStartAutoRefresh() {
+        const hasProcessing = document.querySelectorAll('.badge.bg-primary, .badge.bg-warning').length > 0;
+        
+        if (hasProcessing && !autoRefreshInterval) {
+            console.log('检测到进行中的任务，启动自动刷新（每5秒）');
+            autoRefreshInterval = setInterval(() => {
+                console.log('自动刷新任务列表...');
+                location.reload();
+            }, 5000); // 每5秒刷新一次
+        } else if (!hasProcessing && autoRefreshInterval) {
+            console.log('没有进行中的任务，停止自动刷新');
+            clearInterval(autoRefreshInterval);
+            autoRefreshInterval = null;
+        }
+    }
+
+    // 刷新列表
+    function refreshList() {
+        location.reload();
+    }
+
+    // 提交新任务
+    async function submitTask() {
+        const urlsInput = document.getElementById('urlsInput');
+        const submitBtn = document.getElementById('submitTaskBtn');
+        const urls = urlsInput.value.trim();
+
+        if (!urls) {
+            alert('请输入微信文章链接');
+            return;
+        }
+
+        // 解析 URL 列表
+        const urlList = urls.split('\n')
+            .map(u => u.trim())
+            .filter(u => u && u.includes('mp.weixin.qq.com'));
+
+        if (urlList.length === 0) {
+            alert('请输入有效的微信文章链接');
+            return;
+        }
+
+        if (urlList.length > 10) {
+            alert('每次最多提交 10 个链接');
+            return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 提交中...';
+
+        try {
+            const response = await fetch('@Url.Action("CreateTaskAjax")', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ urls: urlList })
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                // 关闭弹窗
+                bootstrap.Modal.getInstance(document.getElementById('createTaskModal')).hide();
+                urlsInput.value = '';
+                
+                // 显示成功消息并刷新
+                alert(`任务创建成功！\n任务ID: ${result.taskId}\n链接数: ${result.urlCount}`);
+                location.reload();
+            } else {
+                alert(result.error || '创建任务失败');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('请求失败，请重试');
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="bi bi-cloud-upload"></i> 提交任务';
+        }
+    }
+
+    // 确认删除
+    function confirmDelete(articleId, title) {
+        deleteArticleId = articleId;
+        document.getElementById('deleteTaskTitle').textContent = title;
+        new bootstrap.Modal(document.getElementById('deleteConfirmModal')).show();
+    }
+
+    // 执行删除
+    async function executeDelete() {
+        if (!deleteArticleId) return;
+
+        const confirmBtn = document.getElementById('confirmDeleteBtn');
+        confirmBtn.disabled = true;
+        confirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 删除中...';
+
+        try {
+            const response = await fetch('@Url.Action("DeleteTaskAjax")', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ articleId: deleteArticleId })
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                bootstrap.Modal.getInstance(document.getElementById('deleteConfirmModal')).hide();
+                // 移除表格行
+                const row = document.querySelector(`tr[data-article-id="${deleteArticleId}"]`);
+                if (row) {
+                    row.remove();
+                }
+                alert('删除成功');
+            } else {
+                alert(result.error || '删除失败');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('请求失败，请重试');
+        } finally {
+            confirmBtn.disabled = false;
+            confirmBtn.innerHTML = '<i class="bi bi-trash"></i> 确认删除';
+            deleteArticleId = null;
+        }
+    }
+</script>
+}

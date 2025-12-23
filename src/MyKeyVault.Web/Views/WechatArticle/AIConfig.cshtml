@@ -1,0 +1,159 @@
+@model MyKeyVault.Web.Models.AIConfig
+@{
+    ViewData["Title"] = "AI 配置";
+}
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">
+                        <i class="bi bi-robot"></i> AI 配置
+                    </h4>
+                </div>
+                <div class="card-body">
+                    @if (TempData["Success"] != null)
+                    {
+                        <div class="alert alert-success alert-dismissible fade show" role="alert">
+                            @TempData["Success"]
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    }
+                    
+                    @if (TempData["Error"] != null)
+                    {
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            @TempData["Error"]
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    }
+
+                    <form asp-action="AIConfig" method="post">
+                        @Html.AntiForgeryToken()
+                        
+                        <div class="mb-3">
+                            <label class="form-label">AI 提供商</label>
+                            <select asp-for="Provider" class="form-select" id="providerSelect">
+                                <option value="deepseek">DeepSeek</option>
+                                <option value="openai">OpenAI</option>
+                                <option value="azure">Azure OpenAI</option>
+                                <option value="claude">Claude</option>
+                                <option value="custom">自定义</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="ApiKey" class="form-label">API Key <span class="text-danger">*</span></label>
+                            <input asp-for="ApiKey" type="password" class="form-control" required 
+                                   placeholder="输入您的 API Key">
+                            <div class="form-text">
+                                您的 API Key 将加密存储，仅用于调用 AI 服务
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="BaseUrl" class="form-label">API Base URL</label>
+                            <input asp-for="BaseUrl" type="url" class="form-control" 
+                                   placeholder="https://api.deepseek.com">
+                            <div class="form-text">
+                                默认: DeepSeek = https://api.deepseek.com, OpenAI = https://api.openai.com/v1
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="ModelName" class="form-label">模型名称</label>
+                            <select asp-for="ModelName" class="form-select" id="modelSelect">
+                                <option value="deepseek-chat">deepseek-chat (非思考模式)</option>
+                                <option value="deepseek-reasoner">deepseek-reasoner (思考模式)</option>
+                                <option value="gpt-4o">gpt-4o</option>
+                                <option value="gpt-4">gpt-4</option>
+                                <option value="claude-3-opus">claude-3-opus</option>
+                            </select>
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a asp-action="Index" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> 返回
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-save"></i> 保存配置
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-muted">使用说明</h6>
+                    <ul class="small">
+                        <li>配置后即可使用文章萃取功能</li>
+                        <li>DeepSeek 支持视觉模型，可以分析文章中的图片</li>
+                        <li>API Key 获取方式：
+                            <ul>
+                                <li>DeepSeek: <a href="https://platform.deepseek.com/" target="_blank">https://platform.deepseek.com/</a></li>
+                                <li>OpenAI: <a href="https://platform.openai.com/" target="_blank">https://platform.openai.com/</a></li>
+                            </ul>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const providerSelect = document.getElementById('providerSelect');
+            const baseUrlInput = document.querySelector('input[name="BaseUrl"]');
+            const modelSelect = document.getElementById('modelSelect');
+
+            providerSelect.addEventListener('change', function() {
+                const provider = this.value;
+                
+                // 更新默认 Base URL
+                switch(provider) {
+                    case 'deepseek':
+                        baseUrlInput.value = 'https://api.deepseek.com';
+                        updateModelOptions([
+                            { value: 'deepseek-chat', text: 'deepseek-chat (非思考模式)' },
+                            { value: 'deepseek-reasoner', text: 'deepseek-reasoner (思考模式)' }
+                        ]);
+                        break;
+                    case 'openai':
+                        baseUrlInput.value = 'https://api.openai.com/v1';
+                        updateModelOptions([
+                            { value: 'gpt-4o', text: 'gpt-4o' },
+                            { value: 'gpt-4-turbo', text: 'gpt-4-turbo' },
+                            { value: 'gpt-4', text: 'gpt-4' },
+                            { value: 'gpt-3.5-turbo', text: 'gpt-3.5-turbo' }
+                        ]);
+                        break;
+                    case 'claude':
+                        baseUrlInput.value = 'https://api.anthropic.com';
+                        updateModelOptions([
+                            { value: 'claude-3-opus-20240229', text: 'claude-3-opus' },
+                            { value: 'claude-3-sonnet-20240229', text: 'claude-3-sonnet' }
+                        ]);
+                        break;
+                    default:
+                        baseUrlInput.value = '';
+                        break;
+                }
+            });
+
+            function updateModelOptions(options) {
+                modelSelect.innerHTML = '';
+                options.forEach(opt => {
+                    const option = document.createElement('option');
+                    option.value = opt.value;
+                    option.textContent = opt.text;
+                    modelSelect.appendChild(option);
+                });
+            }
+        });
+    </script>
+}

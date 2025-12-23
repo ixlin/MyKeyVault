@@ -1,0 +1,235 @@
+@model List<MyKeyVault.Web.Models.WechatArticleExtraction>
+@{
+    ViewData["Title"] = "萃取历史";
+    var article = ViewBag.Article as MyKeyVault.Web.Models.WechatArticle;
+}
+
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>
+            <i class="bi bi-clock-history"></i> 萃取历史
+        </h2>
+        <div>
+            <a asp-action="Extract" asp-route-id="@article!.ArticleId" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> 新建萃取
+            </a>
+            <a asp-action="Index" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> 返回列表
+            </a>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <h5 class="card-title">@article.Title</h5>
+            <p class="card-text text-muted">
+                作者: @(article.Author ?? "-") | 
+                发布时间: @(article.PublishTime ?? "-")
+            </p>
+        </div>
+    </div>
+
+    @if (Model.Count == 0)
+    {
+        <div class="text-center py-5">
+            <i class="bi bi-inbox display-1 text-muted"></i>
+            <p class="mt-3 text-muted">还没有萃取记录</p>
+            <a asp-action="Extract" asp-route-id="@article.ArticleId" class="btn btn-primary">
+                <i class="bi bi-magic"></i> 开始第一次萃取
+            </a>
+        </div>
+    }
+    else
+    {
+        <div class="row">
+            @foreach (var extraction in Model)
+            {
+                <div class="col-md-6 col-lg-4 mb-3">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <span class="badge @(extraction.Status == "completed" ? "bg-success" : extraction.Status == "failed" ? "bg-danger" : "bg-warning")">
+                                    @switch (extraction.Status)
+                                    {
+                                        case "completed":
+                                            <text>已完成</text>
+                                            break;
+                                        case "failed":
+                                            <text>失败</text>
+                                            break;
+                                        default:
+                                            <text>处理中</text>
+                                            break;
+                                    }
+                                </span>
+                                <small class="text-muted">@extraction.CreatedAt.ToLocalTime().ToString("MM-dd HH:mm")</small>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-2 text-muted">提示词</h6>
+                            <p class="card-text small" style="max-height: 100px; overflow: hidden; text-overflow: ellipsis;">
+                                @(extraction.Prompt.Length > 150 ? extraction.Prompt.Substring(0, 150) + "..." : extraction.Prompt)
+                            </p>
+                            
+                            @if (!string.IsNullOrEmpty(extraction.ModelUsed))
+                            {
+                                <p class="small text-muted mb-2">
+                                    <i class="bi bi-cpu"></i> @extraction.ModelUsed
+                                </p>
+                            }
+
+                            @if (extraction.Status == "failed" && !string.IsNullOrEmpty(extraction.ErrorMessage))
+                            {
+                                <div class="alert alert-danger small py-1 px-2">
+                                    @extraction.ErrorMessage
+                                </div>
+                            }
+                        </div>
+                        <div class="card-footer">
+                            @if (extraction.Status == "completed")
+                            {
+                                <div class="d-grid gap-2">
+                                    <a asp-action="ExtractionDetail" asp-route-id="@extraction.ExtractionId" 
+                                       class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-eye"></i> 查看结果
+                                    </a>
+                                    <button class="btn btn-sm btn-success generate-ppt-btn" data-extraction-id="@extraction.ExtractionId">
+                                        <i class="bi bi-file-earmark-slides"></i> 生成 PPT
+                                    </button>
+                                </div>
+                            }
+                            else if (extraction.Status == "failed")
+                            {
+                                <button class="btn btn-sm btn-outline-secondary w-100" disabled>
+                                    萃取失败
+                                </button>
+                            }
+                            else
+                            {
+                                <button class="btn btn-sm btn-outline-info w-100" disabled>
+                                    <span class="spinner-border spinner-border-sm" role="status"></span>
+                                    处理中...
+                                </button>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<!-- PPT 生成进度模态框 -->
+<div class="modal fade" id="pptProgressModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-file-earmark-slides"></i> 生成 PPT</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" id="closeModalBtn" style="display:none;"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <div class="progress" style="height: 25px;">
+                        <div id="modalProgressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                             role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                            0%
+                        </div>
+                    </div>
+                </div>
+                <p id="modalProgressMessage" class="text-center mb-0">准备生成...</p>
+                <div id="modalDownloadArea" class="text-center mt-3" style="display: none;">
+                    <a id="modalDownloadBtn" href="#" class="btn btn-success">
+                        <i class="bi bi-download"></i> 下载 PPT
+                    </a>
+                </div>
+                <div id="modalErrorArea" class="alert alert-danger mt-3" style="display: none;">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <span id="modalErrorMessage"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    
+    <script>
+        const pptModal = new bootstrap.Modal(document.getElementById('pptProgressModal'));
+        const modalProgressBar = document.getElementById('modalProgressBar');
+        const modalProgressMessage = document.getElementById('modalProgressMessage');
+        const modalDownloadArea = document.getElementById('modalDownloadArea');
+        const modalDownloadBtn = document.getElementById('modalDownloadBtn');
+        const modalErrorArea = document.getElementById('modalErrorArea');
+        const modalErrorMessage = document.getElementById('modalErrorMessage');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+        let progressInterval = null;
+
+        document.querySelectorAll('.generate-ppt-btn').forEach(btn => {
+            btn.addEventListener('click', async function() {
+                const extractionId = this.dataset.extractionId;
+                
+                // 重置并显示模态框
+                modalProgressBar.style.width = '0%';
+                modalProgressBar.textContent = '0%';
+                modalProgressMessage.textContent = '正在启动生成任务...';
+                modalDownloadArea.style.display = 'none';
+                modalErrorArea.style.display = 'none';
+                closeModalBtn.style.display = 'none';
+                pptModal.show();
+
+                try {
+                    const response = await fetch('@Url.Action("GeneratePpt", "WechatArticle")', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: `extractionId=${extractionId}`
+                    });
+
+                    const data = await response.json();
+                    if (!response.ok || !data.success) {
+                        throw new Error(data.error || '启动失败');
+                    }
+
+                    const progressKey = data.progressKey;
+
+                    // 轮询进度
+                    progressInterval = setInterval(async () => {
+                        try {
+                            const progressResponse = await fetch(`@Url.Action("GetPptProgress", "WechatArticle")?progressKey=${encodeURIComponent(progressKey)}`);
+                            if (!progressResponse.ok) return;
+
+                            const progress = await progressResponse.json();
+                            
+                            modalProgressBar.style.width = progress.percentage + '%';
+                            modalProgressBar.textContent = progress.percentage + '%';
+                            modalProgressMessage.textContent = progress.message;
+
+                            if (progress.status === 'completed') {
+                                clearInterval(progressInterval);
+                                modalProgressBar.classList.remove('progress-bar-animated');
+                                modalDownloadBtn.href = progress.downloadUrl;
+                                modalDownloadArea.style.display = 'block';
+                                closeModalBtn.style.display = 'block';
+                            } else if (progress.status === 'failed') {
+                                clearInterval(progressInterval);
+                                modalProgressBar.classList.remove('progress-bar-animated');
+                                modalProgressBar.classList.add('bg-danger');
+                                modalErrorMessage.textContent = progress.error || '生成失败';
+                                modalErrorArea.style.display = 'block';
+                                closeModalBtn.style.display = 'block';
+                            }
+                        } catch (err) {
+                            console.error('查询进度失败:', err);
+                        }
+                    }, 500);
+
+                } catch (error) {
+                    console.error('生成 PPT 失败:', error);
+                    modalErrorMessage.textContent = error.message || '生成失败';
+                    modalErrorArea.style.display = 'block';
+                    closeModalBtn.style.display = 'block';
+                }
+            });
+        });
+    </script>
+}

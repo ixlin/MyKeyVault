@@ -14,9 +14,14 @@
             <i class="bi bi-file-earmark-richtext"></i> 微信图文获取
             <small class="text-muted fs-6">共 @totalCount 篇</small>
         </h2>
-        <a asp-action="Create" class="btn btn-primary @(!serviceAvailable ? "disabled" : "")">
-            <i class="bi bi-plus-circle"></i> 新建任务
-        </a>
+        <div>
+            <a asp-action="TaskManagement" class="btn btn-primary">
+                <i class="bi bi-list-task"></i> 任务管理
+            </a>
+            <a asp-action="AIConfig" class="btn btn-outline-info">
+                <i class="bi bi-robot"></i> AI 配置
+            </a>
+        </div>
     </div>
 
     @if (TempData["Success"] != null)
@@ -48,9 +53,7 @@
         <div class="text-center py-5">
             <i class="bi bi-inbox display-1 text-muted"></i>
             <p class="mt-3 text-muted">还没有爬取过文章</p>
-            <a asp-action="Create" class="btn btn-outline-primary">
-                <i class="bi bi-plus-circle"></i> 开始第一次爬取
-            </a>
+            <p class="text-muted">请前往 <a asp-action="TaskManagement" class="btn btn-sm btn-primary"><i class="bi bi-list-task"></i> 任务管理</a> 创建新任务</p>
         </div>
     }
     else
@@ -125,6 +128,11 @@
                                 <div class="btn-group btn-group-sm">
                                     @if (article.Status == "completed")
                                     {
+                                        <a asp-action="Extract" asp-route-id="@article.ArticleId" 
+                                           class="btn btn-outline-primary" title="AI 萃取">
+                                            <i class="bi bi-magic"></i> 萃取
+                                        </a>
+                                        
                                         var pdfUrl = ScraperService.GetPdfUrl(article);
                                         if (!string.IsNullOrEmpty(pdfUrl))
                                         {

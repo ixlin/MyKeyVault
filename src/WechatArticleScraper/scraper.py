@@ -24,6 +24,10 @@ from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeo
 class WechatArticleScraper:
     """微信公众号文章爬取器"""
     
+    # 超时配置（秒）
+    PAGE_LOAD_TIMEOUT = 60  # 页面加载超时
+    OVERALL_TIMEOUT = 300   # 整体任务超时（5分钟）
+    
     def __init__(self, output_dir: str = "output", progress_callback: Optional[Callable[[int, str], None]] = None):
         self.output_dir = output_dir
         self.images_dir = os.path.join(output_dir, "images")
@@ -49,6 +53,34 @@ class WechatArticleScraper:
         # 进度回调（用于 API/前端展示进度；CLI 也可复用）
         self._progress_callback = progress_callback
         self._last_progress = -1
+        
+        # 停止标志和浏览器引用（用于外部强制停止）
+        self._stop_flag = False
+        self._browser = None
+        self._start_time = None
+
+    def stop(self):
+        """外部调用以强制停止爬取任务"""
+        self._stop_flag = True
+        if self._browser:
+            try:
+                self._browser.close()
+            except Exception:
+                pass
+            self._browser = None
+
+    def _check_stop(self):
+        """检查是否需要停止"""
+        if self._stop_flag:
+            raise Exception("任务已被用户取消")
+
+    def _check_timeout(self, stage: str = ""):
+        """检查是否超时"""
+        if self._start_time is None:
+            return
+        elapsed = (datetime.now() - self._start_time).total_seconds()
+        if elapsed > self.OVERALL_TIMEOUT:
+            raise Exception(f"任务超时（已运行 {int(elapsed)} 秒，超过 {self.OVERALL_TIMEOUT} 秒限制）{': ' + stage if stage else ''}")
 
     def _set_progress(self, percent: int, message: str):
         """上报进度：percent 0-100；message 为面向用户的阶段提示。"""
@@ -96,8 +128,15 @@ class WechatArticleScraper:
         Returns:
             dict: 包含文章信息的字典
         """
+        # 记录开始时间
+        self._start_time = datetime.now()
+        self._stop_flag = False
+        
         print(f"🚀 开始爬取: {url}")
         self._set_progress(1, "开始获取文章")
+        
+        # 检查停止和超时
+        self._check_stop()
         
         # 定义临时 PDF 输出路径
         temp_pdf_filename = "article_temp.pdf"
@@ -109,26 +148,36 @@ class WechatArticleScraper:
         if not html_content:
             raise Exception("无法获取页面内容")
 
+        self._check_stop()
+        self._check_timeout("页面内容已获取")
         self._set_progress(40, "页面内容已获取")
         
         # 解析文章内容
         article = self._parse_article(html_content, url)
 
+        self._check_stop()
+        self._check_timeout("解析文章")
         self._set_progress(50, "正在下载资源")
         
         # 下载图片
         self._download_images(article)
 
+        self._check_stop()
+        self._check_timeout("下载图片")
         self._set_progress(70, "图片处理完成")
         
         # 下载视频
         self._download_videos(article)
 
+        self._check_stop()
+        self._check_timeout("下载视频")
         self._set_progress(80, "视频处理完成")
         
         # 生成输出 HTML
         output_html = self._generate_html(article)
 
+        self._check_stop()
+        self._check_timeout("生成HTML")
         self._set_progress(90, "正在生成本地页面")
         
         # 保存文件
@@ -181,6 +230,9 @@ class WechatArticleScraper:
                     "--disable-infobars",
                 ]
             )
+            # 保存浏览器引用，以便外部可以强制关闭
+            self._browser = browser
+            
             context = browser.new_context(
                 viewport={'width': 1280, 'height': 800},
                 user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
@@ -215,17 +267,26 @@ class WechatArticleScraper:
             page.on('request', handle_request)
             
             try:
-                # 访问页面 - 降低超时要求
+                # 检查停止标志
+                self._check_stop()
+                
+                # 访问页面 - 使用配置的页面加载超时
                 print(f"  访问 URL: {url[:50]}...")
                 self._set_progress(15, "加载页面")
-                page.goto(url, wait_until='domcontentloaded', timeout=30000)
+                page.goto(url, wait_until='domcontentloaded', timeout=self.PAGE_LOAD_TIMEOUT * 1000)
                 print("  页面已加载")
+                
+                # 检查停止标志
+                self._check_stop()
                 
                 # 等待文章内容加载 - 缩短超时
                 print("  等待文章内容...")
                 self._set_progress(25, "等待文章内容")
-                page.wait_for_selector('#js_content', timeout=8000)
+                page.wait_for_selector('#js_content', timeout=15000)
                 print("  文章内容已加载")
+                
+                # 检查停止标志
+                self._check_stop()
                 
                 # 滚动页面以触发懒加载
                 self._set_progress(30, "加载图片与视频")
@@ -233,6 +294,9 @@ class WechatArticleScraper:
                 
                 # 等待图片加载
                 page.wait_for_timeout(1500)
+                
+                # 检查停止标志
+                self._check_stop()
                 
                 # 尝试点击视频元素以触发视频URL请求
                 self._trigger_video_urls(page)
@@ -260,10 +324,15 @@ class WechatArticleScraper:
                         print("  ✓ 成功获取部分内容")
                     else:
                         print("  ✗ 页面内容不完整")
+                        raise Exception(f"页面加载超时（{self.PAGE_LOAD_TIMEOUT}秒）且内容不完整")
                 except Exception as inner_e:
                     print(f"  ✗ 获取失败: {inner_e}")
+                    raise Exception(f"页面加载超时（{self.PAGE_LOAD_TIMEOUT}秒）: {inner_e}")
             except Exception as e:
                 print(f"  ✗ 发生错误: {type(e).__name__}: {str(e)}")
+                # 如果是用户取消或超时，直接抛出
+                if "取消" in str(e) or "超时" in str(e):
+                    raise
                 try:
                     html_content = page.content()
                 except:
@@ -271,6 +340,7 @@ class WechatArticleScraper:
             finally:
                 try:
                     browser.close()
+                    self._browser = None
                 except:
                     pass
         

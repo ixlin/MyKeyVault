@@ -1,0 +1,288 @@
+@model MyKeyVault.Web.Models.WechatArticleExtraction
+@{
+    ViewData["Title"] = "萃取详情";
+}
+
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>
+            <i class="bi bi-file-text"></i> 萃取详情
+        </h2>
+        <div>
+            <a asp-action="ExtractionHistory" asp-route-id="@Model.ArticleId" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> 返回历史
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="mb-0">文章信息</h5>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-3">文章标题</dt>
+                        <dd class="col-sm-9">@Model.Article?.Title</dd>
+
+                        <dt class="col-sm-3">作者</dt>
+                        <dd class="col-sm-9">@(Model.Article?.Author ?? "-")</dd>
+
+                        <dt class="col-sm-3">发布时间</dt>
+                        <dd class="col-sm-9">@(Model.Article?.PublishTime ?? "-")</dd>
+                    </dl>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="mb-0">提示词</h5>
+                </div>
+                <div class="card-body">
+                    <pre class="bg-light p-3 rounded"><code>@Model.Prompt</code></pre>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">萃取结果</h5>
+                    <span class="badge bg-success">@Model.Status</span>
+                </div>
+                <div class="card-body">
+                    @if (Model.Status == "completed" && !string.IsNullOrEmpty(Model.Result))
+                    {
+                        <div id="renderedResult" class="markdown-body"></div>
+                    }
+                    else if (Model.Status == "failed")
+                    {
+                        <div class="alert alert-danger">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            萃取失败: @Model.ErrorMessage
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center py-5">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">处理中...</span>
+                            </div>
+                            <p class="mt-3 text-muted">处理中...</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">萃取信息</h5>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0 small">
+                        <dt class="col-sm-5">萃取时间</dt>
+                        <dd class="col-sm-7">@Model.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</dd>
+
+                        @if (Model.CompletedAt.HasValue)
+                        {
+                            <dt class="col-sm-5">完成时间</dt>
+                            <dd class="col-sm-7">@Model.CompletedAt.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</dd>
+                        }
+
+                        @if (!string.IsNullOrEmpty(Model.ModelUsed))
+                        {
+                            <dt class="col-sm-5">使用模型</dt>
+                            <dd class="col-sm-7">@Model.ModelUsed</dd>
+                        }
+
+                        @if (Model.TokensUsed.HasValue)
+                        {
+                            <dt class="col-sm-5">Token 消耗</dt>
+                            <dd class="col-sm-7">@Model.TokensUsed</dd>
+                        }
+
+                        <dt class="col-sm-5">状态</dt>
+                        <dd class="col-sm-7">
+                            <span class="badge @(Model.Status == "completed" ? "bg-success" : Model.Status == "failed" ? "bg-danger" : "bg-warning")">
+                                @Model.Status
+                            </span>
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    
+    @if (Model.Status == "completed" && !string.IsNullOrEmpty(Model.Result))
+    {
+        <!-- Markdown 渲染 -->
+        <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
+        
+        <!-- Mermaid 图表 -->
+        <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+        
+        <!-- 代码高亮 -->
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css">
+        <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/highlight.min.js"></script>
+        
+        <!-- GitHub Markdown 样式 -->
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.5.0/github-markdown.min.css">
+
+        <style>
+            .markdown-body {
+                box-sizing: border-box;
+                width: 100%;
+                max-width: 100%;
+                padding: 20px;
+                font-size: 16px;
+                line-height: 1.6;
+            }
+            
+            .markdown-body pre code {
+                background-color: #f6f8fa;
+                padding: 16px;
+                border-radius: 6px;
+                display: block;
+                overflow-x: auto;
+            }
+
+            .markdown-body table {
+                display: block;
+                width: 100%;
+                overflow-x: auto;
+                border-collapse: collapse;
+            }
+
+            .markdown-body img {
+                max-width: 100%;
+                height: auto;
+            }
+
+            /* Mermaid 图表样式优化 */
+            .markdown-body .mermaid-diagram {
+                background: #f8f9fa;
+                border: 1px solid #dee2e6;
+                border-radius: 8px;
+                padding: 20px;
+                margin: 20px 0;
+                overflow-x: auto;
+                overflow-y: auto;
+                max-height: 600px;
+            }
+
+            .markdown-body .mermaid-diagram svg {
+                max-width: none !important;
+                height: auto !important;
+                display: block;
+                margin: 0 auto;
+            }
+
+            /* 列表样式优化 */
+            .markdown-body ul, .markdown-body ol {
+                padding-left: 2em;
+                margin: 1em 0;
+            }
+
+            .markdown-body li {
+                margin: 0.5em 0;
+            }
+
+            /* 标题样式优化 */
+            .markdown-body h1, .markdown-body h2, .markdown-body h3 {
+                margin-top: 1.5em;
+                margin-bottom: 0.5em;
+                font-weight: 600;
+            }
+
+            .markdown-body h1 {
+                font-size: 2em;
+                border-bottom: 2px solid #eaecef;
+                padding-bottom: 0.3em;
+            }
+
+            .markdown-body h2 {
+                font-size: 1.5em;
+                border-bottom: 1px solid #eaecef;
+                padding-bottom: 0.3em;
+            }
+
+            .markdown-body blockquote {
+                border-left: 4px solid #dfe2e5;
+                padding: 0 1em;
+                color: #6a737d;
+                margin: 1em 0;
+            }
+        </style>
+
+        <script>
+            // 初始化 Mermaid（依赖加载失败时不阻塞页面）
+            if (typeof mermaid !== 'undefined') {
+                mermaid.initialize({
+                    startOnLoad: false,
+                    theme: 'default',
+                    securityLevel: 'loose'
+                });
+            }
+
+            // 配置 marked（依赖加载失败时不阻塞页面）
+            if (typeof marked !== 'undefined') {
+                marked.setOptions({
+                    breaks: true,
+                    gfm: true
+                });
+            }
+
+            document.addEventListener('DOMContentLoaded', async function() {
+                const renderedResult = document.getElementById('renderedResult');
+                const markdown = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Result));
+
+                if (typeof marked === 'undefined') {
+                    renderedResult.textContent = markdown;
+                    return;
+                }
+
+                // 渲染 Markdown
+                const html = marked.parse(markdown);
+                renderedResult.innerHTML = html;
+
+                // 渲染代码高亮
+                if (typeof hljs !== 'undefined') {
+                    renderedResult.querySelectorAll('pre code').forEach((block) => {
+                        try {
+                            hljs.highlightElement(block);
+                        } catch (e) {
+                            console.warn('代码高亮失败:', e);
+                        }
+                    });
+                }
+
+                // 渲染 Mermaid 图表
+                if (typeof mermaid !== 'undefined') {
+                    const mermaidBlocks = renderedResult.querySelectorAll('pre > code.language-mermaid');
+                    for (let i = 0; i < mermaidBlocks.length; i++) {
+                        const block = mermaidBlocks[i];
+                        const pre = block.closest('pre');
+                        if (!pre) continue;
+
+                        const mermaidCode = block.textContent || '';
+                        try {
+                            const id = `mermaid-${Date.now()}-${i}`;
+                            const { svg } = await mermaid.render(id, mermaidCode);
+                            const div = document.createElement('div');
+                            div.innerHTML = svg;
+                            div.className = 'mermaid-diagram';
+                            pre.replaceWith(div);
+                        } catch (error) {
+                            console.error('Mermaid 渲染失败:', error);
+                        }
+                    }
+                }
+            });
+        </script>
+    }
+}

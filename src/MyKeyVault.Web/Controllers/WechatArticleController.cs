@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using MyKeyVault.Web.Data;
 using MyKeyVault.Web.Services;
 
 namespace MyKeyVault.Web.Controllers;
@@ -11,14 +13,26 @@ namespace MyKeyVault.Web.Controllers;
 public class WechatArticleController : Controller
 {
     private readonly WechatScraperService _scraperService;
+    private readonly AIExtractionService _extractionService;
+    private readonly PptGenerationService _pptService;
+    private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly ILogger<WechatArticleController> _logger;
+    private readonly ApplicationDbContext _context;
 
     public WechatArticleController(
         WechatScraperService scraperService,
-        ILogger<WechatArticleController> logger)
+        AIExtractionService extractionService,
+        PptGenerationService pptService,
+        IServiceScopeFactory serviceScopeFactory,
+        ILogger<WechatArticleController> logger,
+        ApplicationDbContext context)
     {
         _scraperService = scraperService;
+        _extractionService = extractionService;
+        _pptService = pptService;
+        _serviceScopeFactory = serviceScopeFactory;
         _logger = logger;
+        _context = context;
     }
 
     private string CurrentUserId => User?.Identity?.IsAuthenticated == true
@@ -47,79 +61,44 @@ public class WechatArticleController : Controller
     }
 
     /// <summary>
-    /// 创建/提交爬取任务页面
+    /// 任务详情与进度页面
     /// </summary>
-    public async Task<IActionResult> Create()
+    public async Task<IActionResult> Task(string id, long? articleId = null)
     {
-        ViewBag.ServiceAvailable = await _scraperService.IsServiceAvailableAsync();
-        return View();
-    }
-
-    /// <summary>
-    /// 提交爬取任务
-    /// </summary>
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(string urls)
-    {
-        if (string.IsNullOrWhiteSpace(urls))
-        {
-            TempData["Error"] = "请输入至少一个微信链接";
-            return RedirectToAction(nameof(Create));
-        }
-
         var userId = CurrentUserId;
+        string? taskId = id;
         
-        // 解析链接（按行分割）
-        var urlList = urls
-            .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
-            .Select(u => u.Trim())
-            .Where(u => !string.IsNullOrEmpty(u))
-            .Distinct()
-            .ToList();
-
-        if (urlList.Count == 0)
+        // 如果提供了 ArticleId，尝试从数据库查找对应的 TaskId
+        if (articleId.HasValue && string.IsNullOrEmpty(taskId))
         {
-            TempData["Error"] = "请输入有效的微信链接";
-            return RedirectToAction(nameof(Create));
+            var article = await _scraperService.GetArticleAsync(articleId.Value, userId);
+            if (article != null && !string.IsNullOrEmpty(article.TaskId))
+            {
+                taskId = article.TaskId;
+            }
+        }
+        
+        if (string.IsNullOrEmpty(taskId))
+        {
+            TempData["Error"] = "任务ID不存在";
+            return RedirectToAction(nameof(TaskManagement));
         }
 
-        if (urlList.Count > 10)
-        {
-            TempData["Error"] = "每次最多提交 10 个链接";
-            return RedirectToAction(nameof(Create));
-        }
-
-        var (success, taskId, error) = await _scraperService.SubmitScrapeTaskAsync(userId, urlList);
-
-        if (!success)
-        {
-            TempData["Error"] = error ?? "提交失败";
-            return RedirectToAction(nameof(Create));
-        }
-
-        TempData["Success"] = $"已提交 {urlList.Count} 个链接的爬取任务";
-        return RedirectToAction(nameof(Task), new { id = taskId });
-    }
-
-    /// <summary>
-    /// 任务状态页面
-    /// </summary>
-    public async Task<IActionResult> Task(string id)
-    {
-        if (string.IsNullOrEmpty(id))
-        {
-            return RedirectToAction(nameof(Index));
-        }
-
-        var status = await _scraperService.GetTaskStatusAsync(id);
+        var status = await _scraperService.GetTaskStatusAsync(taskId);
         if (status == null)
         {
             TempData["Error"] = "任务不存在或已过期";
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(TaskManagement));
         }
 
-        ViewBag.TaskId = id;
+        // 查询数据库中对应的记录，传递给视图
+        var dbArticles = await _context.WechatArticles
+            .Where(a => a.UserId == userId && a.TaskId == taskId)
+            .OrderBy(a => a.ArticleId)
+            .ToListAsync();
+        
+        ViewBag.TaskId = taskId;
+        ViewBag.DbArticles = dbArticles;
         return View(status);
     }
 
@@ -138,6 +117,23 @@ public class WechatArticleController : Controller
         if (status == null)
         {
             return NotFound(new { error = "任务不存在" });
+        }
+
+        // 如果 Python 任务已完成或失败，同步更新数据库状态
+        if (status.Status == "completed" || status.Status == "failed" || status.Status == "partial")
+        {
+            var userId = CurrentUserId;
+            _ = System.Threading.Tasks.Task.Run(async () =>
+            {
+                try
+                {
+                    await _scraperService.SyncTaskStatusFromPythonAsync(taskId, userId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "同步任务状态失败: {TaskId}", taskId);
+                }
+            });
         }
 
         return Json(status);
@@ -288,4 +284,473 @@ public class WechatArticleController : Controller
         
         return Ok(new { success = true });
     }
+
+    #region 任务管理功能
+
+    /// <summary>
+    /// 抓取任务管理页面
+    /// </summary>
+    public async Task<IActionResult> TaskManagement(int page = 1)
+    {
+        var userId = CurrentUserId;
+        var pageSize = 50;
+        
+        var articles = await _scraperService.GetTaskManagementListAsync(userId, page, pageSize);
+        var totalCount = await _scraperService.GetTaskManagementCountAsync(userId);
+        
+        ViewBag.CurrentPage = page;
+        ViewBag.TotalPages = (int)Math.Ceiling((double)totalCount / pageSize);
+        ViewBag.TotalCount = totalCount;
+        ViewBag.ServiceAvailable = await _scraperService.IsServiceAvailableAsync();
+        
+        return View(articles);
+    }
+
+    /// <summary>
+    /// 创建新任务（AJAX - 用于弹窗提交）
+    /// </summary>
+    [HttpPost]
+    [IgnoreAntiforgeryToken]
+    public async Task<IActionResult> CreateTaskAjax([FromBody] CreateTaskRequestDto request)
+    {
+        if (request?.Urls == null || !request.Urls.Any())
+        {
+            return BadRequest(new { error = "请输入至少一个微信链接" });
+        }
+
+        var userId = CurrentUserId;
+        var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString();
+        
+        // 解析链接
+        var urlList = request.Urls
+            .SelectMany(u => u.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+            .Select(u => u.Trim())
+            .Where(u => !string.IsNullOrEmpty(u) && u.Contains("mp.weixin.qq.com"))
+            .Distinct()
+            .ToList();
+
+        if (urlList.Count == 0)
+        {
+            return BadRequest(new { error = "请输入有效的微信链接" });
+        }
+
+        if (urlList.Count > 10)
+        {
+            return BadRequest(new { error = "每次最多提交 10 个链接" });
+        }
+
+        var (success, taskId, error) = await _scraperService.SubmitScrapeTaskAsync(userId, urlList);
+
+        // 记录日志
+        await _scraperService.WriteLogAsync(
+            userId,
+            "CreateTask",
+            taskId,
+            new { urls = urlList, success, error },
+            success ? "Success" : "Failed",
+            error,
+            clientIp);
+
+        if (!success)
+        {
+            return BadRequest(new { error = error ?? "提交失败" });
+        }
+
+        return Ok(new { success = true, taskId, urlCount = urlList.Count });
+    }
+
+    /// <summary>
+    /// 创建任务请求 DTO
+    /// </summary>
+    public class CreateTaskRequestDto
+    {
+        public List<string> Urls { get; set; } = new();
+    }
+
+    /// <summary>
+    /// 删除任务（带审计日志）- 从任务管理页面调用
+    /// </summary>
+    [HttpPost]
+    [IgnoreAntiforgeryToken]
+    public async Task<IActionResult> DeleteTaskAjax([FromBody] DeleteTaskRequestDto request)
+    {
+        if (request == null || !request.ArticleId.HasValue || request.ArticleId.Value <= 0)
+        {
+            return BadRequest(new { error = "无效的文章ID" });
+        }
+
+        var userId = CurrentUserId;
+        var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString();
+        
+        var (success, error, logDetails) = await _scraperService.DeleteArticleWithLogAsync(
+            request.ArticleId.Value, 
+            userId, 
+            clientIp);
+
+        if (!success)
+        {
+            return BadRequest(new { error = error ?? "删除失败" });
+        }
+
+        return Ok(new { success = true, message = "删除成功", logDetails });
+    }
+
+    /// <summary>
+    /// 删除任务请求 DTO
+    /// </summary>
+    public class DeleteTaskRequestDto
+    {
+        public long? ArticleId { get; set; }
+        public string? TaskId { get; set; }
+    }
+
+    /// <summary>
+    /// 获取任务详情（AJAX）
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> GetTaskDetail(long id)
+    {
+        var userId = CurrentUserId;
+        var article = await _scraperService.GetArticleAsync(id, userId);
+        
+        if (article == null)
+        {
+            return NotFound(new { error = "任务不存在" });
+        }
+
+        // 如果有 TaskId 且状态为 processing，尝试获取实时进度
+        TaskStatusResponseDto? taskStatus = null;
+        if (!string.IsNullOrEmpty(article.TaskId) && article.Status == "processing")
+        {
+            taskStatus = await _scraperService.GetTaskStatusAsync(article.TaskId);
+        }
+
+        return Ok(new
+        {
+            articleId = article.ArticleId,
+            taskId = article.TaskId,
+            title = article.Title ?? "处理中...",
+            author = article.Author,
+            sourceUrl = article.SourceUrl,
+            status = article.Status,
+            errorMessage = article.ErrorMessage,
+            imagesCount = article.ImagesCount,
+            videosCount = article.VideosCount,
+            createdAt = article.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss"),
+            completedAt = article.CompletedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss"),
+            // 实时进度（如果有）
+            progress = taskStatus?.Articles.FirstOrDefault(a => a.ArticleId == article.ArticleUniqueId)?.Progress ?? 0,
+            stage = taskStatus?.Articles.FirstOrDefault(a => a.ArticleId == article.ArticleUniqueId)?.Stage ?? ""
+        });
+    }
+    
+    /// <summary>
+    /// 从任务详情页删除任务（AJAX）
+    /// </summary>
+    [HttpPost]
+    [IgnoreAntiforgeryToken]
+    public async Task<IActionResult> DeleteTaskFromDetail([FromBody] DeleteTaskRequestDto request)
+    {
+        if (string.IsNullOrEmpty(request.TaskId))
+        {
+            return BadRequest(new { error = "任务ID不能为空" });
+        }
+
+        var userId = CurrentUserId;
+        var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString();
+
+        try
+        {
+            // 查找该 TaskId 对应的所有文章
+            var articles = await _context.WechatArticles
+                .Where(a => a.UserId == userId && a.TaskId == request.TaskId)
+                .ToListAsync();
+
+            if (!articles.Any())
+            {
+                return NotFound(new { error = "任务不存在或已被删除" });
+            }
+
+            // 先取消 Python 任务
+            await _scraperService.CancelTaskAsync(request.TaskId, deleteFiles: true);
+
+            // 删除所有相关文章
+            foreach (var article in articles)
+            {
+                var (success, error, logDetails) = await _scraperService.DeleteArticleWithLogAsync(
+                    article.ArticleId, 
+                    userId, 
+                    clientIp
+                );
+
+                if (!success)
+                {
+                    _logger.LogWarning("删除文章失败: ArticleId={ArticleId}, Error={Error}", article.ArticleId, error);
+                }
+            }
+
+            return Ok(new { success = true, message = $"已删除任务及其 {articles.Count} 篇文章" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "从详情页删除任务失败: TaskId={TaskId}", request.TaskId);
+            return StatusCode(500, new { error = "删除失败：" + ex.Message });
+        }
+    }
+
+    #endregion
+
+    #region AI 萃取功能
+
+    /// <summary>
+    /// AI 配置页面
+    /// </summary>
+    public async Task<IActionResult> AIConfig()
+    {
+        var userId = CurrentUserId;
+        var config = await _extractionService.GetUserConfigAsync(userId);
+        
+        return View(config ?? new Models.AIConfig 
+        { 
+            Provider = "deepseek",
+            BaseUrl = "https://api.deepseek.com",
+            ModelName = "deepseek-chat"
+        });
+    }
+
+    /// <summary>
+    /// 保存 AI 配置
+    /// </summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AIConfig(Models.AIConfig config)
+    {
+        var userId = CurrentUserId;
+        
+        if (string.IsNullOrWhiteSpace(config.ApiKey))
+        {
+            TempData["Error"] = "API Key 不能为空";
+            return View(config);
+        }
+
+        var (success, error) = await _extractionService.SaveConfigAsync(userId, config);
+        
+        if (!success)
+        {
+            TempData["Error"] = error ?? "保存失败";
+            return View(config);
+        }
+
+        TempData["Success"] = "AI 配置已保存";
+        return RedirectToAction(nameof(Index));
+    }
+
+    /// <summary>
+    /// 萃取页面
+    /// </summary>
+    public async Task<IActionResult> Extract(long id)
+    {
+        var userId = CurrentUserId;
+        var article = await _scraperService.GetArticleAsync(id, userId);
+        
+        if (article == null)
+        {
+            TempData["Error"] = "文章不存在";
+            return RedirectToAction(nameof(Index));
+        }
+
+        if (article.Status != "completed")
+        {
+            TempData["Error"] = "文章尚未完成下载";
+            return RedirectToAction(nameof(Index));
+        }
+
+        // 检查是否配置了 AI
+        var config = await _extractionService.GetUserConfigAsync(userId);
+        if (config == null)
+        {
+            TempData["Error"] = "请先配置 AI 设置";
+            return RedirectToAction(nameof(AIConfig));
+        }
+
+        ViewBag.Article = article;
+        ViewBag.PreviewUrl = _scraperService.GetPreviewUrl(article);
+        
+        return View();
+    }
+
+    /// <summary>
+    /// 执行萃取（AJAX）
+    /// </summary>
+    [HttpPost]
+    public async Task<IActionResult> DoExtract([FromBody] ExtractRequestDto request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Prompt))
+        {
+            return BadRequest(new { error = "提示词不能为空" });
+        }
+
+        var userId = CurrentUserId;
+        
+        var (success, extraction, error) = await _extractionService.ExtractArticleAsync(
+            request.ArticleId,
+            userId,
+            request.Prompt);
+
+        if (!success)
+        {
+            return BadRequest(new { error = error ?? "萃取失败" });
+        }
+
+        return Ok(new
+        {
+            success = true,
+            extractionId = extraction!.ExtractionId,
+            result = extraction.Result,
+            createdAt = extraction.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
+        });
+    }
+
+    /// <summary>
+    /// 萃取历史列表
+    /// </summary>
+    public async Task<IActionResult> ExtractionHistory(long id)
+    {
+        var userId = CurrentUserId;
+        var article = await _scraperService.GetArticleAsync(id, userId);
+        
+        if (article == null)
+        {
+            TempData["Error"] = "文章不存在";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var extractions = await _extractionService.GetArticleExtractionsAsync(id, userId);
+        
+        ViewBag.Article = article;
+        return View(extractions);
+    }
+
+    /// <summary>
+    /// 萃取详情
+    /// </summary>
+    public async Task<IActionResult> ExtractionDetail(long id)
+    {
+        var userId = CurrentUserId;
+        var extraction = await _extractionService.GetExtractionAsync(id, userId);
+        
+        if (extraction == null)
+        {
+            TempData["Error"] = "萃取记录不存在";
+            return RedirectToAction(nameof(Index));
+        }
+
+        return View(extraction);
+    }
+
+    /// <summary>
+    /// 萃取请求 DTO
+    /// </summary>
+    public class ExtractRequestDto
+    {
+        public long ArticleId { get; set; }
+        public string Prompt { get; set; } = string.Empty;
+    }
+
+    #endregion
+
+    #region PPT 生成功能
+
+    /// <summary>
+    /// 生成 PPT（异步启动）
+    /// </summary>
+    [HttpPost]
+    public async Task<IActionResult> GeneratePpt(long extractionId)
+    {
+        var userId = CurrentUserId;
+        
+        var extraction = await _extractionService.GetExtractionAsync(extractionId, userId);
+        if (extraction == null)
+        {
+            return BadRequest(new { error = "萃取记录不存在" });
+        }
+
+        if (extraction.Status != "completed")
+        {
+            return BadRequest(new { error = "萃取尚未完成" });
+        }
+
+        // 生成唯一进度 Key
+        var progressKey = $"ppt_generation_{userId}_{extractionId}_{Guid.NewGuid():N}";
+
+        // 后台异步生成（创建新的 Scope 避免 DbContext 被提前释放）
+        _ = System.Threading.Tasks.Task.Run(async () =>
+        {
+            try
+            {
+                // 创建新的服务范围
+                using var scope = _serviceScopeFactory.CreateScope();
+                var pptService = scope.ServiceProvider.GetRequiredService<PptGenerationService>();
+                
+                await pptService.GeneratePptAsync(extractionId, userId, progressKey);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "生成 PPT 失败: ExtractionId={ExtractionId}", extractionId);
+            }
+        });
+
+        return Ok(new { success = true, progressKey });
+    }
+
+    /// <summary>
+    /// 查询 PPT 生成进度（轮询）
+    /// </summary>
+    [HttpGet]
+    public IActionResult GetPptProgress(string progressKey)
+    {
+        if (string.IsNullOrEmpty(progressKey))
+        {
+            return BadRequest(new { error = "progressKey 不能为空" });
+        }
+
+        var progress = _pptService.GetProgress(progressKey);
+        if (progress == null)
+        {
+            return NotFound(new { error = "进度信息不存在或已过期" });
+        }
+
+        return Ok(progress);
+    }
+
+    /// <summary>
+    /// 下载生成的 PPT
+    /// </summary>
+    [HttpGet]
+    public IActionResult DownloadPpt(string file)
+    {
+        if (string.IsNullOrEmpty(file))
+        {
+            return BadRequest("文件名不能为空");
+        }
+
+        var tempPath = Path.Combine(Path.GetTempPath(), file);
+        if (!System.IO.File.Exists(tempPath))
+        {
+            return NotFound("文件不存在或已过期");
+        }
+
+        var bytes = System.IO.File.ReadAllBytes(tempPath);
+
+        // 删除临时文件
+        try
+        {
+            System.IO.File.Delete(tempPath);
+        }
+        catch { }
+
+        return File(bytes, "application/vnd.openxmlformats-officedocument.presentationml.presentation", file);
+    }
+
+    #endregion
 }

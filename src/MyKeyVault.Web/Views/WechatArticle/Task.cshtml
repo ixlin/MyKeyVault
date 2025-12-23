@@ -5,22 +5,107 @@
     var currentStage = Model.Articles.FirstOrDefault(a => a.Status == "processing" && !string.IsNullOrWhiteSpace(a.Stage));
 }
 
-<div class="container" style="max-width: 800px;">
+<div class="container" style="max-width: 900px;">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2><i class="bi bi-arrow-repeat"></i> 任务进度</h2>
-        <a asp-action="Index" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left"></i> 返回列表
-        </a>
+        <h2><i class="bi bi-arrow-repeat"></i> 任务详情与进度</h2>
+        <div>
+            <a asp-action="TaskManagement" class="btn btn-outline-secondary me-2">
+                <i class="bi bi-arrow-left"></i> 返回任务管理
+            </a>
+            <a asp-action="Index" class="btn btn-outline-secondary me-2">
+                <i class="bi bi-file-earmark-text"></i> 查看文章
+            </a>
+            @if (Model.Status == "completed" || Model.Status == "failed" || Model.Status == "partial")
+            {
+                <button type="button" class="btn btn-outline-danger" onclick="confirmDeleteTask()">
+                    <i class="bi bi-trash"></i> 删除任务
+                </button>
+            }
+        </div>
     </div>
 
     <div class="card mb-4">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <span>任务 ID: <code>@taskId</code></span>
+            <span><i class="bi bi-info-circle"></i> 任务信息</span>
             <span id="taskStatus" class="badge @GetStatusBadgeClass(Model.Status)">@GetStatusText(Model.Status)</span>
         </div>
         <div class="card-body">
-            <div class="mb-3">
-                <label class="form-label">进度</label>
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label class="form-label text-muted">Python Task ID</label>
+                    <div><code>@taskId</code></div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label text-muted">数据库 ID(s)</label>
+                    <div>
+                        @{
+                            var dbArticles = ViewBag.DbArticles as List<MyKeyVault.Web.Models.WechatArticle>;
+                            if (dbArticles != null && dbArticles.Any())
+                            {
+                                foreach (var article in dbArticles)
+                                {
+                                    <code class="me-2">@article.ArticleId</code>
+                                }
+                            }
+                            else
+                            {
+                                <span class="text-muted">-</span>
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label class="form-label text-muted">创建时间</label>
+                    <div>
+                        @if (dbArticles != null && dbArticles.Any())
+                        {
+                            <span>@dbArticles.First().CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</span>
+                        }
+                        else
+                        {
+                            <span class="text-muted">-</span>
+                        }
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label text-muted">完成时间</label>
+                    <div>
+                        @if (dbArticles != null && dbArticles.Any() && dbArticles.First().CompletedAt.HasValue)
+                        {
+                            <span>@dbArticles.First().CompletedAt.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</span>
+                        }
+                        else if (Model.Status == "completed" || Model.Status == "failed" || Model.Status == "partial")
+                        {
+                            <span class="text-muted">刚刚完成</span>
+                        }
+                        else
+                        {
+                            <span class="text-muted">进行中...</span>
+                        }
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row mb-3">
+                <div class="col-md-4">
+                    <label class="form-label text-muted">总图片数</label>
+                    <div><strong>@Model.Articles.Sum(a => a.ImagesCount)</strong> 张</div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label text-muted">总视频数</label>
+                    <div><strong>@Model.Articles.Sum(a => a.VideosCount)</strong> 个</div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label text-muted">文章数量</label>
+                    <div><strong>@Model.TotalCount</strong> 篇</div>
+                </div>
+            </div>
+            
+            <div class="mb-0">
+                <label class="form-label text-muted">整体进度</label>
                 <div class="progress" style="height: 25px;">
                     <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
                          role="progressbar" 
@@ -276,6 +361,38 @@
         if (initialStatus !== 'completed' && initialStatus !== 'failed' && initialStatus !== 'partial') {
             // 每 3 秒轮询一次
             pollInterval = setInterval(pollStatus, 3000);
+        }
+        
+        // 确认删除任务
+        function confirmDeleteTask() {
+            if (confirm('确定要删除此任务吗？\n\n此操作将：\n• 强制停止正在运行的抓取进程\n• 删除已下载的文件和目录\n• 删除所有相关数据库记录\n• 记录此操作到审计日志\n\n此操作不可恢复！')) {
+                deleteTask();
+            }
+        }
+        
+        // 删除任务
+        async function deleteTask() {
+            try {
+                const response = await fetch('@Url.Action("DeleteTaskFromDetail")', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+                    },
+                    body: JSON.stringify({ taskId: taskId })
+                });
+                
+                if (response.ok) {
+                    alert('任务删除成功');
+                    window.location.href = '@Url.Action("TaskManagement")';
+                } else {
+                    const result = await response.json();
+                    alert(result.error || '删除失败');
+                }
+            } catch (error) {
+                console.error('删除失败:', error);
+                alert('删除请求失败，请重试');
+            }
         }
     </script>
 }

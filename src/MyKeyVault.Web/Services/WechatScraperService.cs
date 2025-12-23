@@ -139,6 +139,24 @@ public class ArticleResultDto
 }
 
 /// <summary>
+/// 取消任务响应 DTO
+/// </summary>
+public class CancelTaskResponseDto
+{
+    [JsonPropertyName("success")]
+    public bool Success { get; set; }
+    
+    [JsonPropertyName("message")]
+    public string Message { get; set; } = string.Empty;
+    
+    [JsonPropertyName("stopped_articles")]
+    public List<string> StoppedArticles { get; set; } = new();
+    
+    [JsonPropertyName("deleted_dirs")]
+    public List<string> DeletedDirs { get; set; } = new();
+}
+
+/// <summary>
 /// 微信爬虫服务
 /// </summary>
 public class WechatScraperService
@@ -451,6 +469,34 @@ public class WechatScraperService
     }
 
     /// <summary>
+    /// 从 Python 服务同步任务状态到数据库
+    /// </summary>
+    public async Task<bool> SyncTaskStatusFromPythonAsync(string taskId, string userId)
+    {
+        try
+        {
+            // 从 Python 获取最新状态
+            var taskStatus = await GetTaskStatusAsync(taskId);
+            if (taskStatus == null)
+            {
+                _logger.LogWarning("同步任务状态失败：Python 服务中未找到任务 {TaskId}", taskId);
+                return false;
+            }
+
+            // 更新数据库
+            await UpdateArticleStatusAsync(taskStatus);
+            
+            _logger.LogInformation("成功同步任务状态: {TaskId}, Status: {Status}", taskId, taskStatus.Status);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "同步任务状态异常: {TaskId}", taskId);
+            return false;
+        }
+    }
+
+    /// <summary>
     /// 更新文章状态
     /// </summary>
     private async Task UpdateArticleStatusAsync(TaskStatusResponseDto taskStatus)
@@ -644,5 +690,166 @@ public class WechatScraperService
             _logger.LogError(ex, "创建 ZIP 文件失败");
             return (false, null, $"创建下载包失败: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// 取消/终止任务（调用 Python 服务）
+    /// </summary>
+    public async Task<(bool success, string? error, List<string> stoppedArticles, List<string> deletedDirs)> CancelTaskAsync(string taskId, bool deleteFiles = true)
+    {
+        try
+        {
+            var response = await _httpClient.PostAsync($"/api/task/{taskId}/cancel?delete_files={deleteFiles.ToString().ToLower()}", null);
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                _logger.LogError("取消任务失败: {TaskId}, {StatusCode}, {Error}", taskId, response.StatusCode, errorContent);
+                return (false, $"服务错误: {response.StatusCode}", new(), new());
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<CancelTaskResponseDto>();
+            if (result == null)
+            {
+                return (false, "解析响应失败", new(), new());
+            }
+
+            return (result.Success, null, result.StoppedArticles, result.DeletedDirs);
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "无法连接到爬虫服务");
+            return (false, "无法连接到爬虫服务", new(), new());
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "取消任务失败: {TaskId}", taskId);
+            return (false, $"取消失败: {ex.Message}", new(), new());
+        }
+    }
+
+    /// <summary>
+    /// 删除文章及相关文件（带日志记录）
+    /// </summary>
+    public async Task<(bool success, string? error, string? logDetails)> DeleteArticleWithLogAsync(long articleId, string userId, string? clientIp = null)
+    {
+        var article = await _context.WechatArticles
+            .FirstOrDefaultAsync(a => a.ArticleId == articleId && a.UserId == userId);
+        
+        if (article == null)
+        {
+            return (false, "文章不存在", null);
+        }
+
+        var logDetails = new Dictionary<string, object>
+        {
+            ["articleId"] = articleId,
+            ["taskId"] = article.TaskId ?? "",
+            ["title"] = article.Title ?? "",
+            ["sourceUrl"] = article.SourceUrl,
+            ["status"] = article.Status
+        };
+
+        var deletedFiles = new List<string>();
+        var errors = new List<string>();
+
+        // 1. 尝试取消 Python 服务中的任务（如果还在运行）
+        if (!string.IsNullOrEmpty(article.TaskId) && article.Status == "processing")
+        {
+            var (cancelSuccess, cancelError, stoppedArticles, deletedDirs) = await CancelTaskAsync(article.TaskId, false);
+            logDetails["cancelResult"] = new { cancelSuccess, cancelError, stoppedArticles };
+            if (!cancelSuccess && !string.IsNullOrEmpty(cancelError))
+            {
+                errors.Add($"取消任务: {cancelError}");
+            }
+        }
+
+        // 2. 删除文件夹
+        if (!string.IsNullOrEmpty(article.ArticleUniqueId))
+        {
+            var folderPath = Path.Combine(_env.WebRootPath, _options.OutputPath, userId, article.ArticleUniqueId);
+            if (Directory.Exists(folderPath))
+            {
+                try
+                {
+                    Directory.Delete(folderPath, recursive: true);
+                    deletedFiles.Add(folderPath);
+                    _logger.LogInformation("已删除文章文件夹: {Path}", folderPath);
+                }
+                catch (Exception ex)
+                {
+                    errors.Add($"删除文件夹失败: {ex.Message}");
+                    _logger.LogWarning(ex, "删除文章文件夹失败: {Path}", folderPath);
+                }
+            }
+        }
+
+        logDetails["deletedFiles"] = deletedFiles;
+
+        // 3. 删除数据库记录
+        _context.WechatArticles.Remove(article);
+        await _context.SaveChangesAsync();
+
+        // 4. 写入审计日志
+        var log = new WechatScrapeLog
+        {
+            UserId = userId,
+            Action = "DeleteArticle",
+            TargetId = articleId.ToString(),
+            Details = System.Text.Json.JsonSerializer.Serialize(logDetails),
+            Status = errors.Count == 0 ? "Success" : "Partial",
+            ErrorMessage = errors.Count > 0 ? string.Join("; ", errors) : null,
+            ClientIp = clientIp,
+            CreatedAt = DateTime.UtcNow
+        };
+        _context.WechatScrapeLogs.Add(log);
+        await _context.SaveChangesAsync();
+
+        var logJson = System.Text.Json.JsonSerializer.Serialize(logDetails);
+        return (true, errors.Count > 0 ? string.Join("; ", errors) : null, logJson);
+    }
+
+    /// <summary>
+    /// 获取任务管理列表（包含数据库ID和Python Task ID）
+    /// </summary>
+    public async Task<List<WechatArticle>> GetTaskManagementListAsync(string userId, int page = 1, int pageSize = 50)
+    {
+        return await _context.WechatArticles
+            .Where(a => a.UserId == userId)
+            .OrderByDescending(a => a.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .AsNoTracking()
+            .ToListAsync();
+    }
+
+    /// <summary>
+    /// 获取任务管理列表总数
+    /// </summary>
+    public async Task<int> GetTaskManagementCountAsync(string userId)
+    {
+        return await _context.WechatArticles
+            .Where(a => a.UserId == userId)
+            .CountAsync();
+    }
+
+    /// <summary>
+    /// 写入审计日志
+    /// </summary>
+    public async Task WriteLogAsync(string userId, string action, string? targetId, object? details, string status = "Success", string? errorMessage = null, string? clientIp = null)
+    {
+        var log = new WechatScrapeLog
+        {
+            UserId = userId,
+            Action = action,
+            TargetId = targetId,
+            Details = details != null ? System.Text.Json.JsonSerializer.Serialize(details) : null,
+            Status = status,
+            ErrorMessage = errorMessage,
+            ClientIp = clientIp,
+            CreatedAt = DateTime.UtcNow
+        };
+        _context.WechatScrapeLogs.Add(log);
+        await _context.SaveChangesAsync();
     }
 }

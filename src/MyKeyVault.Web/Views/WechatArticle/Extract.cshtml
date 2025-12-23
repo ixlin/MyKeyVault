@@ -1,0 +1,584 @@
+@{
+    ViewData["Title"] = "文章萃取";
+    var article = ViewBag.Article as MyKeyVault.Web.Models.WechatArticle;
+    var previewUrl = ViewBag.PreviewUrl as string;
+}
+
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2>
+                    <i class="bi bi-magic"></i> 文章萃取
+                </h2>
+                <div>
+                    <a asp-action="ExtractionHistory" asp-route-id="@article!.ArticleId" class="btn btn-outline-info">
+                        <i class="bi bi-clock-history"></i> 历史记录
+                    </a>
+                    <a asp-action="Index" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left"></i> 返回列表
+                    </a>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 fw-bold">萃取对象：</div>
+                        <div class="col-md-9">
+                            @if (!string.IsNullOrEmpty(previewUrl))
+                            {
+                                <a href="@previewUrl" target="_blank" class="text-decoration-none">
+                                    @article.Title
+                                    <i class="bi bi-box-arrow-up-right small"></i>
+                                </a>
+                            }
+                            else
+                            {
+                                @article.Title
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="mb-0">提炼要求</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">快捷提示词模板</label>
+                        <div class="btn-group-vertical d-grid gap-2">
+                            <button type="button" class="btn btn-outline-secondary btn-sm text-start template-btn" data-template="core">
+                                <i class="bi bi-lightbulb"></i> 提炼核心观点
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm text-start template-btn" data-template="mindmap">
+                                <i class="bi bi-diagram-3"></i> 生成思维导图
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm text-start template-btn" data-template="analysis">
+                                <i class="bi bi-search"></i> 多维度分析
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm text-start template-btn" data-template="chart">
+                                <i class="bi bi-bar-chart"></i> 图表解读
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm text-start template-btn" data-template="summary">
+                                <i class="bi bi-file-text"></i> 内容摘要
+                            </button>
+                            <button type="button" class="btn btn-outline-primary btn-sm text-start template-btn" data-template="ppt">
+                                <i class="bi bi-easel"></i> PPT 专用格式（推荐生成 PPT 时使用）
+                            </button>
+                        </div>
+                    </div>
+                    <textarea id="promptInput" class="form-control font-monospace" rows="15" 
+                              placeholder="请输入您的提示词，支持 Markdown 格式。或点击上方快捷按钮使用模板。"></textarea>
+                    <div class="mt-3 d-flex justify-content-between align-items-center">
+                        <small class="text-muted">
+                            <i class="bi bi-info-circle"></i> 
+                            提示：系统会自动将文章内容发送给 AI 模型
+                        </small>
+                        <div>
+                            <button id="extractBtn" class="btn btn-primary btn-lg">
+                                <i class="bi bi-magic"></i> 开始萃取
+                            </button>
+                            <button id="generatePptBtn" class="btn btn-success btn-lg ms-2" style="display: none;">
+                                <i class="bi bi-file-earmark-slides"></i> 生成 PPT
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="resultCard" class="card" style="display: none;">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">萃取结果</h5>
+                    <small id="extractTime" class="text-muted"></small>
+                </div>
+                <div class="card-body">
+                    <!-- Loading -->
+                    <div id="loadingIndicator" class="text-center py-5" style="display: none;">
+                        <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                            <span class="visually-hidden">处理中...</span>
+                        </div>
+                        <p class="mt-3 text-muted">AI 正在分析文章内容，请稍候...</p>
+                    </div>
+                    
+                    <!-- Result -->
+                    <div id="resultContent" style="display: none;">
+                        <div id="renderedResult" class="markdown-body"></div>
+                    </div>
+
+                    <!-- Error -->
+                    <div id="errorContent" class="alert alert-danger" style="display: none;">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <span id="errorMessage"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PPT 生成进度卡片 -->
+            <div id="pptProgressCard" class="card mt-3" style="display: none;">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-file-earmark-slides"></i> 生成 PPT
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <div class="progress" style="height: 25px;">
+                            <div id="pptProgressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                                 role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                                0%
+                            </div>
+                        </div>
+                    </div>
+                    <p id="pptProgressMessage" class="text-center mb-0">准备生成...</p>
+                    <div id="pptDownloadArea" class="text-center mt-3" style="display: none;">
+                        <a id="pptDownloadBtn" href="#" class="btn btn-success btn-lg">
+                            <i class="bi bi-download"></i> 下载 PPT
+                        </a>
+                    </div>
+                    <div id="pptErrorArea" class="alert alert-danger mt-3" style="display: none;">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <span id="pptErrorMessage"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    
+    <!-- Markdown 渲染 -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
+    
+    <!-- Mermaid 图表 -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    
+    <!-- 代码高亮 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/highlight.min.js"></script>
+    
+    <!-- GitHub Markdown 样式 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.5.0/github-markdown.min.css">
+
+    <style>
+        .markdown-body {
+            box-sizing: border-box;
+            width: 100%;
+            max-width: 100%;
+            padding: 20px;
+            font-size: 16px;
+            line-height: 1.6;
+        }
+        
+        .markdown-body pre code {
+            background-color: #f6f8fa;
+            padding: 16px;
+            border-radius: 6px;
+            display: block;
+            overflow-x: auto;
+        }
+
+        .markdown-body table {
+            display: block;
+            width: 100%;
+            overflow-x: auto;
+            border-collapse: collapse;
+        }
+
+        .markdown-body img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        /* Mermaid 图表样式优化 */
+        .markdown-body .mermaid-diagram {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            overflow-x: auto;
+            overflow-y: auto;
+            max-height: 600px;
+        }
+
+        .markdown-body .mermaid-diagram svg {
+            max-width: none !important;
+            height: auto !important;
+            display: block;
+            margin: 0 auto;
+        }
+
+        /* 列表样式优化 */
+        .markdown-body ul, .markdown-body ol {
+            padding-left: 2em;
+            margin: 1em 0;
+        }
+
+        .markdown-body li {
+            margin: 0.5em 0;
+        }
+
+        /* 标题样式优化 */
+        .markdown-body h1, .markdown-body h2, .markdown-body h3 {
+            margin-top: 1.5em;
+            margin-bottom: 0.5em;
+            font-weight: 600;
+        }
+
+        .markdown-body h1 {
+            font-size: 2em;
+            border-bottom: 2px solid #eaecef;
+            padding-bottom: 0.3em;
+        }
+
+        .markdown-body h2 {
+            font-size: 1.5em;
+            border-bottom: 1px solid #eaecef;
+            padding-bottom: 0.3em;
+        }
+
+        .markdown-body blockquote {
+            border-left: 4px solid #dfe2e5;
+            padding: 0 1em;
+            color: #6a737d;
+            margin: 1em 0;
+        }
+
+        .font-monospace {
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+        }
+    </style>
+
+    <script>
+        // 初始化 Mermaid（依赖加载失败时不阻塞页面功能）
+        if (typeof mermaid !== 'undefined') {
+            mermaid.initialize({
+                startOnLoad: false,
+                theme: 'default',
+                securityLevel: 'loose'
+            });
+        }
+
+        // 配置 marked（依赖加载失败时不阻塞页面功能）
+        if (typeof marked !== 'undefined') {
+            marked.setOptions({
+                breaks: true,
+                gfm: true
+            });
+        }
+
+        const extractBtn = document.getElementById('extractBtn');
+        const promptInput = document.getElementById('promptInput');
+        const resultCard = document.getElementById('resultCard');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const resultContent = document.getElementById('resultContent');
+        const errorContent = document.getElementById('errorContent');
+        const renderedResult = document.getElementById('renderedResult');
+        const extractTime = document.getElementById('extractTime');
+        const errorMessage = document.getElementById('errorMessage');
+
+        // 提示词模板
+        const templates = {
+            core: `请提炼这篇文章的核心观点，以条目形式列出，每条观点不超过50字。`,
+            
+            mindmap: `请分析文章结构，用 Mermaid 语法生成思维导图，展示文章的逻辑框架。
+
+输出格式示例：
+\`\`\`mermaid
+graph TD
+    A[主题] --> B[观点1]
+    A --> C[观点2]
+    B --> D[论据1]
+    B --> E[论据2]
+\`\`\``,
+            
+            analysis: `请从以下维度分析这篇文章：
+
+## 1. 主题和核心观点
+## 2. 论证逻辑和论据
+## 3. 创新点和亮点
+## 4. 可能的不足或争议点
+## 5. 实际应用价值
+
+请用 Markdown 格式输出，使用二级标题分隔各部分。`,
+            
+            chart: `文章中包含数据和图表，请：
+
+1. 总结图表展示的关键信息
+2. 分析数据趋势和规律
+3. 解读图表背后的含义
+
+如有必要，请用 Mermaid 绘制补充说明图。`,
+            
+            summary: `请为这篇文章生成一个完整的内容摘要，包括：
+
+1. **一句话总结**（30字以内）
+2. **核心内容**（100-200字）
+3. **关键要点**（3-5条）
+4. **适用场景**
+
+请用 Markdown 格式输出。`,
+            
+            ppt: `请按照以下要求分析文章，生成适合转为 PPT 的结构化内容：
+
+## 输出要求
+
+1. **使用二级标题（##）划分主题**
+   - 每个 ## 标题将成为 PPT 的一页
+   - 标题简洁明了（不超过 15 字）
+   - 建议 5-8 个主题
+
+2. **每个主题下使用要点列表**
+   - 使用 - 或数字列表
+   - 每条要点 20-40 字
+   - 每页不超过 5 个要点
+
+3. **适当使用 Mermaid 图表**
+   - 流程图、思维导图、时序图等
+   - 用 \`\`\`mermaid 代码块包裹
+   - 图表要清晰简洁
+
+4. **避免大段文字**
+   - 不要整段引用原文
+   - 用关键词和短句
+
+## 输出格式示例
+
+## 核心发现
+
+- 企业级 AI 正从试点转为核心基础设施
+- AI 工具从偶尔使用转为日常工作流
+- 组织准备度成为关键瓶颈
+
+## 应用场景分布
+
+- 文本分析占 60%
+- 流程优化占 25%
+- 决策支持占 15%
+
+\`\`\`mermaid
+pie
+    title 应用场景占比
+    "文本分析" : 60
+    "流程优化" : 25
+    "决策支持" : 15
+\`\`\`
+
+请严格按照此格式输出。`
+        };
+
+        // 快捷模板按钮点击事件
+        document.querySelectorAll('.template-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const template = this.dataset.template;
+                if (templates[template]) {
+                    promptInput.value = templates[template];
+                    promptInput.focus();
+                    
+                    // 高亮效果
+                    this.classList.add('active');
+                    setTimeout(() => this.classList.remove('active'), 200);
+                }
+            });
+        });
+
+        extractBtn.addEventListener('click', async function() {
+            const prompt = promptInput.value.trim();
+            
+            if (!prompt) {
+                alert('请输入提示词');
+                return;
+            }
+
+            // 显示结果卡片和 Loading
+            resultCard.style.display = 'block';
+            loadingIndicator.style.display = 'block';
+            resultContent.style.display = 'none';
+            errorContent.style.display = 'none';
+            extractBtn.disabled = true;
+
+            // 滚动到结果区域
+            resultCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+            try {
+                const response = await fetch('@Url.Action("DoExtract")', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+                    },
+                    body: JSON.stringify({
+                        articleId: @article.ArticleId,
+                        prompt: prompt
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || '萃取失败');
+                }
+
+                // 渲染 Markdown
+                await renderMarkdown(data.result);
+                
+                // 显示结果
+                loadingIndicator.style.display = 'none';
+                resultContent.style.display = 'block';
+                extractTime.textContent = '萃取时间: ' + data.createdAt;
+
+                // 显示生成 PPT 按钮
+                const generatePptBtn = document.getElementById('generatePptBtn');
+                generatePptBtn.style.display = 'inline-block';
+                generatePptBtn.dataset.extractionId = data.extractionId;
+
+            } catch (error) {
+                console.error('萃取失败:', error);
+                loadingIndicator.style.display = 'none';
+                errorContent.style.display = 'block';
+                errorMessage.textContent = error.message || '萃取失败，请重试';
+            } finally {
+                extractBtn.disabled = false;
+            }
+        });
+
+        async function renderMarkdown(markdown) {
+            if (typeof marked === 'undefined') {
+                renderedResult.textContent = markdown;
+                return;
+            }
+
+            // 使用 marked 转换 Markdown
+            const html = marked.parse(markdown);
+            renderedResult.innerHTML = html;
+
+            // 渲染代码高亮
+            if (typeof hljs !== 'undefined') {
+                renderedResult.querySelectorAll('pre code').forEach((block) => {
+                    try {
+                        hljs.highlightElement(block);
+                    } catch (e) {
+                        console.warn('代码高亮失败:', e);
+                    }
+                });
+            }
+
+            // 渲染 Mermaid 图表（```mermaid 会被 marked 标记为 language-mermaid）
+            if (typeof mermaid !== 'undefined') {
+                const mermaidBlocks = renderedResult.querySelectorAll('pre > code.language-mermaid');
+                for (let i = 0; i < mermaidBlocks.length; i++) {
+                    const block = mermaidBlocks[i];
+                    const pre = block.closest('pre');
+                    if (!pre) continue;
+
+                    const mermaidCode = block.textContent || '';
+                    try {
+                        const id = `mermaid-${Date.now()}-${i}`;
+                        const { svg } = await mermaid.render(id, mermaidCode);
+                        const div = document.createElement('div');
+                        div.innerHTML = svg;
+                        div.className = 'mermaid-diagram';
+                        pre.replaceWith(div);
+                    } catch (error) {
+                        console.error('Mermaid 渲染失败:', error);
+                    }
+                }
+            }
+        }
+
+        // ===== PPT 生成功能 =====
+        const generatePptBtn = document.getElementById('generatePptBtn');
+        const pptProgressCard = document.getElementById('pptProgressCard');
+        const pptProgressBar = document.getElementById('pptProgressBar');
+        const pptProgressMessage = document.getElementById('pptProgressMessage');
+        const pptDownloadArea = document.getElementById('pptDownloadArea');
+        const pptDownloadBtn = document.getElementById('pptDownloadBtn');
+        const pptErrorArea = document.getElementById('pptErrorArea');
+        const pptErrorMessage = document.getElementById('pptErrorMessage');
+
+        let progressInterval = null;
+
+        generatePptBtn.addEventListener('click', async function() {
+            const extractionId = this.dataset.extractionId;
+            if (!extractionId) {
+                alert('萃取记录不存在');
+                return;
+            }
+
+            // 显示进度卡片
+            pptProgressCard.style.display = 'block';
+            pptProgressBar.style.width = '0%';
+            pptProgressBar.textContent = '0%';
+            pptProgressMessage.textContent = '正在启动生成任务...';
+            pptDownloadArea.style.display = 'none';
+            pptErrorArea.style.display = 'none';
+            generatePptBtn.disabled = true;
+
+            pptProgressCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+            try {
+                // 1. 启动生成任务
+                const response = await fetch('@Url.Action("GeneratePpt")', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `extractionId=${extractionId}`
+                });
+
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || '启动失败');
+                }
+
+                const progressKey = data.progressKey;
+
+                // 2. 轮询进度
+                progressInterval = setInterval(async () => {
+                    try {
+                        const progressResponse = await fetch(`@Url.Action("GetPptProgress")?progressKey=${encodeURIComponent(progressKey)}`);
+                        if (!progressResponse.ok) {
+                            throw new Error('查询进度失败');
+                        }
+
+                        const progress = await progressResponse.json();
+                        
+                        // 更新进度条
+                        pptProgressBar.style.width = progress.percentage + '%';
+                        pptProgressBar.textContent = progress.percentage + '%';
+                        pptProgressMessage.textContent = progress.message;
+
+                        // 检查状态
+                        if (progress.status === 'completed') {
+                            clearInterval(progressInterval);
+                            pptProgressBar.classList.remove('progress-bar-animated');
+                            pptDownloadBtn.href = progress.downloadUrl;
+                            pptDownloadArea.style.display = 'block';
+                            generatePptBtn.disabled = false;
+                        } else if (progress.status === 'failed') {
+                            clearInterval(progressInterval);
+                            pptProgressBar.classList.remove('progress-bar-animated');
+                            pptProgressBar.classList.add('bg-danger');
+                            pptErrorMessage.textContent = progress.error || '生成失败';
+                            pptErrorArea.style.display = 'block';
+                            generatePptBtn.disabled = false;
+                        }
+                    } catch (err) {
+                        console.error('查询进度失败:', err);
+                    }
+                }, 500); // 每 500ms 查询一次
+
+            } catch (error) {
+                console.error('生成 PPT 失败:', error);
+                pptErrorMessage.textContent = error.message || '生成失败';
+                pptErrorArea.style.display = 'block';
+                generatePptBtn.disabled = false;
+            }
+        });
+    </script>
+}
