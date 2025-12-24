@@ -94,7 +94,7 @@
                                         <i class="bi bi-eye"></i> 查看结果
                                     </a>
                                     <button class="btn btn-sm btn-success generate-ppt-btn" data-extraction-id="@extraction.ExtractionId">
-                                        <i class="bi bi-file-earmark-slides"></i> 生成 PPT
+                                        <i class="bi bi-file-earmark-slides"></i> 生成演示文稿
                                     </button>
                                 </div>
                             }
@@ -119,12 +119,12 @@
     }
 </div>
 
-<!-- PPT 生成进度模态框 -->
+<!-- 演示文稿生成进度模态框 -->
 <div class="modal fade" id="pptProgressModal" tabindex="-1" data-bs-backdrop="static">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="bi bi-file-earmark-slides"></i> 生成 PPT</h5>
+                <h5 class="modal-title"><i class="bi bi-file-earmark-slides"></i> 生成演示文稿</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" id="closeModalBtn" style="display:none;"></button>
             </div>
             <div class="modal-body">
@@ -138,8 +138,8 @@
                 </div>
                 <p id="modalProgressMessage" class="text-center mb-0">准备生成...</p>
                 <div id="modalDownloadArea" class="text-center mt-3" style="display: none;">
-                    <a id="modalDownloadBtn" href="#" class="btn btn-success">
-                        <i class="bi bi-download"></i> 下载 PPT
+                    <a id="modalDownloadBtn" href="#" target="_blank" class="btn btn-success">
+                        <i class="bi bi-eye"></i> 查看演示文稿
                     </a>
                 </div>
                 <div id="modalErrorArea" class="alert alert-danger mt-3" style="display: none;">
@@ -179,7 +179,7 @@
                 pptModal.show();
 
                 try {
-                    const response = await fetch('@Url.Action("GeneratePpt", "WechatArticle")', {
+                    const response = await fetch('@Url.Action("GeneratePresentation", "WechatArticle")', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                         body: `extractionId=${extractionId}`
@@ -195,7 +195,7 @@
                     // 轮询进度
                     progressInterval = setInterval(async () => {
                         try {
-                            const progressResponse = await fetch(`@Url.Action("GetPptProgress", "WechatArticle")?progressKey=${encodeURIComponent(progressKey)}`);
+                            const progressResponse = await fetch(`@Url.Action("GetPresentationProgress", "WechatArticle")?progressKey=${encodeURIComponent(progressKey)}`);
                             if (!progressResponse.ok) return;
 
                             const progress = await progressResponse.json();
@@ -207,7 +207,7 @@
                             if (progress.status === 'completed') {
                                 clearInterval(progressInterval);
                                 modalProgressBar.classList.remove('progress-bar-animated');
-                                modalDownloadBtn.href = progress.downloadUrl;
+                                modalDownloadBtn.href = progress.viewUrl;
                                 modalDownloadArea.style.display = 'block';
                                 closeModalBtn.style.display = 'block';
                             } else if (progress.status === 'failed') {
@@ -224,7 +224,7 @@
                     }, 500);
 
                 } catch (error) {
-                    console.error('生成 PPT 失败:', error);
+                    console.error('生成演示文稿失败:', error);
                     modalErrorMessage.textContent = error.message || '生成失败';
                     modalErrorArea.style.display = 'block';
                     closeModalBtn.style.display = 'block';

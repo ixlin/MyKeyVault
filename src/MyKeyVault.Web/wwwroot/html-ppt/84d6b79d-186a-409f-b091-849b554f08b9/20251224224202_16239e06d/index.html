@@ -1,0 +1,346 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgentScope x RocketMQ：打造企业级高可靠 A2A 智能体通信基座 - 演示文稿</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0a0a0f;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            color: #FFFFFF;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 24px;
+            background: #12121a;
+            border-radius: 12px;
+            margin-bottom: 24px;
+        }
+        header h1 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #FFFFFF;
+        }
+        .controls {
+            display: flex;
+            gap: 12px;
+        }
+        .btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+        .btn:hover {
+            background: #60a5fa;
+            transform: translateY(-1px);
+        }
+        .btn-secondary {
+            background: #12121a;
+            border: 1px solid #2d2d3a;
+        }
+        .btn-secondary:hover {
+            background: #1a1a2e;
+        }
+        .preview-container {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            align-items: center;
+        }
+        .slide-preview {
+            width: 90vw;
+            max-width: 1280px;
+            aspect-ratio: 16/9;
+            background: #12121a;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+        .slide-preview:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 30px rgba(59, 130, 246, 0.2);
+        }
+        .slide-number {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            z-index: 10;
+        }
+        .slide-frame-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            overflow: hidden;
+        }
+        .slide-frame {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 1280px;
+            height: 720px;
+            border: none;
+            transform-origin: center center;
+        }
+        /* 演示模式 */
+        .presentation-mode {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: black;
+            z-index: 1000;
+            display: none;
+            flex-direction: column;
+        }
+        .presentation-slide-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .presentation-slide {
+            width: 1280px;
+            height: 720px;
+            border: none;
+            transform-origin: center center;
+        }
+        .presentation-controls {
+            height: 60px;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            padding: 0 20px;
+        }
+        .presentation-controls button {
+            background: transparent;
+            color: white;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+        .presentation-controls button:hover {
+            background: rgba(255,255,255,0.1);
+        }
+        .progress-bar {
+            flex: 1;
+            max-width: 400px;
+            height: 4px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #3b82f6;
+            transition: width 0.3s;
+        }
+        .slide-counter {
+            color: white;
+            font-size: 14px;
+            min-width: 60px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📊 AgentScope x RocketMQ：打造企业级高可靠 A2A 智能体通信基座</h1>
+            <div class="controls">
+                <button class="btn" onclick="startPresentation(0)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    开始演示
+                </button>
+            </div>
+        </header>
+        <div class="preview-container" id="preview-container"></div>
+    </div>
+
+    <div class="presentation-mode" id="presentation-mode">
+        <div class="presentation-slide-container">
+            <iframe id="presentation-slide" class="presentation-slide"></iframe>
+        </div>
+        <div class="presentation-controls">
+            <button onclick="prevSlide()" title="上一页">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress-fill"></div>
+            </div>
+            <span class="slide-counter"><span id="current-slide">1</span> / <span id="total-slides">9</span></span>
+            <button onclick="nextSlide()" title="下一页">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+            <button onclick="toggleFullscreen()" title="全屏">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+            </button>
+            <button onclick="exitPresentation()" title="退出">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const slides = ["slides/slide1.html", "slides/slide2.html", "slides/slide3.html", "slides/slide4.html", "slides/slide5.html", "slides/slide6.html", "slides/slide7.html", "slides/slide8.html", "slides/slide9.html"];
+        let currentIndex = 0;
+
+        // 生成预览
+        function generatePreviews() {
+            const container = document.getElementById('preview-container');
+            slides.forEach((slide, index) => {
+                const preview = document.createElement('div');
+                preview.className = 'slide-preview';
+                preview.innerHTML = `
+                    <div class="slide-number">${index + 1}</div>
+                    <div class="slide-frame-container">
+                        <iframe class="slide-frame" src="${slide}" frameborder="0"></iframe>
+                    </div>
+                `;
+                preview.onclick = () => startPresentation(index);
+                container.appendChild(preview);
+                
+                // 计算缩放
+                setTimeout(() => {
+                    const frameContainer = preview.querySelector('.slide-frame-container');
+                    const frame = preview.querySelector('.slide-frame');
+                    const scale = Math.min(
+                        frameContainer.clientWidth / 1280,
+                        frameContainer.clientHeight / 720
+                    );
+                    frame.style.transform = `translate(-50%, -50%) scale(${scale})`;
+                }, 100);
+            });
+        }
+
+        // 开始演示
+        function startPresentation(index) {
+            currentIndex = index;
+            document.getElementById('presentation-mode').style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+            updateSlide();
+            requestFullscreen();
+        }
+
+        // 更新幻灯片
+        function updateSlide() {
+            document.getElementById('presentation-slide').src = slides[currentIndex];
+            document.getElementById('current-slide').textContent = currentIndex + 1;
+            document.getElementById('progress-fill').style.width = ((currentIndex + 1) / slides.length * 100) + '%';
+            scalePresentationSlide();
+        }
+
+        // 缩放演示幻灯片
+        function scalePresentationSlide() {
+            const container = document.querySelector('.presentation-slide-container');
+            const slide = document.getElementById('presentation-slide');
+            const scale = Math.min(
+                (container.clientWidth - 40) / 1280,
+                (container.clientHeight - 40) / 720
+            );
+            slide.style.transform = `scale(${scale})`;
+        }
+
+        function nextSlide() {
+            if (currentIndex < slides.length - 1) {
+                currentIndex++;
+                updateSlide();
+            }
+        }
+
+        function prevSlide() {
+            if (currentIndex > 0) {
+                currentIndex--;
+                updateSlide();
+            }
+        }
+
+        function exitPresentation() {
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+            }
+            document.getElementById('presentation-mode').style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+
+        function requestFullscreen() {
+            const elem = document.getElementById('presentation-mode');
+            if (elem.requestFullscreen) elem.requestFullscreen();
+            else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
+        }
+
+        function toggleFullscreen() {
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+            } else {
+                requestFullscreen();
+            }
+        }
+
+        // 键盘控制
+        document.addEventListener('keydown', (e) => {
+            if (document.getElementById('presentation-mode').style.display === 'flex') {
+                if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter') {
+                    e.preventDefault();
+                    nextSlide();
+                } else if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    prevSlide();
+                } else if (e.key === 'Escape') {
+                    exitPresentation();
+                } else if (e.key === 'f' || e.key === 'F') {
+                    toggleFullscreen();
+                }
+            }
+        });
+
+        // 监听窗口大小变化
+        window.addEventListener('resize', () => {
+            if (document.getElementById('presentation-mode').style.display === 'flex') {
+                scalePresentationSlide();
+            }
+        });
+
+        // 初始化
+        window.addEventListener('load', generatePreviews);
+    </script>
+</body>
+</html>

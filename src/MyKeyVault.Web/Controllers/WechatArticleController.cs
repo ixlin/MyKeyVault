@@ -14,7 +14,7 @@ public class WechatArticleController : Controller
 {
     private readonly WechatScraperService _scraperService;
     private readonly AIExtractionService _extractionService;
-    private readonly PptGenerationService _pptService;
+    private readonly HtmlPresentationService _presentationService;
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly ILogger<WechatArticleController> _logger;
     private readonly ApplicationDbContext _context;
@@ -22,14 +22,14 @@ public class WechatArticleController : Controller
     public WechatArticleController(
         WechatScraperService scraperService,
         AIExtractionService extractionService,
-        PptGenerationService pptService,
+        HtmlPresentationService presentationService,
         IServiceScopeFactory serviceScopeFactory,
         ILogger<WechatArticleController> logger,
         ApplicationDbContext context)
     {
         _scraperService = scraperService;
         _extractionService = extractionService;
-        _pptService = pptService;
+        _presentationService = presentationService;
         _serviceScopeFactory = serviceScopeFactory;
         _logger = logger;
         _context = context;
@@ -659,13 +659,13 @@ public class WechatArticleController : Controller
 
     #endregion
 
-    #region PPT 生成功能
+    #region HTML 演示文稿生成功能
 
     /// <summary>
-    /// 生成 PPT（异步启动）
+    /// 生成 HTML 演示文稿（异步启动）
     /// </summary>
     [HttpPost]
-    public async Task<IActionResult> GeneratePpt(long extractionId)
+    public async Task<IActionResult> GeneratePresentation(long extractionId)
     {
         var userId = CurrentUserId;
         
@@ -681,7 +681,7 @@ public class WechatArticleController : Controller
         }
 
         // 生成唯一进度 Key
-        var progressKey = $"ppt_generation_{userId}_{extractionId}_{Guid.NewGuid():N}";
+        var progressKey = $"html_presentation_{userId}_{extractionId}_{Guid.NewGuid():N}";
 
         // 后台异步生成（创建新的 Scope 避免 DbContext 被提前释放）
         _ = System.Threading.Tasks.Task.Run(async () =>
@@ -690,13 +690,13 @@ public class WechatArticleController : Controller
             {
                 // 创建新的服务范围
                 using var scope = _serviceScopeFactory.CreateScope();
-                var pptService = scope.ServiceProvider.GetRequiredService<PptGenerationService>();
+                var presentationService = scope.ServiceProvider.GetRequiredService<HtmlPresentationService>();
                 
-                await pptService.GeneratePptAsync(extractionId, userId, progressKey);
+                await presentationService.GenerateAsync(extractionId, userId, progressKey);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "生成 PPT 失败: ExtractionId={ExtractionId}", extractionId);
+                _logger.LogError(ex, "生成 HTML 演示文稿失败: ExtractionId={ExtractionId}", extractionId);
             }
         });
 
@@ -704,52 +704,23 @@ public class WechatArticleController : Controller
     }
 
     /// <summary>
-    /// 查询 PPT 生成进度（轮询）
+    /// 查询演示文稿生成进度（轮询）
     /// </summary>
     [HttpGet]
-    public IActionResult GetPptProgress(string progressKey)
+    public IActionResult GetPresentationProgress(string progressKey)
     {
         if (string.IsNullOrEmpty(progressKey))
         {
             return BadRequest(new { error = "progressKey 不能为空" });
         }
 
-        var progress = _pptService.GetProgress(progressKey);
+        var progress = _presentationService.GetProgress(progressKey);
         if (progress == null)
         {
             return NotFound(new { error = "进度信息不存在或已过期" });
         }
 
         return Ok(progress);
-    }
-
-    /// <summary>
-    /// 下载生成的 PPT
-    /// </summary>
-    [HttpGet]
-    public IActionResult DownloadPpt(string file)
-    {
-        if (string.IsNullOrEmpty(file))
-        {
-            return BadRequest("文件名不能为空");
-        }
-
-        var tempPath = Path.Combine(Path.GetTempPath(), file);
-        if (!System.IO.File.Exists(tempPath))
-        {
-            return NotFound("文件不存在或已过期");
-        }
-
-        var bytes = System.IO.File.ReadAllBytes(tempPath);
-
-        // 删除临时文件
-        try
-        {
-            System.IO.File.Delete(tempPath);
-        }
-        catch { }
-
-        return File(bytes, "application/vnd.openxmlformats-officedocument.presentationml.presentation", file);
     }
 
     #endregion

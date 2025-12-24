@@ -66,7 +66,7 @@
                                 <i class="bi bi-file-text"></i> 内容摘要
                             </button>
                             <button type="button" class="btn btn-outline-primary btn-sm text-start template-btn" data-template="ppt">
-                                <i class="bi bi-easel"></i> PPT 专用格式（推荐生成 PPT 时使用）
+                                <i class="bi bi-easel"></i> 演示文稿专用格式（推荐生成 HTML 演示文稿时使用）
                             </button>
                         </div>
                     </div>
@@ -82,7 +82,7 @@
                                 <i class="bi bi-magic"></i> 开始萃取
                             </button>
                             <button id="generatePptBtn" class="btn btn-success btn-lg ms-2" style="display: none;">
-                                <i class="bi bi-file-earmark-slides"></i> 生成 PPT
+                                <i class="bi bi-file-earmark-slides"></i> 生成演示文稿
                             </button>
                         </div>
                     </div>
@@ -116,11 +116,11 @@
                 </div>
             </div>
 
-            <!-- PPT 生成进度卡片 -->
+            <!-- 演示文稿生成进度卡片 -->
             <div id="pptProgressCard" class="card mt-3" style="display: none;">
                 <div class="card-header">
                     <h5 class="mb-0">
-                        <i class="bi bi-file-earmark-slides"></i> 生成 PPT
+                        <i class="bi bi-file-earmark-slides"></i> 生成演示文稿
                     </h5>
                 </div>
                 <div class="card-body">
@@ -134,8 +134,8 @@
                     </div>
                     <p id="pptProgressMessage" class="text-center mb-0">准备生成...</p>
                     <div id="pptDownloadArea" class="text-center mt-3" style="display: none;">
-                        <a id="pptDownloadBtn" href="#" class="btn btn-success btn-lg">
-                            <i class="bi bi-download"></i> 下载 PPT
+                        <a id="pptDownloadBtn" href="#" target="_blank" class="btn btn-success btn-lg">
+                            <i class="bi bi-eye"></i> 查看演示文稿
                         </a>
                     </div>
                     <div id="pptErrorArea" class="alert alert-danger mt-3" style="display: none;">
@@ -324,12 +324,12 @@ graph TD
 
 请用 Markdown 格式输出。`,
             
-            ppt: `请按照以下要求分析文章，生成适合转为 PPT 的结构化内容：
+            ppt: `请按照以下要求分析文章，生成适合转为 HTML 演示文稿的结构化内容：
 
 ## 输出要求
 
 1. **使用二级标题（##）划分主题**
-   - 每个 ## 标题将成为 PPT 的一页
+   - 每个 ## 标题将成为演示文稿的一页
    - 标题简洁明了（不超过 15 字）
    - 建议 5-8 个主题
 
@@ -338,14 +338,28 @@ graph TD
    - 每条要点 20-40 字
    - 每页不超过 5 个要点
 
-3. **适当使用 Mermaid 图表**
+3. **数据可视化（重要！）**
+   如果文章包含数据、统计、对比信息，请提取并生成 ECharts 图表配置：
+   \`\`\`chart-data
+   {
+     "type": "bar",
+     "title": "图表标题",
+     "xAxis": ["类别1", "类别2", "类别3"],
+     "series": [
+       { "name": "系列1", "data": [10, 20, 30] }
+     ]
+   }
+   \`\`\`
+   支持的图表类型：bar（柱状图）、line（折线图）、pie（饼图）
+
+4. **适当使用 Mermaid 图表**
    - 流程图、思维导图、时序图等
    - 用 \`\`\`mermaid 代码块包裹
    - 图表要清晰简洁
 
-4. **避免大段文字**
-   - 不要整段引用原文
-   - 用关键词和短句
+5. **关键数字突出**
+   - 将重要的数字指标单独成行
+   - 格式如：40% 的企业已采用 AI
 
 ## 输出格式示例
 
@@ -355,21 +369,39 @@ graph TD
 - AI 工具从偶尔使用转为日常工作流
 - 组织准备度成为关键瓶颈
 
-## 应用场景分布
+## 效率提升数据
 
-- 文本分析占 60%
-- 流程优化占 25%
-- 决策支持占 15%
+40% 效率提升
+60分钟 每天节省时间
 
-\`\`\`mermaid
-pie
-    title 应用场景占比
-    "文本分析" : 60
-    "流程优化" : 25
-    "决策支持" : 15
+\`\`\`chart-data
+{
+  "type": "bar",
+  "title": "AI工具使用效果",
+  "xAxis": ["传统方式", "使用AI后"],
+  "series": [
+    { "name": "完成时间(分钟)", "data": [120, 60] }
+  ]
+}
 \`\`\`
 
-请严格按照此格式输出。`
+## 应用场景分布
+
+\`\`\`chart-data
+{
+  "type": "pie",
+  "title": "应用场景占比",
+  "series": [
+    { "name": "场景", "data": [
+      {"value": 60, "name": "文本分析"},
+      {"value": 25, "name": "流程优化"},
+      {"value": 15, "name": "决策支持"}
+    ]}
+  ]
+}
+\`\`\`
+
+请严格按照此格式输出，确保数据图表的 JSON 格式正确。`
         };
 
         // 快捷模板按钮点击事件
@@ -491,7 +523,7 @@ pie
             }
         }
 
-        // ===== PPT 生成功能 =====
+        // ===== HTML 演示文稿生成功能 =====
         const generatePptBtn = document.getElementById('generatePptBtn');
         const pptProgressCard = document.getElementById('pptProgressCard');
         const pptProgressBar = document.getElementById('pptProgressBar');
@@ -523,7 +555,7 @@ pie
 
             try {
                 // 1. 启动生成任务
-                const response = await fetch('@Url.Action("GeneratePpt")', {
+                const response = await fetch('@Url.Action("GeneratePresentation")', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded',
@@ -541,7 +573,7 @@ pie
                 // 2. 轮询进度
                 progressInterval = setInterval(async () => {
                     try {
-                        const progressResponse = await fetch(`@Url.Action("GetPptProgress")?progressKey=${encodeURIComponent(progressKey)}`);
+                        const progressResponse = await fetch(`@Url.Action("GetPresentationProgress")?progressKey=${encodeURIComponent(progressKey)}`);
                         if (!progressResponse.ok) {
                             throw new Error('查询进度失败');
                         }
@@ -557,7 +589,7 @@ pie
                         if (progress.status === 'completed') {
                             clearInterval(progressInterval);
                             pptProgressBar.classList.remove('progress-bar-animated');
-                            pptDownloadBtn.href = progress.downloadUrl;
+                            pptDownloadBtn.href = progress.viewUrl;
                             pptDownloadArea.style.display = 'block';
                             generatePptBtn.disabled = false;
                         } else if (progress.status === 'failed') {
@@ -574,7 +606,7 @@ pie
                 }, 500); // 每 500ms 查询一次
 
             } catch (error) {
-                console.error('生成 PPT 失败:', error);
+                console.error('生成演示文稿失败:', error);
                 pptErrorMessage.textContent = error.message || '生成失败';
                 pptErrorArea.style.display = 'block';
                 generatePptBtn.disabled = false;
