@@ -448,6 +448,13 @@ public class WechatScraperService
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogWarning("获取任务状态失败: {TaskId}, {StatusCode}", taskId, response.StatusCode);
+                
+                // 如果 Python 服务返回 404，说明任务已丢失（可能是服务重启）
+                // 需要将数据库中仍处于 pending/processing 的文章标记为失败
+                if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    await MarkOrphanedArticlesAsFailedAsync(taskId);
+                }
                 return null;
             }
 
@@ -461,10 +468,48 @@ public class WechatScraperService
 
             return result;
         }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "无法连接到爬虫服务: {TaskId}", taskId);
+            // 连接失败时不立即标记为失败，可能只是临时网络问题
+            return null;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "获取任务状态失败: {TaskId}", taskId);
             return null;
+        }
+    }
+
+    /// <summary>
+    /// 将孤立的文章（Python 服务中找不到对应任务）标记为失败
+    /// </summary>
+    private async Task MarkOrphanedArticlesAsFailedAsync(string taskId)
+    {
+        try
+        {
+            var orphanedArticles = await _context.WechatArticles
+                .Where(a => a.TaskId == taskId && (a.Status == "pending" || a.Status == "processing"))
+                .ToListAsync();
+
+            if (!orphanedArticles.Any())
+            {
+                return;
+            }
+
+            foreach (var article in orphanedArticles)
+            {
+                article.Status = "failed";
+                article.ErrorMessage = "任务已丢失（爬虫服务可能已重启），请重新提交";
+                article.CompletedAt = DateTime.UtcNow;
+            }
+
+            await _context.SaveChangesAsync();
+            _logger.LogWarning("已将 {Count} 个孤立文章标记为失败: TaskId={TaskId}", orphanedArticles.Count, taskId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "标记孤立文章失败: {TaskId}", taskId);
         }
     }
 
@@ -559,6 +604,70 @@ public class WechatScraperService
     {
         return await _context.WechatArticles
             .FirstOrDefaultAsync(a => a.ArticleId == articleId && a.UserId == userId);
+    }
+
+    /// <summary>
+    /// 重试失败的文章爬取任务
+    /// </summary>
+    public async Task<(bool success, string? newTaskId, string? error)> RetryArticleAsync(long articleId, string userId)
+    {
+        var article = await _context.WechatArticles
+            .FirstOrDefaultAsync(a => a.ArticleId == articleId && a.UserId == userId);
+
+        if (article == null)
+        {
+            return (false, null, "文章不存在");
+        }
+
+        // 只能重试失败或处理中超时的文章
+        if (article.Status != "failed" && article.Status != "processing")
+        {
+            return (false, null, $"当前状态 [{article.Status}] 不支持重试");
+        }
+
+        // 如果是 processing 状态，检查是否已经超时（超过10分钟）
+        if (article.Status == "processing")
+        {
+            var timeSinceCreated = DateTime.UtcNow - article.CreatedAt;
+            if (timeSinceCreated.TotalMinutes < 10)
+            {
+                return (false, null, "任务正在处理中，请耐心等待");
+            }
+        }
+
+        // 删除旧的文件夹（如果存在）
+        if (!string.IsNullOrEmpty(article.ArticleUniqueId))
+        {
+            var folderPath = Path.Combine(_env.WebRootPath, _options.OutputPath, userId, article.ArticleUniqueId);
+            if (Directory.Exists(folderPath))
+            {
+                try
+                {
+                    Directory.Delete(folderPath, recursive: true);
+                    _logger.LogInformation("已删除旧文章文件夹: {Path}", folderPath);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "删除旧文件夹失败: {Path}", folderPath);
+                }
+            }
+        }
+
+        // 重新提交爬取任务
+        var (success, taskId, error) = await SubmitScrapeTaskAsync(userId, new List<string> { article.SourceUrl });
+
+        if (!success)
+        {
+            return (false, null, error);
+        }
+
+        // 删除旧记录（新任务会创建新记录）
+        _context.WechatArticles.Remove(article);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("重试文章成功: 旧ArticleId={OldId}, 新TaskId={NewTaskId}", articleId, taskId);
+
+        return (true, taskId, null);
     }
 
     /// <summary>

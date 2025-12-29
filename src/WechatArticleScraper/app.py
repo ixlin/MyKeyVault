@@ -9,9 +9,12 @@ import os
 import re
 import asyncio
 import shutil
-from datetime import datetime
-from typing import List, Optional
+import traceback
+import logging
+from datetime import datetime, timedelta
+from typing import List, Optional, Dict, Any
 from urllib.parse import urlparse, parse_qs
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,10 +23,97 @@ import uvicorn
 
 from scraper import WechatArticleScraper
 
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# 单个文章爬取超时时间（秒）
+ARTICLE_SCRAPE_TIMEOUT = 300  # 5分钟
+# 任务过期时间（小时）
+TASK_EXPIRE_HOURS = 24
+# 孤立任务检查间隔（秒）
+ORPHAN_CHECK_INTERVAL = 300  # 5分钟
+
+# 后台清理任务的控制标志
+cleanup_task: Optional[asyncio.Task] = None
+
+async def cleanup_orphaned_tasks():
+    """后台任务：定期清理孤立/超时的任务"""
+    while True:
+        try:
+            await asyncio.sleep(ORPHAN_CHECK_INTERVAL)
+            now = datetime.now()
+            expired_task_ids = []
+            
+            for task_id, task in list(tasks.items()):
+                try:
+                    # 检查任务是否过期（超过24小时）
+                    created_at = datetime.fromisoformat(task.get('created_at', now.isoformat()))
+                    if (now - created_at).total_seconds() > TASK_EXPIRE_HOURS * 3600:
+                        expired_task_ids.append(task_id)
+                        continue
+                    
+                    # 检查是否有任务长时间处于 processing 状态（超过10分钟）
+                    updated_at = datetime.fromisoformat(task.get('updated_at', now.isoformat()))
+                    if task.get('status') == 'processing' and (now - updated_at).total_seconds() > 600:
+                        # 标记为超时失败
+                        for article in task.get('articles', []):
+                            if article.status == 'processing':
+                                article.status = 'failed'
+                                article.error_message = '任务处理超时（超过10分钟无响应）'
+                        task['status'] = 'failed'
+                        task['updated_at'] = now.isoformat()
+                        logger.warning(f"任务 {task_id} 因超时被标记为失败")
+                except Exception as e:
+                    logger.error(f"检查任务 {task_id} 时出错: {e}")
+            
+            # 清理过期任务
+            for task_id in expired_task_ids:
+                try:
+                    # 先停止可能正在运行的爬虫
+                    if task_id in running_scrapers:
+                        for article_id, scraper in list(running_scrapers[task_id].items()):
+                            try:
+                                scraper.stop()
+                            except Exception:
+                                pass
+                        del running_scrapers[task_id]
+                    del tasks[task_id]
+                    logger.info(f"已清理过期任务: {task_id}")
+                except Exception as e:
+                    logger.error(f"清理任务 {task_id} 时出错: {e}")
+                    
+        except asyncio.CancelledError:
+            logger.info("清理任务已取消")
+            break
+        except Exception as e:
+            logger.error(f"清理任务执行出错: {e}")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """应用生命周期管理"""
+    global cleanup_task
+    # 启动时：启动后台清理任务
+    cleanup_task = asyncio.create_task(cleanup_orphaned_tasks())
+    logger.info("微信图文爬取服务已启动")
+    yield
+    # 关闭时：停止后台任务
+    if cleanup_task:
+        cleanup_task.cancel()
+        try:
+            await cleanup_task
+        except asyncio.CancelledError:
+            pass
+    logger.info("微信图文爬取服务已关闭")
+
 app = FastAPI(
     title="微信图文爬取服务",
     description="提供微信公众号文章内容抓取的 REST API",
-    version="1.1.0"
+    version="1.2.0",
+    lifespan=lifespan
 )
 
 # CORS 配置（仅允许本地访问）
@@ -126,18 +216,42 @@ def generate_task_id() -> str:
     return f"task_{datetime.now().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:8]}"
 
 
+async def scrape_article_with_timeout(scraper: WechatArticleScraper, url: str, timeout: int = ARTICLE_SCRAPE_TIMEOUT):
+    """带超时控制的爬取执行"""
+    try:
+        # 在后台线程中执行同步 Playwright，并添加超时控制
+        result = await asyncio.wait_for(
+            asyncio.to_thread(scraper.scrape, url),
+            timeout=timeout
+        )
+        return result
+    except asyncio.TimeoutError:
+        # 超时时尝试停止爬虫
+        try:
+            scraper.stop()
+        except Exception:
+            pass
+        raise Exception(f"爬取超时（超过 {timeout} 秒）")
+
+
 async def scrape_article(article_result: ArticleResult, output_dir: str, task_id: str = ""):
     """异步爬取单篇文章（在独立线程中运行同步 Playwright，避免事件循环冲突）"""
     scraper = None
+    start_time = datetime.now()
+    
     try:
         article_result.status = "processing"
         article_result.progress = 0
         article_result.stage = "准备中"
+        logger.info(f"开始爬取文章: {article_result.source_url}")
 
         def on_progress(percent: int, message: str):
             # 只写面向用户的阶段信息，不暴露内部实现细节
             article_result.progress = int(percent)
             article_result.stage = message
+            # 更新任务的 updated_at 时间，防止被误判为超时
+            if task_id and task_id in tasks:
+                tasks[task_id]['updated_at'] = datetime.now().isoformat()
         
         scraper = WechatArticleScraper(output_dir=output_dir, progress_callback=on_progress)
         
@@ -147,8 +261,8 @@ async def scrape_article(article_result: ArticleResult, output_dir: str, task_id
                 running_scrapers[task_id] = {}
             running_scrapers[task_id][article_result.article_id] = scraper
         
-        # 在后台线程中执行同步 Playwright，避免 "Sync API inside the asyncio loop" 报错
-        result = await asyncio.to_thread(scraper.scrape, article_result.source_url)
+        # 使用带超时控制的爬取
+        result = await scrape_article_with_timeout(scraper, article_result.source_url)
         
         article_result.title = result.get("title")
         article_result.author = result.get("author")
@@ -161,6 +275,20 @@ async def scrape_article(article_result: ArticleResult, output_dir: str, task_id
         article_result.progress = 100
         article_result.stage = "完成"
         
+        elapsed = (datetime.now() - start_time).total_seconds()
+        logger.info(f"文章爬取成功: {article_result.title} (耗时 {elapsed:.1f}s)")
+        
+    except asyncio.CancelledError:
+        article_result.status = "cancelled"
+        article_result.error_message = "任务已被取消"
+        article_result.stage = "已取消"
+        logger.warning(f"文章爬取被取消: {article_result.source_url}")
+        # 尝试停止爬虫
+        if scraper:
+            try:
+                scraper.stop()
+            except Exception:
+                pass
     except Exception as e:
         article_result.status = "failed"
         # 尽量让前端看到"卡在哪一步"
@@ -171,6 +299,10 @@ async def scrape_article(article_result: ArticleResult, output_dir: str, task_id
         if len(msg) > 500:
             msg = msg[:500] + "..."
         article_result.error_message = msg
+        
+        elapsed = (datetime.now() - start_time).total_seconds()
+        logger.error(f"文章爬取失败: {article_result.source_url} (耗时 {elapsed:.1f}s): {msg}")
+        logger.debug(traceback.format_exc())
     finally:
         # 清理 scraper 引用
         if task_id and task_id in running_scrapers:

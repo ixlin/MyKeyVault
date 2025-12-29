@@ -137,6 +137,14 @@
                                                     <i class="bi bi-box-arrow-up-right"></i> 查看任务
                                                 </button>
                                             }
+                                            @if (article.Status == "failed" || (article.Status == "processing" && article.CreatedAt.AddMinutes(10) < DateTime.UtcNow))
+                                            {
+                                                <button type="button" class="btn btn-outline-warning" 
+                                                        onclick="confirmRetry(@article.ArticleId, '@(article.Title?.Replace("'", "\\'") ?? article.SourceUrl.Substring(0, Math.Min(50, article.SourceUrl.Length)))')"
+                                                        title="重新提交任务">
+                                                    <i class="bi bi-arrow-repeat"></i> 重试
+                                                </button>
+                                            }
                                             <button type="button" class="btn btn-outline-danger" 
                                                     onclick="confirmDelete(@article.ArticleId, '@(article.Title?.Replace("'", "\\'") ?? "未知")')">
                                                 <i class="bi bi-trash"></i> 删除
@@ -265,9 +273,41 @@
     </div>
 </div>
 
+<!-- 重试确认弹窗 -->
+<div class="modal fade" id="retryConfirmModal" tabindex="-1" aria-labelledby="retryConfirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title" id="retryConfirmModalLabel">
+                    <i class="bi bi-arrow-repeat"></i> 确认重试
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>确定要重试任务 <strong id="retryTaskTitle"></strong> 吗？</p>
+                <p class="text-info mb-0">
+                    <i class="bi bi-info-circle"></i> 此操作将：
+                </p>
+                <ul class="text-info">
+                    <li>删除原有的任务记录和已下载的文件</li>
+                    <li>重新提交爬取任务</li>
+                    <li>生成新的任务ID</li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-warning" id="confirmRetryBtn" onclick="executeRetry()">
+                    <i class="bi bi-arrow-repeat"></i> 确认重试
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
 <script>
     var deleteArticleId = null;
+    var retryArticleId = null;
     var autoRefreshInterval = null;
 
     // 初始化 Tooltip
@@ -407,6 +447,49 @@
             confirmBtn.disabled = false;
             confirmBtn.innerHTML = '<i class="bi bi-trash"></i> 确认删除';
             deleteArticleId = null;
+        }
+    }
+
+    // 确认重试
+    function confirmRetry(articleId, title) {
+        retryArticleId = articleId;
+        document.getElementById('retryTaskTitle').textContent = title;
+        new bootstrap.Modal(document.getElementById('retryConfirmModal')).show();
+    }
+
+    // 执行重试
+    async function executeRetry() {
+        if (!retryArticleId) return;
+
+        const confirmBtn = document.getElementById('confirmRetryBtn');
+        confirmBtn.disabled = true;
+        confirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 重试中...';
+
+        try {
+            const response = await fetch('@Url.Action("RetryTaskAjax")', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ articleId: retryArticleId })
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                bootstrap.Modal.getInstance(document.getElementById('retryConfirmModal')).hide();
+                alert(`重试成功！新任务ID: ${result.taskId}`);
+                location.reload();
+            } else {
+                alert(result.error || '重试失败');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('请求失败，请重试');
+        } finally {
+            confirmBtn.disabled = false;
+            confirmBtn.innerHTML = '<i class="bi bi-arrow-repeat"></i> 确认重试';
+            retryArticleId = null;
         }
     }
 </script>

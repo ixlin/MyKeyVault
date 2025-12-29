@@ -405,6 +405,51 @@ public class WechatArticleController : Controller
     }
 
     /// <summary>
+    /// 重试失败的任务（AJAX）
+    /// </summary>
+    [HttpPost]
+    [IgnoreAntiforgeryToken]
+    public async Task<IActionResult> RetryTaskAjax([FromBody] RetryTaskRequestDto request)
+    {
+        if (request == null || !request.ArticleId.HasValue || request.ArticleId.Value <= 0)
+        {
+            return BadRequest(new { error = "无效的文章ID" });
+        }
+
+        var userId = CurrentUserId;
+        var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString();
+
+        var (success, newTaskId, error) = await _scraperService.RetryArticleAsync(
+            request.ArticleId.Value, 
+            userId);
+
+        // 记录日志
+        await _scraperService.WriteLogAsync(
+            userId,
+            "RetryTask",
+            newTaskId ?? request.ArticleId.ToString(),
+            new { articleId = request.ArticleId, newTaskId, success, error },
+            success ? "Success" : "Failed",
+            error,
+            clientIp);
+
+        if (!success)
+        {
+            return BadRequest(new { error = error ?? "重试失败" });
+        }
+
+        return Ok(new { success = true, taskId = newTaskId, message = "已重新提交任务" });
+    }
+
+    /// <summary>
+    /// 重试任务请求 DTO
+    /// </summary>
+    public class RetryTaskRequestDto
+    {
+        public long? ArticleId { get; set; }
+    }
+
+    /// <summary>
     /// 获取任务详情（AJAX）
     /// </summary>
     [HttpGet]

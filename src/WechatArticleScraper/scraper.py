@@ -329,14 +329,35 @@ class WechatArticleScraper:
                     print(f"  ✗ 获取失败: {inner_e}")
                     raise Exception(f"页面加载超时（{self.PAGE_LOAD_TIMEOUT}秒）: {inner_e}")
             except Exception as e:
-                print(f"  ✗ 发生错误: {type(e).__name__}: {str(e)}")
+                error_msg = str(e)
+                error_type = type(e).__name__
+                print(f"  ✗ 发生错误: {error_type}: {error_msg}")
+                
                 # 如果是用户取消或超时，直接抛出
-                if "取消" in str(e) or "超时" in str(e):
+                if "取消" in error_msg or "超时" in error_msg:
                     raise
+                
+                # 检测常见的 Playwright 错误并提供更友好的错误信息
+                if "Target page, context or browser has been closed" in error_msg:
+                    raise Exception("浏览器已关闭，可能是页面加载过程中出错")
+                if "net::ERR_" in error_msg:
+                    raise Exception(f"网络连接错误: {error_msg}")
+                if "Protocol error" in error_msg:
+                    raise Exception("浏览器协议错误，请稍后重试")
+                if "Timeout" in error_msg or "timeout" in error_msg:
+                    raise Exception(f"操作超时: {error_msg}")
+                
+                # 尝试获取已加载的内容
                 try:
                     html_content = page.content()
+                    if html_content and len(html_content) > 1000:
+                        print("  ⚠️ 出错但成功获取部分内容")
                 except:
                     pass
+                
+                # 如果没有获取到内容，抛出原始错误
+                if not html_content or len(html_content) < 500:
+                    raise Exception(f"页面加载失败: {error_msg}")
             finally:
                 try:
                     browser.close()
