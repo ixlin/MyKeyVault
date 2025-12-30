@@ -50,7 +50,7 @@
 
     @if (Model.Count == 0)
     {
-        <div class="text-center py-5">
+        <div class="text-center py-5" id="emptyState">
             <i class="bi bi-inbox display-1 text-muted"></i>
             <p class="mt-3 text-muted">还没有爬取过文章</p>
             <p class="text-muted">请前往 <a asp-action="TaskManagement" class="btn btn-sm btn-primary"><i class="bi bi-list-task"></i> 任务管理</a> 创建新任务</p>
@@ -59,7 +59,7 @@
     else
     {
         <div class="table-responsive">
-            <table class="table table-hover">
+            <table class="table table-hover" id="articlesTable">
                 <thead class="table-light">
                     <tr>
                         <th style="width: 30%">标题</th>
@@ -71,7 +71,7 @@
                         <th style="width: 250px">操作</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="articlesTableBody">
                     @foreach (var article in Model)
                     {
                         <tr>
@@ -190,4 +190,202 @@
 
 @section Scripts {
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    
+    <script>
+        let autoRefreshInterval = null;
+        let currentPage = @currentPage;
+        
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 首次加载文章列表
+            loadArticles(currentPage);
+        });
+        
+        // 加载文章列表（AJAX）
+        async function loadArticles(page) {
+            try {
+                const response = await fetch(`@Url.Action("GetArticlesAjax")?page=${page}`);
+                if (!response.ok) {
+                    console.error('加载文章列表失败:', response.status);
+                    return;
+                }
+                
+                const data = await response.json();
+                
+                // 更新文章总数显示
+                const totalCountElement = document.querySelector('h2 small');
+                if (totalCountElement) {
+                    totalCountElement.textContent = `共 ${data.totalCount} 篇`;
+                }
+                
+                // 渲染表格
+                renderArticlesTable(data.articles);
+                
+                // 检查是否需要自动刷新
+                if (data.hasProcessingTasks && !autoRefreshInterval) {
+                    startAutoRefresh();
+                } else if (!data.hasProcessingTasks && autoRefreshInterval) {
+                    stopAutoRefresh();
+                }
+            } catch (error) {
+                console.error('加载文章列表时出错:', error);
+            }
+        }
+        
+        // 渲染文章表格
+        function renderArticlesTable(articles) {
+            const tbody = document.getElementById('articlesTableBody');
+            if (!tbody) return;
+            
+            if (articles.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-5">
+                            <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                            <p class="mt-3">暂无文章</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            tbody.innerHTML = articles.map(article => {
+                // 标题列
+                let titleHtml = '';
+                if (article.title) {
+                    const displayTitle = article.title.length > 30 ? article.title.substring(0, 30) + '...' : article.title;
+                    if (article.status === 'completed' && article.previewUrl) {
+                        titleHtml = `<a href="${article.previewUrl}" target="_blank" title="${article.title}" class="text-decoration-none fw-bold">${displayTitle}</a>`;
+                    } else {
+                        titleHtml = `<span title="${article.title}">${displayTitle}</span>`;
+                    }
+                } else {
+                    titleHtml = '<span class="text-muted">处理中...</span>';
+                }
+                
+                // 状态徽章
+                let statusBadge = '';
+                switch (article.status) {
+                    case 'completed':
+                        statusBadge = '<span class="badge bg-success">已完成</span>';
+                        break;
+                    case 'processing':
+                        statusBadge = '<span class="badge bg-primary"><span class="spinner-border spinner-border-sm" role="status"></span> 处理中</span>';
+                        break;
+                    case 'pending':
+                        statusBadge = '<span class="badge bg-secondary">等待中</span>';
+                        break;
+                    case 'failed':
+                        statusBadge = `<span class="badge bg-danger" title="${article.errorMessage || ''}">失败</span>`;
+                        break;
+                    default:
+                        statusBadge = `<span class="badge bg-secondary">${article.status}</span>`;
+                }
+                
+                // 操作按钮
+                let actionsHtml = '';
+                if (article.status === 'completed') {
+                    actionsHtml = `
+                        <a href="@Url.Action("Extract")?id=${article.articleId}" class="btn btn-outline-primary btn-sm" title="AI 萃取">
+                            <i class="bi bi-magic"></i> 萃取
+                        </a>
+                        ${article.pdfUrl ? `<a href="${article.pdfUrl}" class="btn btn-outline-success btn-sm" download>下载</a>` : ''}
+                        <a href="${article.sourceUrl}" class="btn btn-outline-secondary btn-sm" target="_blank">原文链接</a>
+                    `;
+                } else if (article.status === 'processing' || article.status === 'pending') {
+                    if (article.taskId) {
+                        actionsHtml = `
+                            <a href="@Url.Action("Task")?id=${article.taskId}" class="btn btn-outline-info btn-sm" title="查看进度">
+                                进度
+                            </a>
+                        `;
+                    }
+                }
+                actionsHtml += `
+                    <form action="@Url.Action("Delete")?id=${article.articleId}" method="post" class="d-inline" onsubmit="return confirm('确定要删除这篇文章吗？');">
+                        <input type="hidden" name="__RequestVerificationToken" value="${document.querySelector('input[name=__RequestVerificationToken]')?.value || ''}" />
+                        <button type="submit" class="btn btn-outline-danger btn-sm">删除</button>
+                    </form>
+                `;
+                
+                return `
+                    <tr>
+                        <td>${titleHtml}</td>
+                        <td>${article.author || '-'}</td>
+                        <td>${article.publishTime || '-'}</td>
+                        <td>${statusBadge}</td>
+                        <td>${article.imagesCount}</td>
+                        <td>${article.createdAt}</td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                ${actionsHtml}
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+        
+        // 启动自动刷新
+        function startAutoRefresh() {
+            if (autoRefreshInterval) return;
+            
+            console.log('检测到处理中/等待中的任务，启动自动刷新（每 5 秒）');
+            autoRefreshInterval = setInterval(() => {
+                console.log('自动刷新文章列表...');
+                loadArticles(currentPage);
+            }, 5000);
+            
+            showAutoRefreshIndicator();
+        }
+        
+        // 停止自动刷新
+        function stopAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+                console.log('停止自动刷新');
+                hideAutoRefreshIndicator();
+            }
+        }
+        
+        // 显示自动刷新指示器
+        function showAutoRefreshIndicator() {
+            if (document.getElementById('autoRefreshIndicator')) return;
+            
+            const indicator = document.createElement('div');
+            indicator.id = 'autoRefreshIndicator';
+            indicator.className = 'alert alert-info alert-dismissible fade show position-fixed bottom-0 end-0 m-3';
+            indicator.style.zIndex = '9999';
+            indicator.style.maxWidth = '350px';
+            indicator.innerHTML = `
+                <div class="d-flex align-items-center">
+                    <div class="spinner-border spinner-border-sm me-2" role="status">
+                        <span class="visually-hidden">刷新中...</span>
+                    </div>
+                    <div>
+                        <strong>自动刷新已启用</strong><br>
+                        <small>检测到进行中的任务，列表将每 5 秒自动更新</small>
+                    </div>
+                    <button type="button" class="btn-close ms-2" data-bs-dismiss="alert" aria-label="Close" onclick="stopAutoRefresh()"></button>
+                </div>
+            `;
+            document.body.appendChild(indicator);
+        }
+        
+        // 隐藏自动刷新指示器
+        function hideAutoRefreshIndicator() {
+            const indicator = document.getElementById('autoRefreshIndicator');
+            if (indicator) {
+                indicator.remove();
+            }
+        }
+        
+        // 页面即将卸载时清理定时器
+        window.addEventListener('beforeunload', function() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+            }
+        });
+    </script>
 }

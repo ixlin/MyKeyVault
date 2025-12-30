@@ -61,6 +61,45 @@ public class WechatArticleController : Controller
     }
 
     /// <summary>
+    /// 获取文章列表（AJAX - 用于自动刷新）
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> GetArticlesAjax(int page = 1)
+    {
+        var userId = CurrentUserId;
+        var pageSize = 20;
+        
+        var articles = await _scraperService.GetUserArticlesAsync(userId, page, pageSize);
+        var totalCount = await _scraperService.GetUserArticleCountAsync(userId);
+        
+        var result = articles.Select(a => new
+        {
+            articleId = a.ArticleId,
+            taskId = a.TaskId,
+            title = a.Title,
+            author = a.Author,
+            publishTime = a.PublishTime,
+            status = a.Status,
+            errorMessage = a.ErrorMessage,
+            imagesCount = a.ImagesCount,
+            videosCount = a.VideosCount,
+            sourceUrl = a.SourceUrl,
+            createdAt = a.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm"),
+            previewUrl = _scraperService.GetPreviewUrl(a),
+            pdfUrl = _scraperService.GetPdfUrl(a)
+        }).ToList();
+
+        return Json(new
+        {
+            articles = result,
+            totalCount,
+            currentPage = page,
+            totalPages = (int)Math.Ceiling((double)totalCount / pageSize),
+            hasProcessingTasks = articles.Any(a => a.Status == "processing" || a.Status == "pending")
+        });
+    }
+
+    /// <summary>
     /// 任务详情与进度页面
     /// </summary>
     public async Task<IActionResult> Task(string id, long? articleId = null)
