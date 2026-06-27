@@ -9,7 +9,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>@ViewData["Title"] - MyKeyVault</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" />
@@ -43,7 +43,9 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
             background: var(--chat-bg);
             color: var(--text-primary);
-            height: 100vh;
+            /* iPhone Safari: 用 dvh 替代 vh，避免地址栏遮挡 */
+            height: 100dvh;
+            height: -webkit-fill-available;
             overflow: hidden;
             display: flex;
             flex-direction: column;
@@ -117,7 +119,8 @@
         /* ─── Layout ─── */
         .app-container {
             display: flex;
-            height: calc(100vh - var(--navbar-height) - var(--topbar-height));
+            flex: 1;
+            min-height: 0;
             overflow: hidden;
         }
 
@@ -605,14 +608,14 @@
             .message-bubble.markdown-body { padding: 12px 14px !important; font-size: 0.85rem; }
             .chat-messages { padding: 10px; }
 
-            /* Input area - fixed at bottom on mobile */
+            /* Input area - iPhone Safari 底部安全区适配 */
             .chat-input-area {
-                padding: 8px 10px 12px;
-                position: sticky;
-                bottom: 0;
+                padding: 8px 10px calc(12px + env(safe-area-inset-bottom, 0px));
+                padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
                 background: #fff;
+                flex-shrink: 0;
             }
-            .templates-bar { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
+            .templates-bar { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
             .template-chip { font-size: 0.7rem; white-space: nowrap; flex-shrink: 0; }
             .input-row textarea { font-size: 0.85rem; padding: 8px 10px; }
             .send-btn { width: 36px; height: 36px; font-size: 1rem; }
