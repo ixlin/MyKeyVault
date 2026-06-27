@@ -48,5 +48,39 @@ public static class AdminInitializer
         {
             logger.LogWarning("✗ 未找到邮箱为 {Email} 的用户，请先注册该账号", adminEmail);
         }
+
+        // 创建测试账号（供 Coder熊 测试用）
+        var testEmail = "coder-test@mykeyvault.test";
+        var testUser = await userManager.FindByEmailAsync(testEmail);
+        if (testUser == null)
+        {
+            testUser = new ApplicationUser
+            {
+                UserName = testEmail,
+                Email = testEmail,
+                EmailConfirmed = true,
+                TermsAcceptedAt = DateTime.UtcNow
+            };
+            var result = await userManager.CreateAsync(testUser, "CoderTest@2025!");
+            if (result.Succeeded)
+            {
+                logger.LogInformation("✓ 已创建测试账号: {Email} / CoderTest@2025!", testEmail);
+                await userManager.AddToRoleAsync(testUser, "Admin");
+                
+                // 接受服务条款
+                var dbContext = serviceProvider.GetRequiredService<Data.ApplicationDbContext>();
+                dbContext.TermsAcceptances.Add(new Models.TermsAcceptance { UserId = testUser.Id, Version = "v1" });
+                await dbContext.SaveChangesAsync();
+                logger.LogInformation("✓ 已接受服务条款");
+            }
+            else
+            {
+                logger.LogError("✗ 创建测试账号失败: {Errors}", string.Join(", ", result.Errors.Select(e => e.Description)));
+            }
+        }
+        else
+        {
+            logger.LogInformation("✓ 测试账号已存在: {Email}", testEmail);
+        }
     }
 }

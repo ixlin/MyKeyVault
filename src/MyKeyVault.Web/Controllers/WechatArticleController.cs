@@ -696,6 +696,30 @@ public class WechatArticleController : Controller
     }
 
     /// <summary>
+    /// 获取萃取历史列表（JSON，用于聊天侧边栏）
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> GetExtractionHistory(long articleId)
+    {
+        var userId = CurrentUserId;
+        var extractions = await _extractionService.GetArticleExtractionsAsync(articleId, userId);
+
+        var result = extractions.Select(e => new
+        {
+            extractionId = e.ExtractionId,
+            prompt = e.Prompt.Length > 100 ? e.Prompt.Substring(0, 100) + "..." : e.Prompt,
+            fullPrompt = e.Prompt,
+            result = e.Result,
+            status = e.Status,
+            modelUsed = e.ModelUsed,
+            createdAt = e.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm"),
+            errorMessage = e.ErrorMessage
+        }).ToList();
+
+        return Json(result);
+    }
+
+    /// <summary>
     /// 萃取历史列表
     /// </summary>
     public async Task<IActionResult> ExtractionHistory(long id)

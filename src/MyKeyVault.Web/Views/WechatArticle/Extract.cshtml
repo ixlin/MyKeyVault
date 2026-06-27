@@ -1,616 +1,1077 @@
 @{
+    Layout = null;
     ViewData["Title"] = "文章萃取";
     var article = ViewBag.Article as MyKeyVault.Web.Models.WechatArticle;
     var previewUrl = ViewBag.PreviewUrl as string;
 }
 
-<div class="container-fluid mt-4">
-    <div class="row">
-        <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h2>
-                    <i class="bi bi-magic"></i> 文章萃取
-                </h2>
-                <div>
-                    <a asp-action="ExtractionHistory" asp-route-id="@article!.ArticleId" class="btn btn-outline-info">
-                        <i class="bi bi-clock-history"></i> 历史记录
-                    </a>
-                    <a asp-action="Index" class="btn btn-outline-secondary">
-                        <i class="bi bi-arrow-left"></i> 返回列表
-                    </a>
-                </div>
-            </div>
-
-            <div class="card mb-3">
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-3 fw-bold">萃取对象：</div>
-                        <div class="col-md-9">
-                            @if (!string.IsNullOrEmpty(previewUrl))
-                            {
-                                <a href="@previewUrl" target="_blank" class="text-decoration-none">
-                                    @article.Title
-                                    <i class="bi bi-box-arrow-up-right small"></i>
-                                </a>
-                            }
-                            else
-                            {
-                                @article.Title
-                            }
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card mb-3">
-                <div class="card-header">
-                    <h5 class="mb-0">提炼要求</h5>
-                </div>
-                <div class="card-body">
-                    <div class="mb-3">
-                        <label class="form-label">快捷提示词模板</label>
-                        <div class="btn-group-vertical d-grid gap-2">
-                            <button type="button" class="btn btn-outline-secondary btn-sm text-start template-btn" data-template="core">
-                                <i class="bi bi-lightbulb"></i> 提炼核心观点
-                            </button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm text-start template-btn" data-template="mindmap">
-                                <i class="bi bi-diagram-3"></i> 生成思维导图
-                            </button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm text-start template-btn" data-template="analysis">
-                                <i class="bi bi-search"></i> 多维度分析
-                            </button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm text-start template-btn" data-template="chart">
-                                <i class="bi bi-bar-chart"></i> 图表解读
-                            </button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm text-start template-btn" data-template="summary">
-                                <i class="bi bi-file-text"></i> 内容摘要
-                            </button>
-                            <button type="button" class="btn btn-outline-primary btn-sm text-start template-btn" data-template="ppt">
-                                <i class="bi bi-easel"></i> 演示文稿专用格式（推荐生成 HTML 演示文稿时使用）
-                            </button>
-                        </div>
-                    </div>
-                    <textarea id="promptInput" class="form-control font-monospace" rows="15" 
-                              placeholder="请输入您的提示词，支持 Markdown 格式。或点击上方快捷按钮使用模板。"></textarea>
-                    <div class="mt-3 d-flex justify-content-between align-items-center">
-                        <small class="text-muted">
-                            <i class="bi bi-info-circle"></i> 
-                            提示：系统会自动将文章内容发送给 AI 模型
-                        </small>
-                        <div>
-                            <button id="extractBtn" class="btn btn-primary btn-lg">
-                                <i class="bi bi-magic"></i> 开始萃取
-                            </button>
-                            <button id="generatePptBtn" class="btn btn-success btn-lg ms-2" style="display: none;">
-                                <i class="bi bi-file-earmark-slides"></i> 生成演示文稿
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="resultCard" class="card" style="display: none;">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">萃取结果</h5>
-                    <small id="extractTime" class="text-muted"></small>
-                </div>
-                <div class="card-body">
-                    <!-- Loading -->
-                    <div id="loadingIndicator" class="text-center py-5" style="display: none;">
-                        <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
-                            <span class="visually-hidden">处理中...</span>
-                        </div>
-                        <p class="mt-3 text-muted">AI 正在分析文章内容，请稍候...</p>
-                    </div>
-                    
-                    <!-- Result -->
-                    <div id="resultContent" style="display: none;">
-                        <div id="renderedResult" class="markdown-body"></div>
-                    </div>
-
-                    <!-- Error -->
-                    <div id="errorContent" class="alert alert-danger" style="display: none;">
-                        <i class="bi bi-exclamation-triangle"></i>
-                        <span id="errorMessage"></span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 演示文稿生成进度卡片 -->
-            <div id="pptProgressCard" class="card mt-3" style="display: none;">
-                <div class="card-header">
-                    <h5 class="mb-0">
-                        <i class="bi bi-file-earmark-slides"></i> 生成演示文稿
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <div class="mb-3">
-                        <div class="progress" style="height: 25px;">
-                            <div id="pptProgressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
-                                 role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
-                                0%
-                            </div>
-                        </div>
-                    </div>
-                    <p id="pptProgressMessage" class="text-center mb-0">准备生成...</p>
-                    <div id="pptDownloadArea" class="text-center mt-3" style="display: none;">
-                        <a id="pptDownloadBtn" href="#" target="_blank" class="btn btn-success btn-lg">
-                            <i class="bi bi-eye"></i> 查看演示文稿
-                        </a>
-                    </div>
-                    <div id="pptErrorArea" class="alert alert-danger mt-3" style="display: none;">
-                        <i class="bi bi-exclamation-triangle"></i>
-                        <span id="pptErrorMessage"></span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-@section Scripts {
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    
-    <!-- Markdown 渲染 -->
-    <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
-    
-    <!-- Mermaid 图表 -->
-    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
-    
-    <!-- 代码高亮 -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/highlight.min.js"></script>
-    
-    <!-- GitHub Markdown 样式 -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.5.0/github-markdown.min.css">
-
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - MyKeyVault</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.5.0/github-markdown.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css" />
     <style>
-        .markdown-body {
-            box-sizing: border-box;
-            width: 100%;
-            max-width: 100%;
-            padding: 20px;
-            font-size: 16px;
-            line-height: 1.6;
+        :root {
+            --sidebar-width: 300px;
+            --navbar-height: 56px;
+            --topbar-height: 56px;
+            --sidebar-bg: #f7f7f8;
+            --sidebar-hover: #ececf1;
+            --sidebar-active: #e0e0e5;
+            --chat-bg: #ffffff;
+            --user-bubble-bg: #e8f0fe;
+            --ai-bubble-bg: #f7f7f8;
+            --input-bg: #ffffff;
+            --border-color: #e5e5e7;
+            --text-primary: #1a1a2e;
+            --text-secondary: #6b7280;
+            --text-muted: #9ca3af;
+            --accent: #2563eb;
+            --accent-hover: #1d4ed8;
+            --danger: #ef4444;
+            --success: #10b981;
         }
-        
-        .markdown-body pre code {
-            background-color: #f6f8fa;
-            padding: 16px;
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: var(--chat-bg);
+            color: var(--text-primary);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ─── Navbar (same as _Layout) ─── */
+        .navbar-custom {
+            flex-shrink: 0;
+        }
+        .navbar-custom .navbar {
+            margin-bottom: 0 !important;
+        }
+
+        /* ─── Top Bar ─── */
+        .topbar {
+            height: var(--topbar-height);
+            background: #fff;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            gap: 12px;
+            z-index: 100;
+            position: relative;
+            flex-shrink: 0;
+        }
+        .topbar .sidebar-toggle {
+            display: none;
+            background: none;
+            border: none;
+            font-size: 1.4rem;
+            cursor: pointer;
+            padding: 4px 8px;
             border-radius: 6px;
-            display: block;
-            overflow-x: auto;
+            color: var(--text-secondary);
         }
-
-        .markdown-body table {
-            display: block;
-            width: 100%;
-            overflow-x: auto;
-            border-collapse: collapse;
+        .topbar .sidebar-toggle:hover { background: var(--sidebar-bg); }
+        .topbar .article-icon {
+            font-size: 1.2rem;
+            color: var(--accent);
         }
-
-        .markdown-body img {
-            max-width: 100%;
-            height: auto;
-        }
-
-        /* Mermaid 图表样式优化 */
-        .markdown-body .mermaid-diagram {
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            padding: 20px;
-            margin: 20px 0;
-            overflow-x: auto;
-            overflow-y: auto;
-            max-height: 600px;
-        }
-
-        .markdown-body .mermaid-diagram svg {
-            max-width: none !important;
-            height: auto !important;
-            display: block;
-            margin: 0 auto;
-        }
-
-        /* 列表样式优化 */
-        .markdown-body ul, .markdown-body ol {
-            padding-left: 2em;
-            margin: 1em 0;
-        }
-
-        .markdown-body li {
-            margin: 0.5em 0;
-        }
-
-        /* 标题样式优化 */
-        .markdown-body h1, .markdown-body h2, .markdown-body h3 {
-            margin-top: 1.5em;
-            margin-bottom: 0.5em;
+        .topbar .article-title {
+            font-size: 0.95rem;
             font-weight: 600;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex: 1;
+            min-width: 0;
+        }
+        .topbar .article-title a {
+            color: var(--text-primary);
+            text-decoration: none;
+        }
+        .topbar .article-title a:hover {
+            color: var(--accent);
+            text-decoration: underline;
+        }
+        .topbar .back-btn {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            white-space: nowrap;
+            padding: 6px 12px;
+            border-radius: 6px;
+            transition: background 0.15s;
+        }
+        .topbar .back-btn:hover { background: var(--sidebar-bg); color: var(--text-primary); }
+
+        /* ─── Layout ─── */
+        .app-container {
+            display: flex;
+            height: calc(100vh - var(--navbar-height) - var(--topbar-height));
+            overflow: hidden;
         }
 
-        .markdown-body h1 {
-            font-size: 2em;
-            border-bottom: 2px solid #eaecef;
-            padding-bottom: 0.3em;
+        /* ─── Sidebar ─── */
+        .sidebar {
+            width: var(--sidebar-width);
+            min-width: var(--sidebar-width);
+            background: var(--sidebar-bg);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.25s ease;
+            z-index: 50;
+        }
+        .sidebar-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+        .sidebar-header h6 {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+        }
+        .new-extract-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px dashed var(--border-color);
+            border-radius: 8px;
+            background: #fff;
+            color: var(--accent);
+            font-size: 0.88rem;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .new-extract-btn:hover {
+            background: #fff;
+            border-color: var(--accent);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+        .sidebar-history {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+        .sidebar-history::-webkit-scrollbar { width: 4px; }
+        .sidebar-history::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 2px; }
+
+        .history-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.12s;
+            margin-bottom: 2px;
+        }
+        .history-item:hover { background: var(--sidebar-hover); }
+        .history-item.active { background: var(--sidebar-active); }
+        .history-item .hi-icon {
+            font-size: 1.1rem;
+            color: var(--text-muted);
+            margin-top: 1px;
+            flex-shrink: 0;
+        }
+        .history-item .hi-content {
+            flex: 1;
+            min-width: 0;
+        }
+        .history-item .hi-title {
+            font-size: 0.85rem;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            line-height: 1.4;
+        }
+        .history-item .hi-meta {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+        .history-item .hi-badge {
+            font-size: 0.68rem;
+            padding: 1px 6px;
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+        .history-item .hi-badge.done { background: #d1fae5; color: #065f46; }
+        .history-item .hi-badge.fail { background: #fee2e2; color: #991b1b; }
+
+        .sidebar-empty {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            padding: 20px;
+            text-align: center;
+        }
+        .sidebar-empty i { font-size: 2rem; margin-bottom: 10px; opacity: 0.4; }
+
+        /* ─── Main Chat Area ─── */
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            background: var(--chat-bg);
         }
 
-        .markdown-body h2 {
-            font-size: 1.5em;
-            border-bottom: 1px solid #eaecef;
-            padding-bottom: 0.3em;
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            scroll-behavior: smooth;
+        }
+        .chat-messages::-webkit-scrollbar { width: 5px; }
+        .chat-messages::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+
+        /* Empty state */
+        .chat-empty {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-muted);
+            text-align: center;
+        }
+        .chat-empty .empty-icon {
+            font-size: 3.5rem;
+            margin-bottom: 16px;
+            opacity: 0.3;
+        }
+        .chat-empty h3 {
+            font-size: 1.2rem;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+        .chat-empty p {
+            font-size: 0.9rem;
+            max-width: 400px;
         }
 
-        .markdown-body blockquote {
-            border-left: 4px solid #dfe2e5;
-            padding: 0 1em;
-            color: #6a737d;
-            margin: 1em 0;
+        /* Message bubbles */
+        .message-row {
+            display: flex;
+            margin-bottom: 20px;
+            animation: fadeInUp 0.25s ease;
+        }
+        @@keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .message-row.user { justify-content: flex-end; }
+        .message-row.ai { justify-content: flex-start; }
+
+        .message-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            flex-shrink: 0;
+            margin: 0 10px;
+        }
+        .message-row.user .message-avatar {
+            background: #e8f0fe;
+            color: var(--accent);
+            order: 2;
+        }
+        .message-row.ai .message-avatar {
+            background: #f0fdf4;
+            color: var(--success);
+            order: 1;
         }
 
-        .font-monospace {
-            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+        .message-bubble {
+            max-width: 75%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-size: 0.92rem;
+            line-height: 1.6;
+            word-break: break-word;
+        }
+        .message-row.user .message-bubble {
+            background: var(--user-bubble-bg);
+            border-bottom-right-radius: 4px;
+            order: 1;
+        }
+        .message-row.ai .message-bubble {
+            background: var(--ai-bubble-bg);
+            border-bottom-left-radius: 4px;
+            order: 2;
+            width: 100%;
+        }
+
+        .message-bubble .prompt-label {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            font-weight: 500;
+        }
+        .message-bubble .prompt-text {
+            color: var(--text-primary);
+            white-space: pre-wrap;
+        }
+        .message-bubble .msg-time {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-top: 6px;
+            text-align: right;
+        }
+
+        /* Markdown in AI bubble */
+        .message-bubble.markdown-body {
+            font-size: 0.92rem;
+            padding: 16px 20px;
+            background: var(--ai-bubble-bg);
+        }
+        .message-bubble.markdown-body h1 { font-size: 1.4rem; }
+        .message-bubble.markdown-body h2 { font-size: 1.2rem; }
+        .message-bubble.markdown-body h3 { font-size: 1.05rem; }
+        .message-bubble.markdown-body pre {
+            background: #1e1e2e;
+            border-radius: 8px;
+            padding: 14px;
+            overflow-x: auto;
+        }
+        .message-bubble.markdown-body pre code {
+            color: #cdd6f4;
+            font-size: 0.82rem;
+            background: transparent;
+            padding: 0;
+        }
+        .message-bubble.markdown-body table {
+            font-size: 0.85rem;
+        }
+        .message-bubble.markdown-body img {
+            max-width: 100%;
+            border-radius: 8px;
+        }
+
+        /* PPT button below AI response */
+        .ppt-action-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px;
+            padding-top: 8px;
+            border-top: 1px solid var(--border-color);
+        }
+        .ppt-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.8rem;
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid #d1d5db;
+            background: #fff;
+            color: #9ca3af;
+            cursor: not-allowed;
+            transition: all 0.15s;
+        }
+        .ppt-btn .coming-soon {
+            font-size: 0.65rem;
+            background: #fef3c7;
+            color: #92400e;
+            padding: 1px 5px;
+            border-radius: 3px;
+            margin-left: 4px;
+        }
+
+        /* Loading indicator */
+        .loading-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 20px;
+            animation: fadeInUp 0.25s ease;
+        }
+        .loading-bubble {
+            background: var(--ai-bubble-bg);
+            border-radius: 12px;
+            border-bottom-left-radius: 4px;
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .typing-dots {
+            display: flex;
+            gap: 4px;
+        }
+        .typing-dots span {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #a0aec0;
+            animation: typingBounce 1.4s infinite ease-in-out both;
+        }
+        .typing-dots span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dots span:nth-child(2) { animation-delay: -0.16s; }
+        @@keyframes typingBounce {
+            0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+            40% { transform: scale(1); opacity: 1; }
+        }
+
+        /* ─── Input Area ─── */
+        .chat-input-area {
+            border-top: 1px solid var(--border-color);
+            padding: 12px 20px 16px;
+            background: #fff;
+            flex-shrink: 0;
+        }
+        .templates-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 10px;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease, margin-bottom 0.3s ease;
+        }
+        .templates-bar.expanded {
+            max-height: 200px;
+            margin-bottom: 10px;
+        }
+        .template-chip {
+            font-size: 0.75rem;
+            padding: 4px 10px;
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+            background: #fff;
+            color: var(--text-secondary);
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.15s;
+        }
+        .template-chip:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: #eff6ff;
+        }
+        .template-chip.active {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent);
+        }
+        .template-toggle {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: none;
+            background: none;
+            margin-bottom: 6px;
+        }
+        .template-toggle:hover { color: var(--accent); }
+
+        .input-row {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }
+        .input-row textarea {
+            flex: 1;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 0.9rem;
+            resize: none;
+            outline: none;
+            font-family: inherit;
+            line-height: 1.5;
+            max-height: 120px;
+            transition: border-color 0.15s;
+        }
+        .input-row textarea:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+        .send-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: var(--accent);
+            color: #fff;
+            font-size: 1.1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: all 0.15s;
+        }
+        .send-btn:hover { background: var(--accent-hover); }
+        .send-btn:disabled {
+            background: #cbd5e1;
+            cursor: not-allowed;
+        }
+        .send-btn .spinner {
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+        @@keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ─── Error Toast ─── */
+        .error-toast {
+            position: fixed;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            z-index: 999;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            animation: fadeInDown 0.3s ease;
+        }
+        @@keyframes fadeInDown {
+            from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+
+        /* ─── Responsive ─── */
+        @@media (max-width: 768px) {
+            .topbar .sidebar-toggle { display: block; }
+            .sidebar {
+                position: fixed;
+                top: var(--topbar-height);
+                left: 0;
+                bottom: 0;
+                transform: translateX(-100%);
+                z-index: 90;
+                box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+            }
+            .sidebar.open { transform: translateX(0); }
+            .message-bubble { max-width: 90%; }
+            .chat-messages { padding: 12px; }
+            .chat-input-area { padding: 10px 12px; }
         }
     </style>
+</head>
+<body>
+    @Html.AntiForgeryToken()
+
+    <!-- Navbar (same as _Layout) -->
+    <header class="navbar-custom">
+        <nav class="navbar navbar-expand-sm navbar-light bg-white border-bottom box-shadow">
+            <div class="container-fluid">
+                <a class="navbar-brand" href="/">我的密码本</a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent" aria-controls="navbarContent" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between" id="navbarContent">
+                    <ul class="navbar-nav flex-grow-1">
+                        <li class="nav-item"><a class="nav-link text-dark" href="/">首页</a></li>
+                        <li class="nav-item"><a class="nav-link text-dark" href="/VaultAccounts">账号</a></li>
+                        <li class="nav-item"><a class="nav-link text-dark" href="/Tags">标签</a></li>
+                        <li class="nav-item"><a class="nav-link text-dark" href="/WechatArticle">微信图文转PDF</a></li>
+                        <li class="nav-item"><a class="nav-link text-dark" href="/TushareManagement/Apps">上市公司数据</a></li>
+                    </ul>
+                    <ul class="navbar-nav">
+                        <li class="nav-item"><span class="nav-link text-dark">Hello coder-test@mykeyvault.test</span></li>
+                        <li class="nav-item">
+                            <form class="form-inline" action="/Identity/Account/Logout" method="post">
+                                <button type="submit" class="nav-link btn btn-link text-dark">注销</button>
+                                <input name="__RequestVerificationToken" type="hidden" value="" />
+                            </form>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Top Bar -->
+    <div class="topbar">
+        <button class="sidebar-toggle" id="sidebarToggle" title="历史记录">
+            <i class="bi bi-list"></i>
+        </button>
+        <span class="article-icon"><i class="bi bi-file-earmark-text"></i></span>
+        <span class="article-title">
+            @if (!string.IsNullOrEmpty(previewUrl))
+            {
+                <a href="@previewUrl" target="_blank" title="预览原文">@article!.Title</a>
+            }
+            else
+            {
+                @article!.Title
+            }
+        </span>
+        <a asp-action="Index" class="back-btn">
+            <i class="bi bi-arrow-left"></i> 返回列表
+        </a>
+    </div>
+
+    <!-- Main Layout -->
+    <div class="app-container">
+        <!-- Left Sidebar: History -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h6><i class="bi bi-clock-history"></i> 萃取历史</h6>
+                <button class="new-extract-btn" id="newExtractBtn">
+                    <i class="bi bi-plus-circle"></i> 新建萃取
+                </button>
+            </div>
+            <div class="sidebar-history" id="historyList">
+                <div class="sidebar-empty">
+                    <i class="bi bi-inbox"></i>
+                    <p>加载中...</p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Right: Chat Area -->
+        <main class="chat-area">
+            <div class="chat-messages" id="chatMessages">
+                <div class="chat-empty" id="chatEmpty">
+                    <div class="empty-icon"><i class="bi bi-magic"></i></div>
+                    <h3>开始萃取</h3>
+                    <p>在下方输入提示词，AI 将基于文章内容为你提炼关键信息。也可以点击左侧历史记录查看之前的萃取结果。</p>
+                </div>
+            </div>
+
+            <!-- Loading indicator (hidden by default) -->
+            <div id="loadingTemplate" style="display:none;">
+                <div class="loading-row">
+                    <div class="message-avatar" style="background:#f0fdf4;color:#10b981;">
+                        <i class="bi bi-robot"></i>
+                    </div>
+                    <div class="loading-bubble">
+                        <span style="color:#6b7280;font-size:0.9rem;">AI 正在分析文章...</span>
+                        <div class="typing-dots">
+                            <span></span><span></span><span></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="chat-input-area">
+                <button class="template-toggle" id="templateToggle">
+                    <i class="bi bi-lightbulb"></i> 快捷模板 <i class="bi bi-chevron-down"></i>
+                </button>
+                <div class="templates-bar" id="templatesBar">
+                    <span class="template-chip" data-template="core">💡 提炼核心观点</span>
+                    <span class="template-chip" data-template="mindmap">🧠 生成思维导图</span>
+                    <span class="template-chip" data-template="analysis">🔍 多维度分析</span>
+                    <span class="template-chip" data-template="chart">📊 图表解读</span>
+                    <span class="template-chip" data-template="summary">📝 内容摘要</span>
+                    <span class="template-chip" data-template="ppt">🎯 演示文稿格式</span>
+                </div>
+                <div class="input-row">
+                    <textarea id="promptInput" rows="1" 
+                              placeholder="输入提示词，AI 将基于文章内容进行萃取..."></textarea>
+                    <button class="send-btn" id="sendBtn" title="发送">
+                        <i class="bi bi-send"></i>
+                    </button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Error Toast -->
+    <div class="error-toast" id="errorToast" style="display:none;"></div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/highlight.min.js"></script>
 
     <script>
-        // 初始化 Mermaid（依赖加载失败时不阻塞页面功能）
-        if (typeof mermaid !== 'undefined') {
-            mermaid.initialize({
-                startOnLoad: false,
-                theme: 'default',
-                securityLevel: 'loose'
-            });
-        }
+        // ─── Constants ───
+        const articleId = @article.ArticleId;
+        const extractUrl = '@Url.Action("DoExtract")';
+        const historyUrl = '@Url.Action("GetExtractionHistory", new { articleId = article.ArticleId })';
+        const pptUrl = '@Url.Action("GeneratePresentation")';
+        const pptProgressUrl = '@Url.Action("GetPresentationProgress")';
 
-        // 配置 marked（依赖加载失败时不阻塞页面功能）
-        if (typeof marked !== 'undefined') {
-            marked.setOptions({
-                breaks: true,
-                gfm: true
-            });
-        }
-
-        const extractBtn = document.getElementById('extractBtn');
-        const promptInput = document.getElementById('promptInput');
-        const resultCard = document.getElementById('resultCard');
-        const loadingIndicator = document.getElementById('loadingIndicator');
-        const resultContent = document.getElementById('resultContent');
-        const errorContent = document.getElementById('errorContent');
-        const renderedResult = document.getElementById('renderedResult');
-        const extractTime = document.getElementById('extractTime');
-        const errorMessage = document.getElementById('errorMessage');
-
-        // 提示词模板
+        // ─── Templates ───
         const templates = {
-            core: `请提炼这篇文章的核心观点，以条目形式列出，每条观点不超过50字。`,
-            
-            mindmap: `请分析文章结构，用 Mermaid 语法生成思维导图，展示文章的逻辑框架。
-
-输出格式示例：
-\`\`\`mermaid
-graph TD
-    A[主题] --> B[观点1]
-    A --> C[观点2]
-    B --> D[论据1]
-    B --> E[论据2]
-\`\`\``,
-            
-            analysis: `请从以下维度分析这篇文章：
-
-## 1. 主题和核心观点
-## 2. 论证逻辑和论据
-## 3. 创新点和亮点
-## 4. 可能的不足或争议点
-## 5. 实际应用价值
-
-请用 Markdown 格式输出，使用二级标题分隔各部分。`,
-            
-            chart: `文章中包含数据和图表，请：
-
-1. 总结图表展示的关键信息
-2. 分析数据趋势和规律
-3. 解读图表背后的含义
-
-如有必要，请用 Mermaid 绘制补充说明图。`,
-            
-            summary: `请为这篇文章生成一个完整的内容摘要，包括：
-
-1. **一句话总结**（30字以内）
-2. **核心内容**（100-200字）
-3. **关键要点**（3-5条）
-4. **适用场景**
-
-请用 Markdown 格式输出。`,
-            
-            ppt: `请按照以下要求分析文章，生成适合转为 HTML 演示文稿的结构化内容：
-
-## 输出要求
-
-1. **使用二级标题（##）划分主题**
-   - 每个 ## 标题将成为演示文稿的一页
-   - 标题简洁明了（不超过 15 字）
-   - 建议 5-8 个主题
-
-2. **每个主题下使用要点列表**
-   - 使用 - 或数字列表
-   - 每条要点 20-40 字
-   - 每页不超过 5 个要点
-
-3. **数据可视化（重要！）**
-   如果文章包含数据、统计、对比信息，请提取并生成 ECharts 图表配置：
-   \`\`\`chart-data
-   {
-     "type": "bar",
-     "title": "图表标题",
-     "xAxis": ["类别1", "类别2", "类别3"],
-     "series": [
-       { "name": "系列1", "data": [10, 20, 30] }
-     ]
-   }
-   \`\`\`
-   支持的图表类型：bar（柱状图）、line（折线图）、pie（饼图）
-
-4. **适当使用 Mermaid 图表**
-   - 流程图、思维导图、时序图等
-   - 用 \`\`\`mermaid 代码块包裹
-   - 图表要清晰简洁
-
-5. **关键数字突出**
-   - 将重要的数字指标单独成行
-   - 格式如：40% 的企业已采用 AI
-
-## 输出格式示例
-
-## 核心发现
-
-- 企业级 AI 正从试点转为核心基础设施
-- AI 工具从偶尔使用转为日常工作流
-- 组织准备度成为关键瓶颈
-
-## 效率提升数据
-
-40% 效率提升
-60分钟 每天节省时间
-
-\`\`\`chart-data
-{
-  "type": "bar",
-  "title": "AI工具使用效果",
-  "xAxis": ["传统方式", "使用AI后"],
-  "series": [
-    { "name": "完成时间(分钟)", "data": [120, 60] }
-  ]
-}
-\`\`\`
-
-## 应用场景分布
-
-\`\`\`chart-data
-{
-  "type": "pie",
-  "title": "应用场景占比",
-  "series": [
-    { "name": "场景", "data": [
-      {"value": 60, "name": "文本分析"},
-      {"value": 25, "name": "流程优化"},
-      {"value": 15, "name": "决策支持"}
-    ]}
-  ]
-}
-\`\`\`
-
-请严格按照此格式输出，确保数据图表的 JSON 格式正确。`
+            core: "请提炼这篇文章的核心观点，以条目形式列出，每条观点不超过50字。",
+            mindmap: "请分析文章结构，用 Mermaid 语法生成思维导图，展示文章的逻辑框架。\n\n输出格式示例：\n```mermaid\ngraph TD\n    A[主题] --> B[观点1]\n    A --> C[观点2]\n    B --> D[论据1]\n    B --> E[论据2]\n```",
+            analysis: "请从以下维度分析这篇文章：\n\n## 1. 主题和核心观点\n## 2. 论证逻辑和论据\n## 3. 创新点和亮点\n## 4. 可能的不足或争议点\n## 5. 实际应用价值\n\n请用 Markdown 格式输出，使用二级标题分隔各部分。",
+            chart: "文章中包含数据和图表，请：\n\n1. 总结图表展示的关键信息\n2. 分析数据趋势和规律\n3. 解读图表背后的含义\n\n如有必要，请用 Mermaid 绘制补充说明图。",
+            summary: "请为这篇文章生成一个完整的内容摘要，包括：\n\n1. **一句话总结**（30字以内）\n2. **核心内容**（100-200字）\n3. **关键要点**（3-5条）\n4. **适用场景**\n\n请用 Markdown 格式输出。",
+            ppt: "请按照以下要求分析文章，生成适合转为 HTML 演示文稿的结构化内容：\n\n## 输出要求\n\n1. **使用二级标题（##）划分主题**\n   - 每个 ## 标题将成为演示文稿的一页\n   - 标题简洁明了（不超过 15 字）\n   - 建议 5-8 个主题\n\n2. **每个主题下使用要点列表**\n   - 使用 - 或数字列表\n   - 每条要点 20-40 字\n   - 每页不超过 5 个要点\n\n3. **数据可视化（重要！）**\n   如果文章包含数据、统计、对比信息，请提取并生成 ECharts 图表配置：\n   ```chart-data\n   {\n     \"type\": \"bar\",\n     \"title\": \"图表标题\",\n     \"xAxis\": [\"类别1\", \"类别2\", \"类别3\"],\n     \"series\": [\n       { \"name\": \"系列1\", \"data\": [10, 20, 30] }\n     ]\n   }\n   ```\n   支持的图表类型：bar（柱状图）、line（折线图）、pie（饼图）\n\n4. **适当使用 Mermaid 图表**\n\n5. **关键数字突出**\n   - 将重要的数字指标单独成行\n\n请严格按照此格式输出，确保数据图表的 JSON 格式正确。"
         };
 
-        // 快捷模板按钮点击事件
-        document.querySelectorAll('.template-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                const template = this.dataset.template;
-                if (templates[template]) {
-                    promptInput.value = templates[template];
+        // ─── DOM refs ───
+        const chatMessages = document.getElementById('chatMessages');
+        const chatEmpty = document.getElementById('chatEmpty');
+        const historyList = document.getElementById('historyList');
+        const promptInput = document.getElementById('promptInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const newExtractBtn = document.getElementById('newExtractBtn');
+        const errorToast = document.getElementById('errorToast');
+        const sidebar = document.getElementById('sidebar');
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        const templatesBar = document.getElementById('templatesBar');
+        const templateToggle = document.getElementById('templateToggle');
+
+        // ─── State ───
+        let extractions = [];
+        let activeExtractionId = null;
+        let isProcessing = false;
+
+        // ─── Init libraries ───
+        if (typeof mermaid !== 'undefined') {
+            mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'loose' });
+        }
+        if (typeof marked !== 'undefined') {
+            marked.setOptions({ breaks: true, gfm: true });
+        }
+
+        // ─── Toast ───
+        function showError(msg) {
+            errorToast.textContent = msg;
+            errorToast.style.display = 'block';
+            setTimeout(() => { errorToast.style.display = 'none'; }, 3000);
+        }
+
+        // ─── Auto-resize textarea ───
+        promptInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+        });
+
+        // ─── Template toggle ───
+        templateToggle.addEventListener('click', function() {
+            templatesBar.classList.toggle('expanded');
+            const icon = this.querySelector('.bi-chevron-down, .bi-chevron-up');
+            if (icon) {
+                icon.classList.toggle('bi-chevron-down');
+                icon.classList.toggle('bi-chevron-up');
+            }
+        });
+
+        // ─── Template chips ───
+        templatesBar.querySelectorAll('.template-chip').forEach(chip => {
+            chip.addEventListener('click', function() {
+                const tpl = this.dataset.template;
+                if (templates[tpl]) {
+                    promptInput.value = templates[tpl];
+                    promptInput.style.height = 'auto';
+                    promptInput.style.height = Math.min(promptInput.scrollHeight, 120) + 'px';
                     promptInput.focus();
-                    
-                    // 高亮效果
+                    // Highlight briefly
                     this.classList.add('active');
-                    setTimeout(() => this.classList.remove('active'), 200);
+                    setTimeout(() => this.classList.remove('active'), 300);
                 }
             });
         });
 
-        extractBtn.addEventListener('click', async function() {
-            const prompt = promptInput.value.trim();
-            
-            if (!prompt) {
-                alert('请输入提示词');
+        // ─── Sidebar toggle (mobile) ───
+        sidebarToggle.addEventListener('click', function() {
+            sidebar.classList.toggle('open');
+        });
+
+        // ─── Load history ───
+        async function loadHistory() {
+            try {
+                const res = await fetch(historyUrl);
+                if (!res.ok) throw new Error('加载失败');
+                extractions = await res.json();
+                renderHistory();
+            } catch (e) {
+                historyList.innerHTML = `<div class="sidebar-empty"><i class="bi bi-exclamation-circle"></i><p>加载失败</p></div>`;
+            }
+        }
+
+        function renderHistory() {
+            if (!extractions.length) {
+                historyList.innerHTML = `<div class="sidebar-empty"><i class="bi bi-inbox"></i><p>暂无萃取记录</p></div>`;
                 return;
             }
+            historyList.innerHTML = extractions.map((e, i) => `
+                <div class="history-item ${e.extractionId === activeExtractionId ? 'active' : ''}" 
+                     data-index="${i}" data-id="${e.extractionId}">
+                    <span class="hi-icon"><i class="bi bi-chat-dots"></i></span>
+                    <div class="hi-content">
+                        <div class="hi-title">${escapeHtml(e.prompt)}</div>
+                        <div class="hi-meta">${e.createdAt}</div>
+                    </div>
+                    ${e.status === 'completed' ? '<span class="hi-badge done">✓</span>' : ''}
+                    ${e.status === 'failed' ? '<span class="hi-badge fail">✗</span>' : ''}
+                </div>
+            `).join('');
 
-            // 显示结果卡片和 Loading
-            resultCard.style.display = 'block';
-            loadingIndicator.style.display = 'block';
-            resultContent.style.display = 'none';
-            errorContent.style.display = 'none';
-            extractBtn.disabled = true;
+            // Click handlers
+            historyList.querySelectorAll('.history-item').forEach(item => {
+                item.addEventListener('click', function() {
+                    const idx = parseInt(this.dataset.index);
+                    const ext = extractions[idx];
+                    if (ext) {
+                        activeExtractionId = ext.extractionId;
+                        renderChatFromExtraction(ext);
+                        renderHistory();
+                        // Close sidebar on mobile
+                        sidebar.classList.remove('open');
+                    }
+                });
+            });
+        }
 
-            // 滚动到结果区域
-            resultCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        function renderChatFromExtraction(ext) {
+            chatEmpty.style.display = 'none';
+            let html = '';
+
+            // User message
+            html += `
+                <div class="message-row user">
+                    <div class="message-avatar"><i class="bi bi-person"></i></div>
+                    <div class="message-bubble">
+                        <div class="prompt-label">提示词</div>
+                        <div class="prompt-text">${escapeHtml(ext.fullPrompt || ext.prompt || '')}</div>
+                        <div class="msg-time">${ext.createdAt}</div>
+                    </div>
+                </div>
+            `;
+
+            // AI response
+            if (ext.status === 'completed' && ext.result) {
+                html += `
+                    <div class="message-row ai">
+                        <div class="message-avatar"><i class="bi bi-robot"></i></div>
+                        <div class="message-bubble markdown-body" id="md-${ext.extractionId}">
+                            <div class="rendered-markdown">${renderMarkdownSync(ext.result)}</div>
+                        </div>
+                    </div>
+                    <div class="message-row ai" style="margin-top:-10px;">
+                        <div class="message-avatar" style="visibility:hidden;"></div>
+                        <div class="ppt-action-bar">
+                            <button class="ppt-btn" disabled title="即将支持">
+                                <i class="bi bi-file-earmark-slides"></i> 生成演示文稿
+                                <span class="coming-soon">即将上线</span>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            } else if (ext.status === 'failed') {
+                html += `
+                    <div class="message-row ai">
+                        <div class="message-avatar" style="background:#fee2e2;color:#ef4444;"><i class="bi bi-exclamation-triangle"></i></div>
+                        <div class="message-bubble" style="color:#991b1b;">
+                            <strong>萃取失败</strong><br>
+                            ${escapeHtml(ext.errorMessage || '未知错误')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            chatMessages.innerHTML = html;
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            // Render mermaid in markdown
+            setTimeout(() => renderMermaidInChat(), 100);
+        }
+
+        function renderMarkdownSync(md) {
+            // 修复：数据库可能存了 \\n 字面文本，替换为真换行
+            var fixed = md.replace(/\\n/g, '\n');
+            if (typeof marked !== 'undefined') {
+                return marked.parse(fixed);
+            }
+            return escapeHtml(fixed).replace(/\n/g, '<br>');
+        }
+
+        async function renderMermaidInChat() {
+            if (typeof mermaid === 'undefined') return;
+            const blocks = chatMessages.querySelectorAll('pre > code.language-mermaid');
+            for (let i = 0; i < blocks.length; i++) {
+                const block = blocks[i];
+                const pre = block.closest('pre');
+                if (!pre) continue;
+                try {
+                    const id = `mermaid-${Date.now()}-${i}`;
+                    const { svg } = await mermaid.render(id, block.textContent || '');
+                    const div = document.createElement('div');
+                    div.innerHTML = svg;
+                    div.className = 'mermaid-diagram';
+                    div.style.cssText = 'background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding:20px;margin:16px 0;overflow-x:auto;text-align:center;';
+                    pre.replaceWith(div);
+                } catch (e) {
+                    console.warn('Mermaid render failed:', e);
+                }
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // ─── Send extraction ───
+        async function doExtract(prompt) {
+            if (isProcessing) return;
+            isProcessing = true;
+            sendBtn.disabled = true;
+            sendBtn.innerHTML = '<div class="spinner"></div>';
+
+            // Show user message
+            chatEmpty.style.display = 'none';
+            const now = new Date().toLocaleString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+            const userMsg = `
+                <div class="message-row user">
+                    <div class="message-avatar"><i class="bi bi-person"></i></div>
+                    <div class="message-bubble">
+                        <div class="prompt-label">提示词</div>
+                        <div class="prompt-text">${escapeHtml(prompt)}</div>
+                        <div class="msg-time">${now}</div>
+                    </div>
+                </div>
+            `;
+            chatMessages.insertAdjacentHTML('beforeend', userMsg);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            // Show loading
+            const loadingHtml = document.getElementById('loadingTemplate').innerHTML;
+            const loadingDiv = document.createElement('div');
+            loadingDiv.innerHTML = loadingHtml;
+            loadingDiv.id = 'loadingIndicator';
+            chatMessages.appendChild(loadingDiv.firstElementChild);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
 
             try {
-                const response = await fetch('@Url.Action("DoExtract")', {
+                const response = await fetch(extractUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
                     },
-                    body: JSON.stringify({
-                        articleId: @article.ArticleId,
-                        prompt: prompt
-                    })
+                    body: JSON.stringify({ articleId: articleId, prompt: prompt })
                 });
 
                 const data = await response.json();
-
                 if (!response.ok || !data.success) {
                     throw new Error(data.error || '萃取失败');
                 }
 
-                // 渲染 Markdown
-                await renderMarkdown(data.result);
-                
-                // 显示结果
-                loadingIndicator.style.display = 'none';
-                resultContent.style.display = 'block';
-                extractTime.textContent = '萃取时间: ' + data.createdAt;
+                // Remove loading
+                const loadingEl = document.getElementById('loadingIndicator');
+                if (loadingEl) loadingEl.remove();
 
-                // 显示生成 PPT 按钮
-                const generatePptBtn = document.getElementById('generatePptBtn');
-                generatePptBtn.style.display = 'inline-block';
-                generatePptBtn.dataset.extractionId = data.extractionId;
+                // Add AI response
+                const aiMsg = `
+                    <div class="message-row ai">
+                        <div class="message-avatar"><i class="bi bi-robot"></i></div>
+                        <div class="message-bubble markdown-body" id="md-${data.extractionId}">
+                            <div class="rendered-markdown">${renderMarkdownSync(data.result)}</div>
+                        </div>
+                    </div>
+                    <div class="message-row ai" style="margin-top:-10px;">
+                        <div class="message-avatar" style="visibility:hidden;"></div>
+                        <div class="ppt-action-bar">
+                            <button class="ppt-btn" disabled title="即将支持">
+                                <i class="bi bi-file-earmark-slides"></i> 生成演示文稿
+                                <span class="coming-soon">即将上线</span>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                chatMessages.insertAdjacentHTML('beforeend', aiMsg);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+
+                // Render mermaid
+                setTimeout(() => renderMermaidInChat(), 100);
+
+                // Update active
+                activeExtractionId = data.extractionId;
+
+                // Reload history
+                await loadHistory();
+                if (activeExtractionId) {
+                    // Highlight the new one
+                    const items = historyList.querySelectorAll('.history-item');
+                    items.forEach(item => {
+                        if (parseInt(item.dataset.id) === data.extractionId) {
+                            item.classList.add('active');
+                        }
+                    });
+                }
 
             } catch (error) {
                 console.error('萃取失败:', error);
-                loadingIndicator.style.display = 'none';
-                errorContent.style.display = 'block';
-                errorMessage.textContent = error.message || '萃取失败，请重试';
+                const loadingEl = document.getElementById('loadingIndicator');
+                if (loadingEl) loadingEl.remove();
+                showError(error.message || '萃取失败，请重试');
             } finally {
-                extractBtn.disabled = false;
-            }
-        });
-
-        async function renderMarkdown(markdown) {
-            if (typeof marked === 'undefined') {
-                renderedResult.textContent = markdown;
-                return;
-            }
-
-            // 使用 marked 转换 Markdown
-            const html = marked.parse(markdown);
-            renderedResult.innerHTML = html;
-
-            // 渲染代码高亮
-            if (typeof hljs !== 'undefined') {
-                renderedResult.querySelectorAll('pre code').forEach((block) => {
-                    try {
-                        hljs.highlightElement(block);
-                    } catch (e) {
-                        console.warn('代码高亮失败:', e);
-                    }
-                });
-            }
-
-            // 渲染 Mermaid 图表（```mermaid 会被 marked 标记为 language-mermaid）
-            if (typeof mermaid !== 'undefined') {
-                const mermaidBlocks = renderedResult.querySelectorAll('pre > code.language-mermaid');
-                for (let i = 0; i < mermaidBlocks.length; i++) {
-                    const block = mermaidBlocks[i];
-                    const pre = block.closest('pre');
-                    if (!pre) continue;
-
-                    const mermaidCode = block.textContent || '';
-                    try {
-                        const id = `mermaid-${Date.now()}-${i}`;
-                        const { svg } = await mermaid.render(id, mermaidCode);
-                        const div = document.createElement('div');
-                        div.innerHTML = svg;
-                        div.className = 'mermaid-diagram';
-                        pre.replaceWith(div);
-                    } catch (error) {
-                        console.error('Mermaid 渲染失败:', error);
-                    }
-                }
+                isProcessing = false;
+                sendBtn.disabled = false;
+                sendBtn.innerHTML = '<i class="bi bi-send"></i>';
             }
         }
 
-        // ===== HTML 演示文稿生成功能 =====
-        const generatePptBtn = document.getElementById('generatePptBtn');
-        const pptProgressCard = document.getElementById('pptProgressCard');
-        const pptProgressBar = document.getElementById('pptProgressBar');
-        const pptProgressMessage = document.getElementById('pptProgressMessage');
-        const pptDownloadArea = document.getElementById('pptDownloadArea');
-        const pptDownloadBtn = document.getElementById('pptDownloadBtn');
-        const pptErrorArea = document.getElementById('pptErrorArea');
-        const pptErrorMessage = document.getElementById('pptErrorMessage');
+        // ─── Send button ───
+        sendBtn.addEventListener('click', function() {
+            const prompt = promptInput.value.trim();
+            if (!prompt) return;
+            doExtract(prompt);
+            promptInput.value = '';
+            promptInput.style.height = 'auto';
+        });
 
-        let progressInterval = null;
-
-        generatePptBtn.addEventListener('click', async function() {
-            const extractionId = this.dataset.extractionId;
-            if (!extractionId) {
-                alert('萃取记录不存在');
-                return;
-            }
-
-            // 显示进度卡片
-            pptProgressCard.style.display = 'block';
-            pptProgressBar.style.width = '0%';
-            pptProgressBar.textContent = '0%';
-            pptProgressMessage.textContent = '正在启动生成任务...';
-            pptDownloadArea.style.display = 'none';
-            pptErrorArea.style.display = 'none';
-            generatePptBtn.disabled = true;
-
-            pptProgressCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-            try {
-                // 1. 启动生成任务
-                const response = await fetch('@Url.Action("GeneratePresentation")', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: `extractionId=${extractionId}`
-                });
-
-                const data = await response.json();
-                if (!response.ok || !data.success) {
-                    throw new Error(data.error || '启动失败');
-                }
-
-                const progressKey = data.progressKey;
-
-                // 2. 轮询进度
-                progressInterval = setInterval(async () => {
-                    try {
-                        const progressResponse = await fetch(`@Url.Action("GetPresentationProgress")?progressKey=${encodeURIComponent(progressKey)}`);
-                        if (!progressResponse.ok) {
-                            throw new Error('查询进度失败');
-                        }
-
-                        const progress = await progressResponse.json();
-                        
-                        // 更新进度条
-                        pptProgressBar.style.width = progress.percentage + '%';
-                        pptProgressBar.textContent = progress.percentage + '%';
-                        pptProgressMessage.textContent = progress.message;
-
-                        // 检查状态
-                        if (progress.status === 'completed') {
-                            clearInterval(progressInterval);
-                            pptProgressBar.classList.remove('progress-bar-animated');
-                            pptDownloadBtn.href = progress.viewUrl;
-                            pptDownloadArea.style.display = 'block';
-                            generatePptBtn.disabled = false;
-                        } else if (progress.status === 'failed') {
-                            clearInterval(progressInterval);
-                            pptProgressBar.classList.remove('progress-bar-animated');
-                            pptProgressBar.classList.add('bg-danger');
-                            pptErrorMessage.textContent = progress.error || '生成失败';
-                            pptErrorArea.style.display = 'block';
-                            generatePptBtn.disabled = false;
-                        }
-                    } catch (err) {
-                        console.error('查询进度失败:', err);
-                    }
-                }, 500); // 每 500ms 查询一次
-
-            } catch (error) {
-                console.error('生成演示文稿失败:', error);
-                pptErrorMessage.textContent = error.message || '生成失败';
-                pptErrorArea.style.display = 'block';
-                generatePptBtn.disabled = false;
+        // ─── Enter to send (Shift+Enter for newline) ───
+        promptInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendBtn.click();
             }
         });
+
+        // ─── New extraction ───
+        newExtractBtn.addEventListener('click', function() {
+            activeExtractionId = null;
+            chatMessages.innerHTML = `
+                <div class="chat-empty" id="chatEmpty">
+                    <div class="empty-icon"><i class="bi bi-magic"></i></div>
+                    <h3>开始萃取</h3>
+                    <p>在下方输入提示词，AI 将基于文章内容为你提炼关键信息。也可以点击左侧历史记录查看之前的萃取结果。</p>
+                </div>
+            `;
+            renderHistory();
+            promptInput.focus();
+            // Close sidebar on mobile
+            sidebar.classList.remove('open');
+        });
+
+        // ─── Init ───
+        loadHistory();
     </script>
-}
+</body>
+</html>
