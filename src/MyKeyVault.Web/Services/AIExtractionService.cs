@@ -178,12 +178,36 @@ public class AIExtractionService
     private async Task<string?> ReadArticleHtmlAsync(WechatArticle article)
     {
         var physicalPath = _scraperService.GetArticlePhysicalPath(article);
-        if (string.IsNullOrEmpty(physicalPath) || !File.Exists(physicalPath))
+        
+        // 如果 HtmlFilePath 有值且文件存在，直接读取
+        if (!string.IsNullOrEmpty(physicalPath) && File.Exists(physicalPath))
         {
-            return null;
+            return await File.ReadAllTextAsync(physicalPath);
         }
 
-        return await File.ReadAllTextAsync(physicalPath);
+        // 回退：HtmlFilePath 为空时，扫描文章目录查找 HTML 文件
+        if (!string.IsNullOrEmpty(article.ArticleUniqueId))
+        {
+            var articleDir = Path.Combine(
+                _env.WebRootPath,
+                "wechat-articles",
+                article.UserId,
+                article.ArticleUniqueId);
+
+            if (Directory.Exists(articleDir))
+            {
+                var htmlFiles = Directory.GetFiles(articleDir, "*.html");
+                if (htmlFiles.Length > 0)
+                {
+                    _logger.LogInformation("回退查找 HTML: {Dir}, 找到 {Count} 个文件", articleDir, htmlFiles.Length);
+                    return await File.ReadAllTextAsync(htmlFiles[0]);
+                }
+            }
+        }
+
+        _logger.LogWarning("无法读取文章内容: ArticleId={ArticleId}, HtmlFilePath={HtmlFilePath}, ArticleUniqueId={ArticleUniqueId}",
+            article.ArticleId, article.HtmlFilePath, article.ArticleUniqueId);
+        return null;
     }
 
     /// <summary>

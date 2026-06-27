@@ -565,20 +565,64 @@
 
         /* ─── Responsive ─── */
         @@media (max-width: 768px) {
+            /* Topbar */
+            .topbar { padding: 0 10px; }
             .topbar .sidebar-toggle { display: block; }
+            .topbar .article-title { font-size: 0.85rem; }
+            .topbar .back-btn { font-size: 0.75rem; padding: 4px 8px; }
+
+            /* Sidebar overlay */
             .sidebar {
                 position: fixed;
-                top: var(--topbar-height);
+                top: 0;
                 left: 0;
                 bottom: 0;
+                width: 85vw;
+                max-width: 320px;
                 transform: translateX(-100%);
-                z-index: 90;
-                box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+                z-index: 1000;
+                box-shadow: 2px 0 12px rgba(0,0,0,0.15);
+                transition: transform 0.25s ease;
             }
             .sidebar.open { transform: translateX(0); }
-            .message-bubble { max-width: 90%; }
-            .chat-messages { padding: 12px; }
-            .chat-input-area { padding: 10px 12px; }
+
+            /* Sidebar overlay backdrop */
+            .sidebar-overlay {
+                display: none;
+                position: fixed;
+                inset: 0;
+                background: rgba(0,0,0,0.3);
+                z-index: 999;
+            }
+            .sidebar-overlay.show { display: block; }
+
+            /* Chat area */
+            .chat-area {
+                width: 100%;
+                min-width: 100%;
+            }
+            .message-bubble { max-width: 92%; font-size: 0.85rem; }
+            .message-bubble.markdown-body { padding: 12px 14px !important; font-size: 0.85rem; }
+            .chat-messages { padding: 10px; }
+
+            /* Input area - fixed at bottom on mobile */
+            .chat-input-area {
+                padding: 8px 10px 12px;
+                position: sticky;
+                bottom: 0;
+                background: #fff;
+            }
+            .templates-bar { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
+            .template-chip { font-size: 0.7rem; white-space: nowrap; flex-shrink: 0; }
+            .input-row textarea { font-size: 0.85rem; padding: 8px 10px; }
+            .send-btn { width: 36px; height: 36px; font-size: 1rem; }
+
+            /* Navbar collapse */
+            .navbar-custom .navbar { padding: 0.5rem 0.75rem; }
+            .navbar-custom .navbar-brand { font-size: 0.9rem; }
+
+            /* Error toast */
+            .error-toast { top: 8px; left: 8px; right: 8px; transform: none; max-width: none; }
         }
     </style>
 </head>
@@ -637,6 +681,7 @@
     </div>
 
     <!-- Main Layout -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
     <div class="app-container">
         <!-- Left Sidebar: History -->
         <aside class="sidebar" id="sidebar">
@@ -740,6 +785,7 @@
         const errorToast = document.getElementById('errorToast');
         const sidebar = document.getElementById('sidebar');
         const sidebarToggle = document.getElementById('sidebarToggle');
+        const sidebarOverlay = document.getElementById('sidebarOverlay');
         const templatesBar = document.getElementById('templatesBar');
         const templateToggle = document.getElementById('templateToggle');
 
@@ -758,9 +804,23 @@
 
         // ─── Toast ───
         function showError(msg) {
-            errorToast.textContent = msg;
+            errorToast.innerHTML = '⚠️ ' + escapeHtml(msg);
             errorToast.style.display = 'block';
-            setTimeout(() => { errorToast.style.display = 'none'; }, 3000);
+            // 移动端显示更长时间，方便截图
+            setTimeout(() => { errorToast.style.display = 'none'; }, 8000);
+            
+            // 同时在聊天区显示错误气泡
+            var errBubble = document.createElement('div');
+            errBubble.className = 'message-row ai';
+            errBubble.innerHTML = `
+                <div class="message-avatar" style="background:#fee2e2;color:#ef4444;">⚠️</div>
+                <div class="message-bubble" style="background:#fef2f2;color:#991b1b;border-left:3px solid #ef4444;">
+                    <strong>萃取失败</strong><br>
+                    <span style="font-size:0.85rem;">${escapeHtml(msg)}</span>
+                </div>
+            `;
+            chatMessages.appendChild(errBubble);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
         // ─── Auto-resize textarea ───
@@ -798,6 +858,11 @@
         // ─── Sidebar toggle (mobile) ───
         sidebarToggle.addEventListener('click', function() {
             sidebar.classList.toggle('open');
+            sidebarOverlay.classList.toggle('show');
+        });
+        sidebarOverlay.addEventListener('click', function() {
+            sidebar.classList.remove('open');
+            sidebarOverlay.classList.remove('show');
         });
 
         // ─── Load history ───
