@@ -832,4 +832,134 @@ public class WechatArticleController : Controller
     }
 
     #endregion
+
+    #region 批量重新抓取
+
+    /// <summary>
+    /// 一键批量重新抓取：查出所有 SourceUrl → 去重 → 分批提交给爬虫
+    /// </summary>
+    [HttpPost]
+    [IgnoreAntiforgeryToken]
+    public async Task<IActionResult> ReScrapeAll()
+    {
+        var userId = CurrentUserId;
+        var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString();
+
+        // 查出所有有 SourceUrl 的文章
+        var allUrls = await _context.WechatArticles
+            .Where(a => a.UserId == userId && !string.IsNullOrEmpty(a.SourceUrl))
+            .Select(a => a.SourceUrl)
+            .Distinct()
+            .ToListAsync();
+
+        if (allUrls.Count == 0)
+        {
+            return BadRequest(new { error = "没有找到可重新抓取的原文链接" });
+        }
+
+        var maxPerBatch = 10;
+        var totalBatches = (int)Math.Ceiling((double)allUrls.Count / maxPerBatch);
+        var submittedTaskIds = new List<string>();
+        var failedUrls = new List<string>();
+
+        for (int i = 0; i < allUrls.Count; i += maxPerBatch)
+        {
+            var batch = allUrls.Skip(i).Take(maxPerBatch).ToList();
+            var (success, taskId, error) = await _scraperService.SubmitScrapeTaskAsync(userId, batch);
+
+            if (success && taskId != null)
+            {
+                submittedTaskIds.Add(taskId);
+            }
+            else
+            {
+                failedUrls.AddRange(batch);
+                _logger.LogWarning("批量抓取第 {Batch} 批提交失败: {Error}", i / maxPerBatch + 1, error);
+            }
+
+            // 批次之间稍等，避免打爆爬虫服务
+            if (i + maxPerBatch < allUrls.Count)
+            {
+                await System.Threading.Tasks.Task.Delay(500);
+            }
+        }
+
+        await _scraperService.WriteLogAsync(
+            userId,
+            "ReScrapeAll",
+            null,
+            new { totalUrls = allUrls.Count, batchCount = totalBatches, submittedTaskIds, failedCount = failedUrls.Count },
+            failedUrls.Count == 0 ? "Success" : "PartialSuccess",
+            failedUrls.Count > 0 ? $"有 {failedUrls.Count} 个链接提交失败" : null,
+            clientIp);
+
+        return Ok(new
+        {
+            success = true,
+            totalUrls = allUrls.Count,
+            totalBatches,
+            submittedTasks = submittedTaskIds.Count,
+            failedCount = failedUrls.Count,
+            taskIds = submittedTaskIds
+        });
+    }
+
+    /// <summary>
+    /// 查询批量重新抓取的进度
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> ReScrapeProgress([FromQuery] string taskIds)
+    {
+        if (string.IsNullOrEmpty(taskIds))
+        {
+            return BadRequest(new { error = "taskIds 不能为空" });
+        }
+
+        var ids = taskIds.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).ToList();
+        if (ids.Count == 0)
+        {
+            return BadRequest(new { error = "taskIds 格式错误" });
+        }
+
+        var userId = CurrentUserId;
+        var articles = await _context.WechatArticles
+            .Where(a => a.UserId == userId && ids.Contains(a.TaskId))
+            .Select(a => new { a.TaskId, a.Status })
+            .ToListAsync();
+
+        var statusMap = articles
+            .GroupBy(a => a.TaskId)
+            .ToDictionary(g => g.Key, g => g.First().Status);
+
+        int completed = 0, processing = 0, pending = 0, failed = 0, cancelled = 0;
+
+        foreach (var id in ids)
+        {
+            var status = statusMap.GetValueOrDefault(id, "unknown");
+            switch (status)
+            {
+                case "completed": completed++; break;
+                case "processing": processing++; break;
+                case "pending": pending++; break;
+                case "failed": failed++; break;
+                case "cancelled": cancelled++; break;
+                default: pending++; break;
+            }
+        }
+
+        var allFinished = (processing + pending) == 0;
+
+        return Ok(new
+        {
+            total = ids.Count,
+            completed,
+            processing,
+            pending,
+            failed,
+            cancelled,
+            allFinished
+        });
+    }
+
+    #endregion
 }

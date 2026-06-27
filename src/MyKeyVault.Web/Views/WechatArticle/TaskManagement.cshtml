@@ -16,12 +16,18 @@
             </a>
             @if (serviceAvailable)
             {
+                <button type="button" class="btn btn-warning me-2" id="reScrapeAllBtn" onclick="confirmReScrapeAll()">
+                    <i class="bi bi-lightning-charge"></i> 一键重新抓取
+                </button>
                 <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createTaskModal">
                     <i class="bi bi-plus-circle"></i> 新建任务
                 </button>
             }
             else
             {
+                <button type="button" class="btn btn-warning me-2" disabled title="爬虫服务不可用">
+                    <i class="bi bi-lightning-charge"></i> 一键重新抓取
+                </button>
                 <button type="button" class="btn btn-secondary" disabled title="爬虫服务不可用">
                     <i class="bi bi-plus-circle"></i> 新建任务
                 </button>
@@ -304,6 +310,65 @@
     </div>
 </div>
 
+<!-- 批量重新抓取确认弹窗 -->
+<div class="modal fade" id="reScrapeConfirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title"><i class="bi bi-lightning-charge"></i> 一键重新抓取</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>将重新抓取数据库中所有 <strong id="reScrapeTotalCount">0</strong> 个原文链接。</p>
+                <p class="text-muted mb-0">
+                    <i class="bi bi-info-circle"></i> 每批最多 10 个链接，已存在的链接可能会被重复抓取。
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-warning" id="confirmReScrapeBtn" onclick="executeReScrapeAll()">
+                    <i class="bi bi-lightning-charge"></i> 确认抓取
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 批量重新抓取进度弹窗 -->
+<div class="modal fade" id="reScrapeProgressModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-arrow-repeat"></i> 批量抓取进度</h5>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>进度</span>
+                        <span><span id="reScrapeProgressText">0</span> / <span id="reScrapeProgressTotal">0</span></span>
+                    </div>
+                    <div class="progress" style="height: 20px;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                             id="reScrapeProgressBar" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="d-flex flex-wrap gap-2 mb-2">
+                    <span class="badge bg-success">✅ 已完成: <span id="reScrapeProgressCompleted">0</span></span>
+                    <span class="badge bg-primary">🔄 进行中: <span id="reScrapeProgressProcessing">0</span></span>
+                    <span class="badge bg-secondary">⏳ 等待中: <span id="reScrapeProgressPending">0</span></span>
+                    <span class="badge bg-danger">❌ 失败: <span id="reScrapeProgressFailed">0</span></span>
+                </div>
+                <p id="reScrapeProgressStatus" class="text-muted mb-0">正在抓取中...</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="location.reload()">
+                    <i class="bi bi-arrow-clockwise"></i> 刷新列表
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
 <script>
     var deleteArticleId = null;
@@ -490,6 +555,97 @@
             confirmBtn.disabled = false;
             confirmBtn.innerHTML = '<i class="bi bi-arrow-repeat"></i> 确认重试';
             retryArticleId = null;
+        }
+    }
+
+    // ==================== 批量重新抓取 ====================
+    let reScrapeProgressTimer = null;
+    let reScrapeTaskIds = [];
+
+    async function confirmReScrapeAll() {
+        // 先获取总数
+        try {
+            const resp = await fetch('@Url.Action("GetArticlesAjax")?page=1');
+            const data = await resp.json();
+            const total = data.totalCount || 0;
+            if (total === 0) {
+                alert('没有找到可重新抓取的文章');
+                return;
+            }
+            document.getElementById('reScrapeTotalCount').textContent = total;
+            new bootstrap.Modal(document.getElementById('reScrapeConfirmModal')).show();
+        } catch (e) {
+            alert('获取文章数量失败，请重试');
+        }
+    }
+
+    async function executeReScrapeAll() {
+        const btn = document.getElementById('confirmReScrapeBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>提交中...';
+
+        try {
+            const resp = await fetch('@Url.Action("ReScrapeAll")', { method: 'POST' });
+            const data = await resp.json();
+
+            if (!resp.ok || !data.success) {
+                alert(data.error || '提交失败');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-lightning-charge"></i> 确认抓取';
+                return;
+            }
+
+            reScrapeTaskIds = data.taskIds || [];
+            document.getElementById('reScrapeProgressTotal').textContent = data.totalUrls;
+            document.getElementById('reScrapeProgressBar').style.width = '0%';
+            document.getElementById('reScrapeProgressText').textContent = '0';
+
+            // 关闭确认弹窗，打开进度弹窗
+            bootstrap.Modal.getInstance(document.getElementById('reScrapeConfirmModal')).hide();
+            new bootstrap.Modal(document.getElementById('reScrapeProgressModal')).show();
+
+            // 开始轮询
+            if (reScrapeProgressTimer) clearInterval(reScrapeProgressTimer);
+            reScrapeProgressTimer = setInterval(pollReScrapeProgress, 3000);
+            pollReScrapeProgress(); // 立即查一次
+
+        } catch (e) {
+            console.error('ReScrapeAll error:', e);
+            alert('请求失败，请重试');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-lightning-charge"></i> 确认抓取';
+        }
+    }
+
+    async function pollReScrapeProgress() {
+        if (reScrapeTaskIds.length === 0) return;
+
+        try {
+            const resp = await fetch('@Url.Action("ReScrapeProgress")?taskIds=' + encodeURIComponent(reScrapeTaskIds.join(',')));
+            const data = await resp.json();
+
+            const finished = data.completed + data.failed + data.cancelled;
+            const total = data.total;
+            const pct = total > 0 ? Math.round(finished / total * 100) : 0;
+
+            document.getElementById('reScrapeProgressBar').style.width = pct + '%';
+            document.getElementById('reScrapeProgressText').textContent = finished;
+            document.getElementById('reScrapeProgressCompleted').textContent = data.completed;
+            document.getElementById('reScrapeProgressProcessing').textContent = data.processing;
+            document.getElementById('reScrapeProgressPending').textContent = data.pending;
+            document.getElementById('reScrapeProgressFailed').textContent = data.failed;
+
+            if (data.allFinished) {
+                clearInterval(reScrapeProgressTimer);
+                reScrapeProgressTimer = null;
+                document.getElementById('reScrapeProgressStatus').textContent = '全部完成！';
+                document.getElementById('reScrapeProgressStatus').className = 'text-success';
+                // 刷新列表
+                setTimeout(() => refreshList(), 1000);
+            }
+        } catch (e) {
+            console.error('Poll progress error:', e);
         }
     }
 </script>
