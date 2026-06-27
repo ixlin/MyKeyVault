@@ -68,9 +68,47 @@ body {
     font-size: 1.1rem;
   }
 
-  /* 表格横向滚动 */
-  .table-responsive {
-    -webkit-overflow-scrolling: touch;
+  /* 表格 → 卡片布局 */
+  .table-responsive table,
+  .table-responsive thead,
+  .table-responsive tbody,
+  .table-responsive th,
+  .table-responsive td,
+  .table-responsive tr {
+    display: block;
+  }
+  .table-responsive thead {
+    display: none;
+  }
+  .table-responsive tr {
+    border: 1px solid #dee2e6;
+    border-radius: 10px;
+    margin-bottom: 12px;
+    padding: 12px;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .table-responsive td {
+    border: none;
+    padding: 5px 0;
+    text-align: left;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .table-responsive td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #6b7280;
+    font-size: 0.75rem;
+    min-width: 70px;
+    flex-shrink: 0;
+  }
+  .table-responsive td:last-child {
+    border-top: 1px solid #f0f0f0;
+    margin-top: 6px;
+    padding-top: 8px;
   }
 
   /* 分页缩小 */

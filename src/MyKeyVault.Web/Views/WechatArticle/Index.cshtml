@@ -75,7 +75,7 @@
                     @foreach (var article in Model)
                     {
                         <tr>
-                            <td>
+                            <td data-label="标题">
                                 @if (!string.IsNullOrEmpty(article.Title))
                                 {
                                     @if (article.Status == "completed")
@@ -97,9 +97,9 @@
                                     <span class="text-muted">处理中...</span>
                                 }
                             </td>
-                            <td>@(article.Author ?? "-")</td>
-                            <td>@(article.PublishTime ?? "-")</td>
-                            <td>
+                            <td data-label="作者">@(article.Author ?? "-")</td>
+                            <td data-label="发布时间">@(article.PublishTime ?? "-")</td>
+                            <td data-label="状态">
                                 @switch (article.Status)
                                 {
                                     case "completed":
@@ -122,9 +122,9 @@
                                         break;
                                 }
                             </td>
-                            <td>@article.ImagesCount</td>
-                            <td>@article.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
-                            <td>
+                            <td data-label="图片">@article.ImagesCount</td>
+                            <td data-label="创建时间">@article.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                            <td data-label="操作">
                                 <div class="btn-group btn-group-sm">
                                     @if (article.Status == "completed")
                                     {
