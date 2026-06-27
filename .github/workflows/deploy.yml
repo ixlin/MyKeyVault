@@ -1,7 +1,7 @@
 # 定义工作流的名称
 name: Deploy MyKeyVault to Aliyun Server
 
-# 定义触发条件：当有代码推送到 main 分支时触发
+# 定义触发条件:当有代码推送到 main 分支时触发
 on:
   push:
     branches: [ "main" ]
@@ -12,34 +12,34 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # 第一步：检出代码
+    # 第一步:检出代码
     # 这个操作会将你的仓库代码下载到虚拟机中
     - name: Checkout code
       uses: actions/checkout@v3
 
-    # 第二步：设置 .NET 环境
+    # 第二步:设置 .NET 环境
     # 我们需要指定一个 .NET 版本来编译你的项目
     - name: Setup .NET
       uses: actions/setup-dotnet@v3
       with:
-        dotnet-version: '8.0.x' # 假设你的项目使用 .NET 8, 如果不是，请修改这里
+        dotnet-version: '8.0.x' # 假设你的项目使用 .NET 8, 如果不是,请修改这里
 
-    # 第三步：发布项目
-    # 这会编译你的 ASP.NET Core 项目，并生成可部署的文件
+    # 第三步:发布项目
+    # 这会编译你的 ASP.NET Core 项目,并生成可部署的文件
     # --configuration Release 指定使用发布模式
     # --output ./publish 指定输出到虚拟机里的 publish 文件夹
     - name: Publish .NET Project
       run: dotnet publish src/MyKeyVault.Web/MyKeyVault.Web.csproj --configuration Release --output ./publish
-    
-    # 在发布产物中写入当前部署的提交哈希与时间，便于线上核对版本
+
+    # 在发布产物中写入当前部署的提交哈希与时间,便于线上核对版本
     - name: Write deploy version file
       run: |
         echo "$GITHUB_SHA" > ./publish/.deploy-version
         date -u +"%Y-%m-%dT%H:%M:%SZ" > ./publish/.deploy-time-utc
 
-    # 第四步：将编译好的文件部署到服务器
+    # 第四步:将编译好的文件部署到服务器
 
-    # 第五步：通过 SCP 将发布文件复制到服务器的临时目录（避免目标目录权限问题）
+    # 第五步:通过 SCP 将发布文件复制到服务器的临时目录(避免目标目录权限问题)
     - name: Copy files to temp via SCP
       uses: appleboy/scp-action@master
       with:
@@ -50,7 +50,7 @@ jobs:
         target: "/tmp/mykv_release_${{ github.sha }}" # 复制到服务器的临时目录
         strip_components: 1 # 移除 publish 这一层目录
 
-    # 第六步：在服务器上用 rsync 同步到正式目录，并保护配置文件
+    # 第六步:在服务器上用 rsync 同步到正式目录,并保护配置文件
     - name: Sync release to target via rsync
       uses: appleboy/ssh-action@master
       with:
@@ -59,54 +59,60 @@ jobs:
         key: ${{ secrets.SERVER_SSH_KEY }}
         script: |
           set -e
-          # 注意：这里必须在工作流渲染阶段注入 SHA，而不是依赖远端环境变量
+          # 注意:这里必须在工作流渲染阶段注入 SHA,而不是依赖远端环境变量
           SRC_DIR="/tmp/mykv_release_${{ github.sha }}"
           DEST_DIR="/var/www/mykeyvault/"
           echo "Source: $SRC_DIR"
           echo "Destination: $DEST_DIR"
-          
+
           # 确保目标目录存在
           sudo -n mkdir -p "$DEST_DIR"
-          
+
           if command -v rsync >/dev/null 2>&1; then
             echo "Using rsync for synchronization"
-            # 同步文件到正式目录，排除本地可变配置，避免覆盖线上通过后台保存的配置
-            # --delete 保持目录一致；如需保留历史文件，可移除此参数
+            # 同步文件到正式目录,排除本地可变配置和运行时数据目录,避免覆盖线上通过后台保存的配置
+            # --delete 保持目录一致;如需保留历史文件,可移除此参数
             sudo -n rsync -a --delete \
               --exclude 'appsettings*.json' \
+              --exclude 'wechat-articles' \
+              --exclude 'html-ppt' \
               "$SRC_DIR/" "$DEST_DIR/"
           else
             echo "rsync not found on remote host, falling back to tar+find copy"
-            # 1) 删除目标目录中除 appsettings*.json 以外的所有内容，达到“删除同步”效果
-            sudo -n find "$DEST_DIR" -mindepth 1 -not -name 'appsettings*.json' -exec rm -rf {} +
-            # 2) 将发布产物打包流式传输到目标目录，同时排除 appsettings*.json，避免覆盖线上配置
+            # 1) 删除目标目录中除 appsettings*.json 和运行时数据目录以外的所有内容，达到"删除同步"效果
+            sudo -n find "$DEST_DIR" -mindepth 1 \
+              -not -name 'appsettings*.json' \
+              -not -name 'wechat-articles' \
+              -not -name 'html-ppt' \
+              -exec rm -rf {} +
+            # 2) 将发布产物打包流式传输到目标目录,同时排除 appsettings*.json,避免覆盖线上配置
             sudo -n tar -C "$SRC_DIR" --exclude='appsettings*.json' -cf - . | sudo -n tar -C "$DEST_DIR" -xpf -
           fi
-          
-          # 为所有文件提供只读兜底权限（确保服务账户可读）
+
+          # 为所有文件提供只读兜底权限(确保服务账户可读)
           sudo -n chmod -R o+r "$DEST_DIR"
 
-          # 确保后台可写配置文件：appsettings.Production.json
-          # 自动探测运行 mykeyvault.service 的用户，优先使用单元文件中的 User=
+          # 确保后台可写配置文件:appsettings.Production.json
+          # 自动探测运行 mykeyvault.service 的用户,优先使用单元文件中的 User=
           SERVICE_USER=$(systemctl show -p User mykeyvault.service | cut -d= -f2)
           if [ -z "$SERVICE_USER" ]; then
-            # 若未显式设置，尝试常见的 www-data，否则退回当前用户
+            # 若未显式设置,尝试常见的 www-data,否则退回当前用户
             if id www-data >/dev/null 2>&1; then SERVICE_USER=www-data; else SERVICE_USER=$(whoami); fi
           fi
           echo "Service will own config as: $SERVICE_USER"
 
           CFG_FILE="$DEST_DIR/appsettings.Production.json"
-          # 如果文件不存在则创建；不覆盖内容，仅保证存在与权限
+          # 如果文件不存在则创建;不覆盖内容,仅保证存在与权限
           sudo -n touch "$CFG_FILE"
-          # 将文件属主设为服务账户，并授予可写权限（rw-rw-r--）
+          # 将文件属主设为服务账户,并授予可写权限(rw-rw-r--)
           sudo -n chown "$SERVICE_USER":"$SERVICE_USER" "$CFG_FILE" || true
           sudo -n chmod 664 "$CFG_FILE" || true
-          
+
           # 清理临时目录
           rm -rf "$SRC_DIR"
 
-    # 第七步：在服务器上重启服务
-    # 数据库迁移会在应用启动时自动执行（参见 Program.cs）
+    # 第七步:在服务器上重启服务
+    # 数据库迁移会在应用启动时自动执行(参见 Program.cs)
     - name: Restart Service on Server
       uses: appleboy/ssh-action@master
       with:
@@ -119,7 +125,7 @@ jobs:
           # 使用我们之前配置好的免密 sudo 权限来重启服务
           sudo -n systemctl restart mykeyvault.service
           echo "Service restarted successfully!"
-          # 检查一下服务状态，确保它正常运行
+          # 检查一下服务状态,确保它正常运行
           sudo systemctl status mykeyvault.service --no-pager
           echo "Recent service logs:"
           journalctl -u mykeyvault.service -n 30 --no-pager || true
@@ -128,7 +134,7 @@ jobs:
           echo "Deploy time (UTC):"
           cat /var/www/mykeyvault/.deploy-time-utc || true
 
-    # 第八步：部署 Python 微信爬虫服务
+    # 第八步:部署 Python 微信爬虫服务
     - name: Deploy WeChat Scraper Python Service
       uses: appleboy/ssh-action@master
       with:
@@ -138,23 +144,23 @@ jobs:
         script: |
           set -e
           echo "Setting up WeChat Scraper service..."
-          
+
           SCRAPER_DIR="/var/www/wechat-scraper"
-          
+
           # 确保 Python 3.10+ 和 pip 已安装
           if ! command -v python3 &> /dev/null; then
             echo "Installing Python3..."
             sudo -n apt-get update
             sudo -n apt-get install -y python3 python3-venv python3-pip
           fi
-          
+
           # 确保目录存在
           sudo -n mkdir -p "$SCRAPER_DIR"
           sudo -n chown -R $USER:$USER "$SCRAPER_DIR"
-          
+
           echo "WeChat Scraper directory prepared: $SCRAPER_DIR"
 
-    # 第九步：复制 Python 爬虫代码到服务器
+    # 第九步:复制 Python 爬虫代码到服务器
     - name: Copy WeChat Scraper files via SCP
       uses: appleboy/scp-action@master
       with:
@@ -165,7 +171,7 @@ jobs:
         target: "/tmp/wechat_scraper_${{ github.sha }}"
         strip_components: 2
 
-    # 第十步：安装 Python 依赖并配置服务
+    # 第十步:安装 Python 依赖并配置服务
     - name: Setup Python environment and service
       uses: appleboy/ssh-action@master
       with:
@@ -181,9 +187,9 @@ jobs:
           echo "Installing system dependencies..."
           sudo -n apt-get update
           # 强制安装 rsync 和 python3-venv (解决 ensurepip is not available 问题)
-          # 如果默认 python3-venv 不匹配，尝试安装 python3.11-venv
+          # 如果默认 python3-venv 不匹配,尝试安装 python3.11-venv
           sudo -n apt-get install -y rsync python3-venv || sudo -n apt-get install -y rsync python3.11-venv
-          
+
           # 复制文件到正式目录
           sudo -n rsync -av --delete \
             --exclude 'venv' \
@@ -191,47 +197,47 @@ jobs:
             --exclude '__pycache__' \
             --exclude '*.pyc' \
             "$SRC_DIR/" "$SCRAPER_DIR/"
-          
-          # 检查虚拟环境是否完整，如果不完整则删除
+
+          # 检查虚拟环境是否完整,如果不完整则删除
           if [ -d "$SCRAPER_DIR/venv" ] && [ ! -f "$SCRAPER_DIR/venv/bin/activate" ]; then
             echo "Virtual environment exists but seems broken (missing activate script). Removing it..."
             sudo -n rm -rf "$SCRAPER_DIR/venv"
           fi
-          
-          # 创建虚拟环境（如果不存在）
+
+          # 创建虚拟环境(如果不存在)
           if [ ! -d "$SCRAPER_DIR/venv" ]; then
             echo "Creating Python virtual environment..."
             cd "$SCRAPER_DIR"
             python3 -m venv venv
           fi
-          
+
           # 激活虚拟环境并安装依赖
           echo "Installing Python dependencies..."
           cd "$SCRAPER_DIR"
           source venv/bin/activate
           pip install --upgrade pip
           pip install -r requirements.txt
-          
-          # 安装 Playwright 浏览器（使用独立目录）
+
+          # 安装 Playwright 浏览器(使用独立目录)
           echo "Installing Playwright browsers..."
           export PLAYWRIGHT_BROWSERS_PATH="$SCRAPER_DIR/pw-browsers"
           playwright install chromium
           playwright install-deps chromium || sudo -n apt-get install -y libnss3 libatk-bridge2.0-0 libxkbcommon0 libxcomposite1 libxrandr2 libgbm1 libasound2
-          
+
           # 设置正确的权限
           sudo -n chown -R www-data:www-data "$SCRAPER_DIR"
-          
-          # 创建文章输出目录（链接到 .NET wwwroot）
+
+          # 创建文章输出目录(链接到 .NET wwwroot)
           ARTICLES_DIR="/var/www/mykeyvault/wwwroot/wechat-articles"
           sudo -n mkdir -p "$ARTICLES_DIR"
           sudo -n chown -R www-data:www-data "$ARTICLES_DIR"
-          
+
           # 清理临时目录
           rm -rf "$SRC_DIR"
-          
+
           echo "Python environment setup complete!"
 
-    # 第十一步：配置并重启 Python 服务
+    # 第十一步:配置并重启 Python 服务
     - name: Configure and restart WeChat Scraper service
       uses: appleboy/ssh-action@master
       with:
@@ -240,10 +246,10 @@ jobs:
         key: ${{ secrets.SERVER_SSH_KEY }}
         script: |
           set -e
-          
+
           # 复制 systemd 服务配置
           SCRAPER_DIR="/var/www/wechat-scraper"
-          
+
           # 创建 systemd service 文件
           cat << 'EOF' | sudo -n tee /etc/systemd/system/wechat-scraper.service
           [Unit]
@@ -269,16 +275,16 @@ jobs:
           [Install]
           WantedBy=multi-user.target
           EOF
-          
+
           # 重新加载 systemd 配置
           sudo -n systemctl daemon-reload
-          
+
           # 启用并重启服务
           sudo -n systemctl enable wechat-scraper.service
           sudo -n systemctl restart wechat-scraper.service
-          
+
           echo "WeChat Scraper service restarted!"
-          
+
           # 检查服务状态
           sleep 2
           sudo systemctl status wechat-scraper.service --no-pager || true
