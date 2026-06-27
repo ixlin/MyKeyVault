@@ -132,7 +132,11 @@ public class AIExtractionService
                 var htmlContent = await ReadArticleHtmlAsync(article);
                 if (string.IsNullOrEmpty(htmlContent))
                 {
-                    throw new Exception("无法读取文章内容");
+                    var dirPath = _scraperService.GetArticleDirectoryPath(article);
+                    var phyPath = _scraperService.GetArticlePhysicalPath(article);
+                    var dirExists = !string.IsNullOrEmpty(dirPath) && Directory.Exists(dirPath);
+                    var fileExists = !string.IsNullOrEmpty(phyPath) && File.Exists(phyPath);
+                    throw new Exception($"无法读取文章内容。目录: {dirPath ?? "(null)"} (存在: {dirExists}), 文件: {phyPath ?? "(null)"} (存在: {fileExists})");
                 }
 
                 // 提取文章正文和图片
@@ -186,23 +190,20 @@ public class AIExtractionService
         }
 
         // 回退：HtmlFilePath 为空时，扫描文章目录查找 HTML 文件
-        if (!string.IsNullOrEmpty(article.ArticleUniqueId))
+        var articleDir = _scraperService.GetArticleDirectoryPath(article);
+        if (!string.IsNullOrEmpty(articleDir) && Directory.Exists(articleDir))
         {
-            var articleDir = Path.Combine(
-                _env.WebRootPath,
-                "wechat-articles",
-                article.UserId,
-                article.ArticleUniqueId);
-
-            if (Directory.Exists(articleDir))
+            var htmlFiles = Directory.GetFiles(articleDir, "*.html");
+            if (htmlFiles.Length > 0)
             {
-                var htmlFiles = Directory.GetFiles(articleDir, "*.html");
-                if (htmlFiles.Length > 0)
-                {
-                    _logger.LogInformation("回退查找 HTML: {Dir}, 找到 {Count} 个文件", articleDir, htmlFiles.Length);
-                    return await File.ReadAllTextAsync(htmlFiles[0]);
-                }
+                _logger.LogInformation("回退查找 HTML: {Dir}, 找到 {Count} 个文件", articleDir, htmlFiles.Length);
+                return await File.ReadAllTextAsync(htmlFiles[0]);
             }
+            _logger.LogWarning("文章目录存在但无 HTML 文件: {Dir}", articleDir);
+        }
+        else
+        {
+            _logger.LogWarning("文章目录不存在: {Dir}", articleDir ?? "(null)");
         }
 
         _logger.LogWarning("无法读取文章内容: ArticleId={ArticleId}, HtmlFilePath={HtmlFilePath}, ArticleUniqueId={ArticleUniqueId}",

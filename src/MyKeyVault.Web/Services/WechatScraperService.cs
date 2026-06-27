@@ -756,6 +756,23 @@ public class WechatScraperService
     }
 
     /// <summary>
+    /// 获取文章目录路径（不含具体文件名）
+    /// </summary>
+    public string? GetArticleDirectoryPath(WechatArticle article)
+    {
+        if (string.IsNullOrEmpty(article.ArticleUniqueId))
+        {
+            return null;
+        }
+
+        return Path.Combine(
+            _env.WebRootPath,
+            _options.OutputPath,
+            article.UserId,
+            article.ArticleUniqueId);
+    }
+
+    /// <summary>
     /// 创建 ZIP 下载包
     /// </summary>
     public async Task<(bool success, string? zipPath, string? error)> CreateDownloadZipAsync(
