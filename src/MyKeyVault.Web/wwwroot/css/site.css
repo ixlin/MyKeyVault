@@ -42,3 +42,49 @@ body {
 .sap-toolbar .sap-button.sap-button-sm {
   padding: .25rem .75rem;
 }
+
+/* ─── 手机端适配 ─── */
+@media (max-width: 768px) {
+  /* 按钮组换行 */
+  .btn-group { flex-wrap: wrap; gap: 4px; }
+  .btn-group .btn,
+  .btn-group-sm .btn {
+    font-size: 0.75rem;
+    padding: 4px 8px;
+    border-radius: 4px !important;
+  }
+
+  /* 页面标题区上下堆叠 */
+  .container-fluid .d-flex.justify-content-between {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .container-fluid .d-flex.justify-content-between > div {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .container-fluid h2 {
+    font-size: 1.1rem;
+  }
+
+  /* 表格横向滚动 */
+  .table-responsive {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* 分页缩小 */
+  .pagination {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .pagination .page-link {
+    padding: 4px 8px;
+    font-size: 0.8rem;
+  }
+
+  /* 模态框边距 */
+  .modal-dialog {
+    margin: 10px;
+  }
+}
