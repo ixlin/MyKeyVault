@@ -25,8 +25,9 @@ class WechatArticleScraper:
     """微信公众号文章爬取器"""
     
     # 超时配置（秒）
-    PAGE_LOAD_TIMEOUT = 60  # 页面加载超时
-    OVERALL_TIMEOUT = 300   # 整体任务超时（5分钟）
+    PAGE_LOAD_TIMEOUT = 35  # 页面加载超时
+    CONTENT_WAIT_TIMEOUT = 12  # 正文内容等待超时
+    OVERALL_TIMEOUT = 150   # 整体任务超时（2.5分钟）
     
     def __init__(self, output_dir: str = "output", progress_callback: Optional[Callable[[int, str], None]] = None):
         self.output_dir = output_dir
@@ -282,7 +283,7 @@ class WechatArticleScraper:
                 # 等待文章内容加载 - 缩短超时
                 print("  等待文章内容...")
                 self._set_progress(25, "等待文章内容")
-                page.wait_for_selector('#js_content', timeout=15000)
+                page.wait_for_selector('#js_content', timeout=self.CONTENT_WAIT_TIMEOUT * 1000)
                 print("  文章内容已加载")
                 
                 # 检查停止标志

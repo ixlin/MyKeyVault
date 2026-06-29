@@ -30,8 +30,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# 单个文章爬取超时时间（秒）
-ARTICLE_SCRAPE_TIMEOUT = 300  # 5分钟
+# 单个文章爬取超时时间（秒）。批量队列是串行推进的，单篇不能长期占住整个批次。
+ARTICLE_SCRAPE_TIMEOUT = 150  # 2.5分钟
 # 任务过期时间（小时）
 TASK_EXPIRE_HOURS = 24
 # 孤立任务检查间隔（秒）
@@ -56,14 +56,14 @@ async def cleanup_orphaned_tasks():
                         expired_task_ids.append(task_id)
                         continue
                     
-                    # 检查是否有任务长时间处于 processing 状态（超过10分钟）
+                    # 检查是否有任务长时间处于 processing 状态（超过5分钟）
                     updated_at = datetime.fromisoformat(task.get('updated_at', now.isoformat()))
-                    if task.get('status') == 'processing' and (now - updated_at).total_seconds() > 600:
+                    if task.get('status') == 'processing' and (now - updated_at).total_seconds() > 300:
                         # 标记为超时失败
                         for article in task.get('articles', []):
                             if article.status == 'processing':
                                 article.status = 'failed'
-                                article.error_message = '任务处理超时（超过10分钟无响应）'
+                                article.error_message = '任务处理超时（超过5分钟无响应）'
                         task['status'] = 'failed'
                         task['updated_at'] = now.isoformat()
                         logger.warning(f"任务 {task_id} 因超时被标记为失败")

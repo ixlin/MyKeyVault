@@ -303,9 +303,7 @@ public class AIExtractionService
         string textContent,
         List<string> imageBase64List)
     {
-        var baseUrl = string.IsNullOrEmpty(config.BaseUrl)
-            ? "https://api.deepseek.com"
-            : config.BaseUrl.TrimEnd('/');
+        var baseUrl = ResolveBaseUrl(config);
 
         var endpoint = $"{baseUrl}/chat/completions";
 
@@ -359,7 +357,7 @@ public class AIExtractionService
         if (!response.IsSuccessStatusCode)
         {
             _logger.LogError("AI API 调用失败: {StatusCode}, {Response}", response.StatusCode, responseContent);
-            throw new Exception($"AI API 调用失败: {response.StatusCode} - {responseContent}");
+            throw new Exception(BuildAiErrorMessage(response.StatusCode, responseContent));
         }
 
         // 解析响应
@@ -379,6 +377,77 @@ public class AIExtractionService
         }
 
         return content.GetString() ?? string.Empty;
+    }
+
+    private static string ResolveBaseUrl(AIConfig config)
+    {
+        if (!string.IsNullOrWhiteSpace(config.BaseUrl))
+        {
+            return config.BaseUrl.TrimEnd('/');
+        }
+
+        return config.Provider.Trim().ToLowerInvariant() switch
+        {
+            "openai" => "https://api.openai.com/v1",
+            "deepseek" => "https://api.deepseek.com",
+            _ => throw new InvalidOperationException($"请为 {config.Provider} 配置 API Base URL")
+        };
+    }
+
+    private static string BuildAiErrorMessage(System.Net.HttpStatusCode statusCode, string responseContent)
+    {
+        var detail = ExtractApiErrorMessage(responseContent);
+        var suffix = string.IsNullOrWhiteSpace(detail) ? "" : $"：{detail}";
+
+        return (int)statusCode switch
+        {
+            401 => $"AI API 认证失败，请检查 API Key 或 Base URL{suffix}",
+            403 => $"AI API 无权限访问当前模型，请检查账号权限、模型权限或 Base URL{suffix}",
+            404 => $"AI API 未找到模型或接口，请检查模型名称和 Base URL{suffix}",
+            429 => $"AI API 调用受限，可能是额度不足、限流或模型调用次数用完{suffix}",
+            >= 500 => $"AI API 服务暂时异常，请稍后重试{suffix}",
+            _ => $"AI API 调用失败: {(int)statusCode} {statusCode}{suffix}"
+        };
+    }
+
+    private static string ExtractApiErrorMessage(string responseContent)
+    {
+        if (string.IsNullOrWhiteSpace(responseContent))
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(responseContent);
+            var root = doc.RootElement;
+            if (root.TryGetProperty("error", out var error))
+            {
+                if (error.ValueKind == JsonValueKind.Object &&
+                    error.TryGetProperty("message", out var message))
+                {
+                    return message.GetString() ?? string.Empty;
+                }
+
+                if (error.ValueKind == JsonValueKind.String)
+                {
+                    return error.GetString() ?? string.Empty;
+                }
+            }
+
+            if (root.TryGetProperty("message", out var directMessage))
+            {
+                return directMessage.GetString() ?? string.Empty;
+            }
+        }
+        catch (JsonException)
+        {
+            return responseContent.Length > 500
+                ? responseContent[..500]
+                : responseContent;
+        }
+
+        return string.Empty;
     }
 
     /// <summary>
