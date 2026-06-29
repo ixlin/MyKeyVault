@@ -71,7 +71,7 @@ public class WechatArticle
     public int VideosCount { get; set; } = 0;
 
     /// <summary>
-    /// 状态: pending, processing, completed, failed
+    /// 状态: queued, pending, processing, completed, failed, cancelled
     /// </summary>
     [MaxLength(20)]
     public string Status { get; set; } = "pending";

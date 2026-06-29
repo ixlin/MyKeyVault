@@ -105,6 +105,7 @@
                                                 "processing" => "bg-primary",
                                                 "failed" => "bg-danger",
                                                 "cancelled" => "bg-secondary",
+                                                "queued" => "bg-info",
                                                 _ => "bg-warning"
                                             };
                                             var statusText = article.Status switch
@@ -113,6 +114,7 @@
                                                 "processing" => "进行中",
                                                 "failed" => "失败",
                                                 "cancelled" => "已取消",
+                                                "queued" => "排队中",
                                                 "pending" => "等待中",
                                                 _ => article.Status
                                             };
@@ -321,7 +323,7 @@
             <div class="modal-body">
                 <p>将重新抓取数据库中所有 <strong id="reScrapeTotalCount">0</strong> 个原文链接。</p>
                 <p class="text-muted mb-0">
-                    <i class="bi bi-info-circle"></i> 每批最多 10 个链接，已存在的链接可能会被重复抓取。
+                    <i class="bi bi-info-circle"></i> 系统会先入队，再按限流逐批抓取，不会一次性同时执行全部链接。
                 </p>
             </div>
             <div class="modal-footer">
@@ -355,7 +357,8 @@
                 <div class="d-flex flex-wrap gap-2 mb-2">
                     <span class="badge bg-success">✅ 已完成: <span id="reScrapeProgressCompleted">0</span></span>
                     <span class="badge bg-primary">🔄 进行中: <span id="reScrapeProgressProcessing">0</span></span>
-                    <span class="badge bg-secondary">⏳ 等待中: <span id="reScrapeProgressPending">0</span></span>
+                    <span class="badge bg-info">排队中: <span id="reScrapeProgressQueued">0</span></span>
+                    <span class="badge bg-secondary">等待中: <span id="reScrapeProgressPending">0</span></span>
                     <span class="badge bg-danger">❌ 失败: <span id="reScrapeProgressFailed">0</span></span>
                 </div>
                 <p id="reScrapeProgressStatus" class="text-muted mb-0">正在抓取中...</p>
@@ -388,7 +391,7 @@
 
     // 检查是否有进行中的任务
     function checkAndStartAutoRefresh() {
-        const hasProcessing = document.querySelectorAll('.badge.bg-primary, .badge.bg-warning').length > 0;
+        const hasProcessing = document.querySelectorAll('.badge.bg-primary, .badge.bg-warning, .badge.bg-info').length > 0;
         
         if (hasProcessing && !autoRefreshInterval) {
             console.log('检测到进行中的任务，启动自动刷新（每5秒）');
@@ -560,7 +563,7 @@
 
     // ==================== 批量重新抓取 ====================
     let reScrapeProgressTimer = null;
-    let reScrapeTaskIds = [];
+    let reScrapeArticleIds = [];
 
     async function confirmReScrapeAll() {
         // 先获取总数
@@ -595,7 +598,7 @@
                 return;
             }
 
-            reScrapeTaskIds = data.taskIds || [];
+            reScrapeArticleIds = data.articleIds || [];
             document.getElementById('reScrapeProgressTotal').textContent = data.totalUrls;
             document.getElementById('reScrapeProgressBar').style.width = '0%';
             document.getElementById('reScrapeProgressText').textContent = '0';
@@ -619,10 +622,10 @@
     }
 
     async function pollReScrapeProgress() {
-        if (reScrapeTaskIds.length === 0) return;
+        if (reScrapeArticleIds.length === 0) return;
 
         try {
-            const resp = await fetch('@Url.Action("ReScrapeProgress")?taskIds=' + encodeURIComponent(reScrapeTaskIds.join(',')));
+            const resp = await fetch('@Url.Action("ReScrapeProgress")?articleIds=' + encodeURIComponent(reScrapeArticleIds.join(',')));
             const data = await resp.json();
 
             const finished = data.completed + data.failed + data.cancelled;
@@ -633,6 +636,7 @@
             document.getElementById('reScrapeProgressText').textContent = finished;
             document.getElementById('reScrapeProgressCompleted').textContent = data.completed;
             document.getElementById('reScrapeProgressProcessing').textContent = data.processing;
+            document.getElementById('reScrapeProgressQueued').textContent = data.queued;
             document.getElementById('reScrapeProgressPending').textContent = data.pending;
             document.getElementById('reScrapeProgressFailed').textContent = data.failed;
 

@@ -28,6 +28,26 @@ public class WechatScraperOptions
     /// 每次最多爬取数量
     /// </summary>
     public int MaxArticlesPerRequest { get; set; } = 10;
+
+    /// <summary>
+    /// 批量重抓每个 Python 任务包含的文章数
+    /// </summary>
+    public int BatchArticlesPerTask { get; set; } = 3;
+
+    /// <summary>
+    /// 单用户同时运行的 Python 抓取任务数
+    /// </summary>
+    public int MaxActiveTasksPerUser { get; set; } = 1;
+
+    /// <summary>
+    /// queued/pending 状态超过多少分钟判定为过期
+    /// </summary>
+    public int StalePendingMinutes { get; set; } = 30;
+
+    /// <summary>
+    /// processing 状态超过多少分钟判定为过期
+    /// </summary>
+    public int StaleProcessingMinutes { get; set; } = 20;
 }
 
 /// <summary>
@@ -161,6 +181,13 @@ public class CancelTaskResponseDto
 /// </summary>
 public class WechatScraperService
 {
+    private const string StatusQueued = "queued";
+    private const string StatusPending = "pending";
+    private const string StatusProcessing = "processing";
+    private const string StatusCompleted = "completed";
+    private const string StatusFailed = "failed";
+    private const string StatusCancelled = "cancelled";
+
     private readonly HttpClient _httpClient;
     private readonly ApplicationDbContext _context;
     private readonly WechatScraperOptions _options;
@@ -191,7 +218,8 @@ public class WechatScraperService
     {
         try
         {
-            var response = await _httpClient.GetAsync("/health");
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+            var response = await _httpClient.GetAsync("/health", cts.Token);
             return response.IsSuccessStatusCode;
         }
         catch (Exception ex)
@@ -358,12 +386,42 @@ public class WechatScraperService
         string userId, 
         List<string> urls)
     {
+        var (success, result, error) = await SubmitScrapeTaskToPythonAsync(userId, urls);
+        if (!success || result == null)
+        {
+            return (false, null, error);
+        }
+
+        // 保存文章记录到数据库
+        foreach (var article in result.Articles)
+        {
+            var dbArticle = new WechatArticle
+            {
+                UserId = userId,
+                SourceUrl = article.SourceUrl,
+                ArticleUniqueId = article.ArticleId,
+                TaskId = result.TaskId,
+                Status = StatusPending,
+                CreatedAt = DateTime.UtcNow
+            };
+            _context.WechatArticles.Add(dbArticle);
+        }
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("爬取任务已提交: TaskId={TaskId}, 文章数={Count}", result.TaskId, result.TotalCount);
+
+        return (true, result.TaskId, null);
+    }
+
+    private async Task<(bool success, ScrapeResponseDto? result, string? error)> SubmitScrapeTaskToPythonAsync(
+        string userId,
+        List<string> urls)
+    {
         if (urls.Count > _options.MaxArticlesPerRequest)
         {
             return (false, null, $"每次最多爬取 {_options.MaxArticlesPerRequest} 篇文章");
         }
 
-        // 验证链接
         foreach (var url in urls)
         {
             if (!url.Contains("mp.weixin.qq.com"))
@@ -404,25 +462,7 @@ public class WechatScraperService
                 return (false, null, "解析响应失败");
             }
 
-            // 保存文章记录到数据库
-            foreach (var article in result.Articles)
-            {
-                var dbArticle = new WechatArticle
-                {
-                    UserId = userId,
-                    SourceUrl = article.SourceUrl,
-                    ArticleUniqueId = article.ArticleId,
-                    TaskId = result.TaskId,
-                    Status = "pending",
-                    CreatedAt = DateTime.UtcNow
-                };
-                _context.WechatArticles.Add(dbArticle);
-            }
-            await _context.SaveChangesAsync();
-
-            _logger.LogInformation("爬取任务已提交: TaskId={TaskId}, 文章数={Count}", result.TaskId, result.TotalCount);
-
-            return (true, result.TaskId, null);
+            return (true, result, null);
         }
         catch (HttpRequestException ex)
         {
@@ -539,6 +579,280 @@ public class WechatScraperService
             _logger.LogError(ex, "同步任务状态异常: {TaskId}", taskId);
             return false;
         }
+    }
+
+    /// <summary>
+    /// 同步当前用户处于 pending/processing 的任务状态。
+    /// </summary>
+    public async Task<int> SyncActiveTaskStatusesAsync(string userId, int maxTasks = 50)
+    {
+        var activeTaskIds = await _context.WechatArticles
+            .Where(a => a.UserId == userId
+                        && !string.IsNullOrEmpty(a.TaskId)
+                        && (a.Status == StatusPending || a.Status == StatusProcessing))
+            .GroupBy(a => a.TaskId!)
+            .OrderBy(g => g.Min(a => a.CreatedAt))
+            .Select(g => g.Key)
+            .Take(maxTasks)
+            .ToListAsync();
+
+        if (!activeTaskIds.Any())
+        {
+            return 0;
+        }
+
+        if (!await IsServiceAvailableAsync())
+        {
+            return 0;
+        }
+
+        var synced = 0;
+        foreach (var taskId in activeTaskIds)
+        {
+            var taskStatus = await GetTaskStatusAsync(taskId);
+            if (taskStatus != null)
+            {
+                synced++;
+            }
+        }
+
+        return synced;
+    }
+
+    public async Task<int> CleanupStaleTasksAsync(string userId)
+    {
+        var now = DateTime.UtcNow;
+        var stalePendingBefore = now.AddMinutes(-Math.Max(1, _options.StalePendingMinutes));
+        var staleProcessingBefore = now.AddMinutes(-Math.Max(1, _options.StaleProcessingMinutes));
+        var cleaned = 0;
+
+        var staleQueued = await _context.WechatArticles
+            .Where(a => a.UserId == userId
+                        && a.Status == StatusQueued
+                        && a.CreatedAt < stalePendingBefore)
+            .ToListAsync();
+
+        foreach (var article in staleQueued)
+        {
+            article.Status = StatusFailed;
+            article.ErrorMessage = "排队任务已超时清理，请重新提交";
+            article.CompletedAt = now;
+        }
+
+        cleaned += staleQueued.Count;
+
+        var staleTaskIds = await _context.WechatArticles
+            .Where(a => a.UserId == userId
+                        && !string.IsNullOrEmpty(a.TaskId)
+                        && ((a.Status == StatusPending && a.CreatedAt < stalePendingBefore)
+                            || (a.Status == StatusProcessing && a.CreatedAt < staleProcessingBefore)))
+            .GroupBy(a => a.TaskId!)
+            .Select(g => g.Key)
+            .ToListAsync();
+
+        if (staleTaskIds.Any() && await IsServiceAvailableAsync())
+        {
+            foreach (var taskId in staleTaskIds)
+            {
+                var status = await GetTaskStatusAsync(taskId);
+                if (status != null)
+                {
+                    continue;
+                }
+
+                var staleArticles = await _context.WechatArticles
+                    .Where(a => a.UserId == userId
+                                && a.TaskId == taskId
+                                && (a.Status == StatusPending || a.Status == StatusProcessing))
+                    .ToListAsync();
+
+                foreach (var article in staleArticles)
+                {
+                    article.Status = StatusFailed;
+                    article.ErrorMessage = "任务状态无法确认且已超时，请重新提交";
+                    article.CompletedAt = now;
+                }
+
+                cleaned += staleArticles.Count;
+            }
+        }
+
+        if (cleaned > 0)
+        {
+            await _context.SaveChangesAsync();
+            _logger.LogWarning("已清理 {Count} 个过期微信抓取任务记录，用户: {UserId}", cleaned, userId);
+        }
+
+        return cleaned;
+    }
+
+    public async Task<bool> HasActiveScrapeWorkAsync(string userId)
+    {
+        await CleanupStaleTasksAsync(userId);
+
+        return await _context.WechatArticles
+            .AnyAsync(a => a.UserId == userId
+                           && (a.Status == StatusQueued
+                               || a.Status == StatusPending
+                               || a.Status == StatusProcessing));
+    }
+
+    public async Task<(bool success, List<long> articleIds, int totalUrls, string? error)> QueueReScrapeAllAsync(string userId)
+    {
+        if (await HasActiveScrapeWorkAsync(userId))
+        {
+            return (false, new(), 0, "当前还有抓取任务正在排队或执行，请等完成后再发起批量抓取");
+        }
+
+        var sourceUrls = await _context.WechatArticles
+            .Where(a => a.UserId == userId && !string.IsNullOrEmpty(a.SourceUrl))
+            .OrderByDescending(a => a.CreatedAt)
+            .Select(a => a.SourceUrl)
+            .ToListAsync();
+
+        var distinctUrls = GetDistinctWechatUrls(sourceUrls);
+        if (distinctUrls.Count == 0)
+        {
+            return (false, new(), 0, "没有找到可重新抓取的原文链接");
+        }
+
+        var now = DateTime.UtcNow;
+        var queuedArticles = distinctUrls.Select(url => new WechatArticle
+        {
+            UserId = userId,
+            SourceUrl = url,
+            Status = StatusQueued,
+            CreatedAt = now
+        }).ToList();
+
+        _context.WechatArticles.AddRange(queuedArticles);
+        await _context.SaveChangesAsync();
+
+        var started = await PumpQueuedScrapeTasksAsync(userId);
+        _logger.LogInformation("批量重抓已入队: UserId={UserId}, Total={Total}, StartedTasks={Started}", userId, queuedArticles.Count, started);
+
+        return (true, queuedArticles.Select(a => a.ArticleId).ToList(), queuedArticles.Count, null);
+    }
+
+    public async Task<int> PumpQueuedScrapeTasksAsync(string userId)
+    {
+        await CleanupStaleTasksAsync(userId);
+        await SyncActiveTaskStatusesAsync(userId);
+
+        if (!await IsServiceAvailableAsync())
+        {
+            return 0;
+        }
+
+        var activeTasks = await _context.WechatArticles
+            .Where(a => a.UserId == userId
+                        && !string.IsNullOrEmpty(a.TaskId)
+                        && (a.Status == StatusPending || a.Status == StatusProcessing))
+            .GroupBy(a => a.TaskId!)
+            .CountAsync();
+
+        var slots = Math.Max(0, _options.MaxActiveTasksPerUser - activeTasks);
+        if (slots == 0)
+        {
+            return 0;
+        }
+
+        var started = 0;
+        var batchSize = Math.Clamp(_options.BatchArticlesPerTask, 1, _options.MaxArticlesPerRequest);
+
+        for (var i = 0; i < slots; i++)
+        {
+            var queuedArticles = await _context.WechatArticles
+                .Where(a => a.UserId == userId && a.Status == StatusQueued)
+                .OrderBy(a => a.CreatedAt)
+                .ThenBy(a => a.ArticleId)
+                .Take(batchSize)
+                .ToListAsync();
+
+            if (!queuedArticles.Any())
+            {
+                break;
+            }
+
+            var urls = queuedArticles.Select(a => a.SourceUrl).ToList();
+            var (success, result, error) = await SubmitScrapeTaskToPythonAsync(userId, urls);
+            var now = DateTime.UtcNow;
+
+            if (!success || result == null)
+            {
+                foreach (var article in queuedArticles)
+                {
+                    article.Status = StatusFailed;
+                    article.ErrorMessage = error ?? "提交爬虫服务失败";
+                    article.CompletedAt = now;
+                }
+
+                await _context.SaveChangesAsync();
+                _logger.LogWarning("提交排队抓取批次失败: UserId={UserId}, Count={Count}, Error={Error}", userId, queuedArticles.Count, error);
+                continue;
+            }
+
+            if (result.Articles.Count != queuedArticles.Count)
+            {
+                foreach (var article in queuedArticles)
+                {
+                    article.Status = StatusFailed;
+                    article.ErrorMessage = "爬虫服务返回文章数量不一致，请重新提交";
+                    article.CompletedAt = now;
+                }
+
+                await _context.SaveChangesAsync();
+                _logger.LogWarning(
+                    "爬虫服务返回文章数量不一致: UserId={UserId}, Expected={Expected}, Actual={Actual}, TaskId={TaskId}",
+                    userId,
+                    queuedArticles.Count,
+                    result.Articles.Count,
+                    result.TaskId);
+                continue;
+            }
+
+            for (var index = 0; index < queuedArticles.Count; index++)
+            {
+                var article = queuedArticles[index];
+                var articleResult = result.Articles.ElementAtOrDefault(index);
+
+                article.TaskId = result.TaskId;
+                article.ArticleUniqueId = articleResult?.ArticleId;
+                article.Status = StatusPending;
+                article.ErrorMessage = null;
+                article.CompletedAt = null;
+            }
+
+            await _context.SaveChangesAsync();
+            started++;
+        }
+
+        return started;
+    }
+
+    private static List<string> GetDistinctWechatUrls(IEnumerable<string> urls)
+    {
+        var result = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var url in urls)
+        {
+            if (string.IsNullOrWhiteSpace(url) || !url.Contains("mp.weixin.qq.com"))
+            {
+                continue;
+            }
+
+            var key = TryParseWechatArticleKey(url, out var articleKey)
+                ? $"{articleKey.Type}:{articleKey.Token}:{articleKey.Biz}:{articleKey.Mid}:{articleKey.Idx}"
+                : url.Trim();
+
+            if (seen.Add(key))
+            {
+                result.Add(url.Trim());
+            }
+        }
+
+        return result;
     }
 
     /// <summary>

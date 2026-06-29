@@ -32,6 +32,10 @@
   "WechatScraper": {
     "ServiceUrl": "http://127.0.0.1:5001",
     "OutputPath": "wechat-articles",
-    "MaxArticlesPerRequest": 10
+    "MaxArticlesPerRequest": 10,
+    "BatchArticlesPerTask": 3,
+    "MaxActiveTasksPerUser": 1,
+    "StalePendingMinutes": 30,
+    "StaleProcessingMinutes": 20
   }
 }

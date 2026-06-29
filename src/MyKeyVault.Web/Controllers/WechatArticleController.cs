@@ -68,6 +68,8 @@ public class WechatArticleController : Controller
     {
         var userId = CurrentUserId;
         var pageSize = 20;
+
+        await _scraperService.PumpQueuedScrapeTasksAsync(userId);
         
         var articles = await _scraperService.GetUserArticlesAsync(userId, page, pageSize);
         var totalCount = await _scraperService.GetUserArticleCountAsync(userId);
@@ -95,7 +97,7 @@ public class WechatArticleController : Controller
             totalCount,
             currentPage = page,
             totalPages = (int)Math.Ceiling((double)totalCount / pageSize),
-            hasProcessingTasks = articles.Any(a => a.Status == "processing" || a.Status == "pending")
+            hasProcessingTasks = articles.Any(a => a.Status == "processing" || a.Status == "pending" || a.Status == "queued")
         });
     }
 
@@ -333,6 +335,8 @@ public class WechatArticleController : Controller
     {
         var userId = CurrentUserId;
         var pageSize = 50;
+
+        await _scraperService.PumpQueuedScrapeTasksAsync(userId);
         
         var articles = await _scraperService.GetTaskManagementListAsync(userId, page, pageSize);
         var totalCount = await _scraperService.GetTaskManagementCountAsync(userId);
@@ -836,7 +840,7 @@ public class WechatArticleController : Controller
     #region 批量重新抓取
 
     /// <summary>
-    /// 一键批量重新抓取：查出所有 SourceUrl → 去重 → 分批提交给爬虫
+    /// 一键批量重新抓取：查出所有 SourceUrl → 去重 → 入队后按限流逐批提交给爬虫
     /// </summary>
     [HttpPost]
     [IgnoreAntiforgeryToken]
@@ -845,62 +849,28 @@ public class WechatArticleController : Controller
         var userId = CurrentUserId;
         var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString();
 
-        // 查出所有有 SourceUrl 的文章
-        var allUrls = await _context.WechatArticles
-            .Where(a => a.UserId == userId && !string.IsNullOrEmpty(a.SourceUrl))
-            .Select(a => a.SourceUrl)
-            .Distinct()
-            .ToListAsync();
-
-        if (allUrls.Count == 0)
-        {
-            return BadRequest(new { error = "没有找到可重新抓取的原文链接" });
-        }
-
-        var maxPerBatch = 10;
-        var totalBatches = (int)Math.Ceiling((double)allUrls.Count / maxPerBatch);
-        var submittedTaskIds = new List<string>();
-        var failedUrls = new List<string>();
-
-        for (int i = 0; i < allUrls.Count; i += maxPerBatch)
-        {
-            var batch = allUrls.Skip(i).Take(maxPerBatch).ToList();
-            var (success, taskId, error) = await _scraperService.SubmitScrapeTaskAsync(userId, batch);
-
-            if (success && taskId != null)
-            {
-                submittedTaskIds.Add(taskId);
-            }
-            else
-            {
-                failedUrls.AddRange(batch);
-                _logger.LogWarning("批量抓取第 {Batch} 批提交失败: {Error}", i / maxPerBatch + 1, error);
-            }
-
-            // 批次之间稍等，避免打爆爬虫服务
-            if (i + maxPerBatch < allUrls.Count)
-            {
-                await System.Threading.Tasks.Task.Delay(500);
-            }
-        }
+        var (success, articleIds, totalUrls, error) = await _scraperService.QueueReScrapeAllAsync(userId);
 
         await _scraperService.WriteLogAsync(
             userId,
             "ReScrapeAll",
             null,
-            new { totalUrls = allUrls.Count, batchCount = totalBatches, submittedTaskIds, failedCount = failedUrls.Count },
-            failedUrls.Count == 0 ? "Success" : "PartialSuccess",
-            failedUrls.Count > 0 ? $"有 {failedUrls.Count} 个链接提交失败" : null,
+            new { totalUrls, queuedArticleIds = articleIds },
+            success ? "Success" : "Failed",
+            error,
             clientIp);
+
+        if (!success)
+        {
+            return BadRequest(new { error = error ?? "批量抓取入队失败" });
+        }
 
         return Ok(new
         {
             success = true,
-            totalUrls = allUrls.Count,
-            totalBatches,
-            submittedTasks = submittedTaskIds.Count,
-            failedCount = failedUrls.Count,
-            taskIds = submittedTaskIds
+            totalUrls,
+            queuedCount = articleIds.Count,
+            articleIds
         });
     }
 
@@ -908,53 +878,59 @@ public class WechatArticleController : Controller
     /// 查询批量重新抓取的进度
     /// </summary>
     [HttpGet]
-    public async Task<IActionResult> ReScrapeProgress([FromQuery] string taskIds)
+    public async Task<IActionResult> ReScrapeProgress([FromQuery] string articleIds)
     {
-        if (string.IsNullOrEmpty(taskIds))
+        if (string.IsNullOrEmpty(articleIds))
         {
-            return BadRequest(new { error = "taskIds 不能为空" });
+            return BadRequest(new { error = "articleIds 不能为空" });
         }
 
-        var ids = taskIds.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).ToList();
+        var ids = articleIds
+            .Split(',', StringSplitOptions.RemoveEmptyEntries)
+            .Select(s => long.TryParse(s.Trim(), out var id) ? id : 0)
+            .Where(id => id > 0)
+            .ToList();
+
         if (ids.Count == 0)
         {
-            return BadRequest(new { error = "taskIds 格式错误" });
+            return BadRequest(new { error = "articleIds 格式错误" });
         }
 
         var userId = CurrentUserId;
+        await _scraperService.PumpQueuedScrapeTasksAsync(userId);
+
         var articles = await _context.WechatArticles
-            .Where(a => a.UserId == userId && ids.Contains(a.TaskId))
-            .Select(a => new { a.TaskId, a.Status })
+            .Where(a => a.UserId == userId && ids.Contains(a.ArticleId))
+            .Select(a => new { a.ArticleId, a.Status })
             .ToListAsync();
 
-        var statusMap = articles
-            .GroupBy(a => a.TaskId)
-            .ToDictionary(g => g.Key, g => g.First().Status);
+        int completed = 0, processing = 0, pending = 0, queued = 0, failed = 0, cancelled = 0;
 
-        int completed = 0, processing = 0, pending = 0, failed = 0, cancelled = 0;
-
-        foreach (var id in ids)
+        foreach (var article in articles)
         {
-            var status = statusMap.GetValueOrDefault(id, "unknown");
-            switch (status)
+            switch (article.Status)
             {
                 case "completed": completed++; break;
                 case "processing": processing++; break;
                 case "pending": pending++; break;
+                case "queued": queued++; break;
                 case "failed": failed++; break;
                 case "cancelled": cancelled++; break;
                 default: pending++; break;
             }
         }
 
-        var allFinished = (processing + pending) == 0;
+        var missing = ids.Count(id => articles.All(a => a.ArticleId != id));
+        failed += missing;
+        var allFinished = (processing + pending + queued) == 0;
 
         return Ok(new
         {
-            total = ids.Count,
+            total = articles.Count + missing,
             completed,
             processing,
             pending,
+            queued,
             failed,
             cancelled,
             allFinished
