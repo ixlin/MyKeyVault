@@ -336,7 +336,11 @@ public class WechatArticleController : Controller
         var userId = CurrentUserId;
         var pageSize = 50;
 
-        await _scraperService.PumpQueuedScrapeTasksAsync(userId);
+        var (deletedRecords, deletedDirectories) = await _scraperService.DeleteUnsuccessfulScrapeHistoryAsync(userId);
+        if (deletedRecords > 0 || deletedDirectories > 0)
+        {
+            TempData["Success"] = $"已清理 {deletedRecords} 条未成功抓取记录和 {deletedDirectories} 个文件目录";
+        }
         
         var articles = await _scraperService.GetTaskManagementListAsync(userId, page, pageSize);
         var totalCount = await _scraperService.GetTaskManagementCountAsync(userId);
@@ -377,9 +381,9 @@ public class WechatArticleController : Controller
             return BadRequest(new { error = "请输入有效的微信链接" });
         }
 
-        if (urlList.Count > 10)
+        if (urlList.Count > 1)
         {
-            return BadRequest(new { error = "每次最多提交 10 个链接" });
+            return BadRequest(new { error = "批量抓取已暂时关闭，每次只能提交 1 个链接" });
         }
 
         var (success, taskId, error) = await _scraperService.SubmitScrapeTaskAsync(userId, urlList);
@@ -840,7 +844,7 @@ public class WechatArticleController : Controller
     #region 批量重新抓取
 
     /// <summary>
-    /// 一键批量重新抓取：查出所有 SourceUrl → 去重 → 入队后按限流逐批提交给爬虫
+    /// 一键批量重新抓取已暂时关闭。
     /// </summary>
     [HttpPost]
     [IgnoreAntiforgeryToken]
@@ -849,92 +853,25 @@ public class WechatArticleController : Controller
         var userId = CurrentUserId;
         var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString();
 
-        var (success, articleIds, totalUrls, error) = await _scraperService.QueueReScrapeAllAsync(userId);
-
         await _scraperService.WriteLogAsync(
             userId,
             "ReScrapeAll",
             null,
-            new { totalUrls, queuedArticleIds = articleIds },
-            success ? "Success" : "Failed",
-            error,
+            new { disabled = true },
+            "Disabled",
+            "批量抓取功能已暂时关闭",
             clientIp);
 
-        if (!success)
-        {
-            return BadRequest(new { error = error ?? "批量抓取入队失败" });
-        }
-
-        return Ok(new
-        {
-            success = true,
-            totalUrls,
-            queuedCount = articleIds.Count,
-            articleIds
-        });
+        return StatusCode(StatusCodes.Status410Gone, new { error = "批量抓取功能已暂时关闭" });
     }
 
     /// <summary>
     /// 查询批量重新抓取的进度
     /// </summary>
     [HttpGet]
-    public async Task<IActionResult> ReScrapeProgress([FromQuery] string articleIds)
+    public IActionResult ReScrapeProgress([FromQuery] string articleIds)
     {
-        if (string.IsNullOrEmpty(articleIds))
-        {
-            return BadRequest(new { error = "articleIds 不能为空" });
-        }
-
-        var ids = articleIds
-            .Split(',', StringSplitOptions.RemoveEmptyEntries)
-            .Select(s => long.TryParse(s.Trim(), out var id) ? id : 0)
-            .Where(id => id > 0)
-            .ToList();
-
-        if (ids.Count == 0)
-        {
-            return BadRequest(new { error = "articleIds 格式错误" });
-        }
-
-        var userId = CurrentUserId;
-        await _scraperService.PumpQueuedScrapeTasksAsync(userId);
-
-        var articles = await _context.WechatArticles
-            .Where(a => a.UserId == userId && ids.Contains(a.ArticleId))
-            .Select(a => new { a.ArticleId, a.Status })
-            .ToListAsync();
-
-        int completed = 0, processing = 0, pending = 0, queued = 0, failed = 0, cancelled = 0;
-
-        foreach (var article in articles)
-        {
-            switch (article.Status)
-            {
-                case "completed": completed++; break;
-                case "processing": processing++; break;
-                case "pending": pending++; break;
-                case "queued": queued++; break;
-                case "failed": failed++; break;
-                case "cancelled": cancelled++; break;
-                default: pending++; break;
-            }
-        }
-
-        var missing = ids.Count(id => articles.All(a => a.ArticleId != id));
-        failed += missing;
-        var allFinished = (processing + pending + queued) == 0;
-
-        return Ok(new
-        {
-            total = articles.Count + missing,
-            completed,
-            processing,
-            pending,
-            queued,
-            failed,
-            cancelled,
-            allFinished
-        });
+        return StatusCode(StatusCodes.Status410Gone, new { error = "批量抓取功能已暂时关闭" });
     }
 
     #endregion

@@ -247,7 +247,7 @@ public class WechatScraperService
             // 先用 SQL 做“缩小范围”的筛选，再在内存里做精确解析比对，避免前缀误判。
             var query = _context.WechatArticles
                 .AsNoTracking()
-                .Where(a => a.UserId == userId);
+                .Where(a => a.UserId == userId && a.Status == StatusCompleted);
 
             query = key.Type switch
             {
@@ -489,11 +489,11 @@ public class WechatScraperService
             {
                 _logger.LogWarning("获取任务状态失败: {TaskId}, {StatusCode}", taskId, response.StatusCode);
                 
-                // 如果 Python 服务返回 404，说明任务已丢失（可能是服务重启）
-                // 需要将数据库中仍处于 pending/processing 的文章标记为失败
+                // 如果 Python 服务返回 404，说明任务已丢失（可能是服务重启）。
+                // 失败任务不再保留历史记录，直接清理数据库记录和已下载目录。
                 if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
                 {
-                    await MarkOrphanedArticlesAsFailedAsync(taskId);
+                    await DeleteOrphanedArticlesAsync(taskId);
                 }
                 return null;
             }
@@ -522,9 +522,9 @@ public class WechatScraperService
     }
 
     /// <summary>
-    /// 将孤立的文章（Python 服务中找不到对应任务）标记为失败
+    /// 删除孤立的文章（Python 服务中找不到对应任务）
     /// </summary>
-    private async Task MarkOrphanedArticlesAsFailedAsync(string taskId)
+    private async Task DeleteOrphanedArticlesAsync(string taskId)
     {
         try
         {
@@ -537,19 +537,13 @@ public class WechatScraperService
                 return;
             }
 
-            foreach (var article in orphanedArticles)
-            {
-                article.Status = "failed";
-                article.ErrorMessage = "任务已丢失（爬虫服务可能已重启），请重新提交";
-                article.CompletedAt = DateTime.UtcNow;
-            }
+            await DeleteArticleRecordsAndDirectoriesAsync(orphanedArticles);
 
-            await _context.SaveChangesAsync();
-            _logger.LogWarning("已将 {Count} 个孤立文章标记为失败: TaskId={TaskId}", orphanedArticles.Count, taskId);
+            _logger.LogWarning("已删除 {Count} 个孤立微信抓取记录: TaskId={TaskId}", orphanedArticles.Count, taskId);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "标记孤立文章失败: {TaskId}", taskId);
+            _logger.LogError(ex, "删除孤立文章失败: {TaskId}", taskId);
         }
     }
 
@@ -632,14 +626,8 @@ public class WechatScraperService
                         && a.CreatedAt < stalePendingBefore)
             .ToListAsync();
 
-        foreach (var article in staleQueued)
-        {
-            article.Status = StatusFailed;
-            article.ErrorMessage = "排队任务已超时清理，请重新提交";
-            article.CompletedAt = now;
-        }
-
         cleaned += staleQueued.Count;
+        await DeleteArticleRecordsAndDirectoriesAsync(staleQueued, saveChanges: false);
 
         var staleTaskIds = await _context.WechatArticles
             .Where(a => a.UserId == userId
@@ -666,14 +654,8 @@ public class WechatScraperService
                                 && (a.Status == StatusPending || a.Status == StatusProcessing))
                     .ToListAsync();
 
-                foreach (var article in staleArticles)
-                {
-                    article.Status = StatusFailed;
-                    article.ErrorMessage = "任务状态无法确认且已超时，请重新提交";
-                    article.CompletedAt = now;
-                }
-
                 cleaned += staleArticles.Count;
+                await DeleteArticleRecordsAndDirectoriesAsync(staleArticles, saveChanges: false);
             }
         }
 
@@ -860,6 +842,8 @@ public class WechatScraperService
     /// </summary>
     private async Task UpdateArticleStatusAsync(TaskStatusResponseDto taskStatus)
     {
+        var articlesToDelete = new List<WechatArticle>();
+
         foreach (var articleDto in taskStatus.Articles)
         {
             var dbArticle = await _context.WechatArticles
@@ -867,6 +851,12 @@ public class WechatScraperService
             
             if (dbArticle != null)
             {
+                if (articleDto.Status == StatusFailed || articleDto.Status == StatusCancelled)
+                {
+                    articlesToDelete.Add(dbArticle);
+                    continue;
+                }
+
                 dbArticle.Title = articleDto.Title;
                 dbArticle.Author = articleDto.Author;
                 dbArticle.PublishTime = articleDto.PublishTime;
@@ -877,13 +867,14 @@ public class WechatScraperService
                 dbArticle.Status = articleDto.Status;
                 dbArticle.ErrorMessage = articleDto.ErrorMessage;
                 
-                if (articleDto.Status == "completed" || articleDto.Status == "failed")
+                if (articleDto.Status == StatusCompleted)
                 {
                     dbArticle.CompletedAt = DateTime.UtcNow;
                 }
             }
         }
 
+        await DeleteArticleRecordsAndDirectoriesAsync(articlesToDelete, saveChanges: false);
         await _context.SaveChangesAsync();
     }
 
@@ -893,7 +884,7 @@ public class WechatScraperService
     public async Task<List<WechatArticle>> GetUserArticlesAsync(string userId, int page = 1, int pageSize = 20)
     {
         return await _context.WechatArticles
-            .Where(a => a.UserId == userId)
+            .Where(a => a.UserId == userId && a.Status == StatusCompleted)
             .OrderByDescending(a => a.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
@@ -907,7 +898,7 @@ public class WechatScraperService
     public async Task<int> GetUserArticleCountAsync(string userId)
     {
         return await _context.WechatArticles
-            .Where(a => a.UserId == userId)
+            .Where(a => a.UserId == userId && a.Status == StatusCompleted)
             .CountAsync();
     }
 
@@ -1255,7 +1246,7 @@ public class WechatScraperService
     public async Task<List<WechatArticle>> GetTaskManagementListAsync(string userId, int page = 1, int pageSize = 50)
     {
         return await _context.WechatArticles
-            .Where(a => a.UserId == userId)
+            .Where(a => a.UserId == userId && a.Status == StatusCompleted)
             .OrderByDescending(a => a.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
@@ -1269,8 +1260,134 @@ public class WechatScraperService
     public async Task<int> GetTaskManagementCountAsync(string userId)
     {
         return await _context.WechatArticles
-            .Where(a => a.UserId == userId)
+            .Where(a => a.UserId == userId && a.Status == StatusCompleted)
             .CountAsync();
+    }
+
+    /// <summary>
+    /// 清理微信抓取历史：只保留成功抓取的文章记录和对应目录。
+    /// </summary>
+    public async Task<(int deletedRecords, int deletedDirectories)> DeleteUnsuccessfulScrapeHistoryAsync(string userId)
+    {
+        var articles = await _context.WechatArticles
+            .Where(a => a.UserId == userId && a.Status != StatusCompleted)
+            .ToListAsync();
+
+        var deletedDirectories = await DeleteArticleRecordsAndDirectoriesAsync(articles, saveChanges: false);
+
+        var completedArticleIds = await _context.WechatArticles
+            .Where(a => a.UserId == userId
+                        && a.Status == StatusCompleted
+                        && !string.IsNullOrEmpty(a.ArticleUniqueId))
+            .Select(a => a.ArticleUniqueId!)
+            .ToListAsync();
+
+        deletedDirectories += DeleteUnreferencedArticleDirectories(userId, completedArticleIds);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "微信抓取历史清理完成: UserId={UserId}, DeletedRecords={DeletedRecords}, DeletedDirectories={DeletedDirectories}",
+            userId,
+            articles.Count,
+            deletedDirectories);
+
+        return (articles.Count, deletedDirectories);
+    }
+
+    private async Task<int> DeleteArticleRecordsAndDirectoriesAsync(List<WechatArticle> articles, bool saveChanges = true)
+    {
+        if (!articles.Any())
+        {
+            return 0;
+        }
+
+        var articleIds = articles.Select(a => a.ArticleId).ToList();
+        var extractions = await _context.WechatArticleExtractions
+            .Where(e => articleIds.Contains(e.ArticleId))
+            .ToListAsync();
+
+        var deletedDirectories = 0;
+        foreach (var article in articles)
+        {
+            if (DeleteArticleDirectory(article))
+            {
+                deletedDirectories++;
+            }
+        }
+
+        if (extractions.Any())
+        {
+            _context.WechatArticleExtractions.RemoveRange(extractions);
+        }
+
+        _context.WechatArticles.RemoveRange(articles);
+
+        if (saveChanges)
+        {
+            await _context.SaveChangesAsync();
+        }
+
+        return deletedDirectories;
+    }
+
+    private bool DeleteArticleDirectory(WechatArticle article)
+    {
+        if (string.IsNullOrEmpty(article.ArticleUniqueId))
+        {
+            return false;
+        }
+
+        var folderPath = Path.Combine(_env.WebRootPath, _options.OutputPath, article.UserId, article.ArticleUniqueId);
+        if (!Directory.Exists(folderPath))
+        {
+            return false;
+        }
+
+        try
+        {
+            Directory.Delete(folderPath, recursive: true);
+            _logger.LogInformation("已删除微信文章目录: {Path}", folderPath);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "删除微信文章目录失败: {Path}", folderPath);
+            return false;
+        }
+    }
+
+    private int DeleteUnreferencedArticleDirectories(string userId, IReadOnlyCollection<string> completedArticleIds)
+    {
+        var userOutputDirectory = Path.Combine(_env.WebRootPath, _options.OutputPath, userId);
+        if (!Directory.Exists(userOutputDirectory))
+        {
+            return 0;
+        }
+
+        var keep = new HashSet<string>(completedArticleIds, StringComparer.OrdinalIgnoreCase);
+        var deletedDirectories = 0;
+
+        foreach (var directory in Directory.EnumerateDirectories(userOutputDirectory))
+        {
+            var articleUniqueId = Path.GetFileName(directory);
+            if (keep.Contains(articleUniqueId))
+            {
+                continue;
+            }
+
+            try
+            {
+                Directory.Delete(directory, recursive: true);
+                deletedDirectories++;
+                _logger.LogInformation("已删除未引用的微信文章目录: {Path}", directory);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "删除未引用的微信文章目录失败: {Path}", directory);
+            }
+        }
+
+        return deletedDirectories;
     }
 
     /// <summary>
