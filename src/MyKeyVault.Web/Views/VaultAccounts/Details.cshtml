@@ -18,7 +18,12 @@
         <dd class="col-sm-9" style="padding:0.6rem 0;">@Model.AccountNameEncrypted</dd>
 
         <dt class="col-sm-3" style="color:var(--mkv-text-muted);font-size:0.85rem;font-weight:600;padding:0.6rem 0;">密码</dt>
-        <dd class="col-sm-9" style="padding:0.6rem 0;">@Model.PasswordEncrypted</dd>
+        <dd class="col-sm-9" style="padding:0.6rem 0;">
+          <span id="password-display" class="mkv-password-mask">••••••••</span>
+          <span id="password-value" class="d-none">@Model.PasswordEncrypted</span>
+          <button id="toggle-password" type="button" class="mkv-btn-quiet ms-2">显示</button>
+          <button id="copy-password" type="button" class="mkv-btn-quiet">复制</button>
+        </dd>
 
         <dt class="col-sm-3" style="color:var(--mkv-text-muted);font-size:0.85rem;font-weight:600;padding:0.6rem 0;">备注</dt>
         <dd class="col-sm-9" style="padding:0.6rem 0;white-space:pre-wrap;">@Model.NoteEncrypted</dd>
@@ -49,3 +54,29 @@
     </div>
   </div>
 </div>
+
+@section Scripts {
+<script>
+  (function () {
+    const display = document.getElementById('password-display');
+    const value = document.getElementById('password-value').textContent;
+    const toggle = document.getElementById('toggle-password');
+    let visible = false;
+    toggle.addEventListener('click', function () {
+      visible = !visible;
+      display.textContent = visible ? value : '••••••••';
+      display.classList.toggle('mkv-password-mask', !visible);
+      toggle.textContent = visible ? '隐藏' : '显示';
+    });
+    document.getElementById('copy-password').addEventListener('click', async function (event) {
+      try {
+        await navigator.clipboard.writeText(value);
+        event.currentTarget.textContent = '已复制';
+        setTimeout(() => event.currentTarget.textContent = '复制', 1600);
+      } catch {
+        event.currentTarget.textContent = '复制失败';
+      }
+    });
+  })();
+</script>
+}

@@ -4,8 +4,9 @@
 }
 <div class="row justify-content-center">
   <div class="col-md-8">
-    <div style="background:#fff;border-radius:16px;padding:2rem;box-shadow:var(--mkv-shadow-lg);">
-      <h2 class="fw-bold mb-3" style="color:var(--mkv-navy);">✏️ @ViewData["Title"]</h2>
+    <div class="mkv-form-card">
+      <h2 class="mb-3">编辑账号</h2>
+      <p class="mkv-page-description mb-4">更新后会立即反映在账号库中。</p>
       <form asp-action="Edit" method="post">
         <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
         <input type="hidden" asp-for="AccountId" />

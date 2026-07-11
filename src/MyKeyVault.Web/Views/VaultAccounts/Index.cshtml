@@ -4,9 +4,12 @@
 }
 <form id="af-form" class="d-none">@Html.AntiForgeryToken()</form>
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h2 class="fw-bold" style="color:var(--mkv-navy)">📋 @ViewData["Title"]</h2>
-    <a class="mkv-btn-primary" asp-action="Create" style="padding:0.5rem 1.5rem;font-size:0.9rem;">+ 新增账号</a>
+<div class="mkv-page-header">
+    <div>
+        <h1 class="mkv-page-heading">账号库</h1>
+        <p class="mkv-page-description">查找、整理并维护你的常用登录信息。</p>
+    </div>
+    <a class="mkv-btn-primary" asp-action="Create">+ 新增账号</a>
 </div>
 
 @{
@@ -17,37 +20,38 @@
 
 @if (allTags != null)
 {
-<div class="mb-3" style="display:flex;flex-wrap:wrap;gap:6px;">
+<div class="mb-3 d-flex flex-wrap gap-2 align-items-center">
     <a href="@Url.Action("Index", new { q = ViewData["q"], tagId = (long?)null })"
-       style="padding:0.35rem 0.9rem;border-radius:20px;font-size:0.82rem;font-weight:600;text-decoration:none;@(currentTagId==null?"background:var(--mkv-gold);color:var(--mkv-navy)":"background:#fff;color:var(--mkv-text-muted);border:1px solid var(--mkv-border)")">
+       class="mkv-chip @(currentTagId == null ? "is-active" : "")">
         全部
     </a>
     @foreach (var t in allTags)
     {
         var c = (counts!=null && counts.ContainsKey(t.TagId)) ? counts[t.TagId] : 0;
         <a href="@Url.Action("Index", new { q = ViewData["q"], tagId = t.TagId })"
-           style="padding:0.35rem 0.9rem;border-radius:20px;font-size:0.82rem;font-weight:600;text-decoration:none;@(currentTagId==t.TagId?"background:var(--mkv-gold);color:var(--mkv-navy)":"background:#fff;color:var(--mkv-text-muted);border:1px solid var(--mkv-border)")">
+           class="mkv-chip @(currentTagId == t.TagId ? "is-active" : "")">
             @t.TagName <span style="opacity:0.6">@c</span>
         </a>
     }
 </div>
 }
 
-<form class="row g-2 align-items-end mb-3" style="background:#fff;padding:1rem;border-radius:var(--mkv-radius);box-shadow:var(--mkv-shadow);">
-    <div class="col-auto" style="flex:1;min-width:180px;">
-        <label style="font-size:0.75rem;color:var(--mkv-text-muted);margin-bottom:2px;">搜索</label>
-        <input type="text" name="q" value="@ViewData["q"]" class="form-control" placeholder="标题 / URL" style="border-radius:8px;border:1.5px solid var(--mkv-border);">
+<form class="mkv-panel mkv-panel-body mkv-toolbar mb-3">
+    <div class="mkv-field" style="flex:1 1 220px;">
+        <label>搜索</label>
+        <input type="text" name="q" value="@ViewData["q"]" class="form-control" placeholder="搜索标题或网址">
     </div>
-    <div class="col-auto">
-        <label style="font-size:0.75rem;color:var(--mkv-text-muted);margin-bottom:2px;">开始日期</label>
-        <input type="date" name="createdFrom" value="@ViewData["createdFrom"]" class="form-control" style="border-radius:8px;border:1.5px solid var(--mkv-border);">
+    <div class="mkv-field">
+        <label>开始日期</label>
+        <input type="date" name="createdFrom" value="@ViewData["createdFrom"]" class="form-control">
     </div>
-    <div class="col-auto">
-        <label style="font-size:0.75rem;color:var(--mkv-text-muted);margin-bottom:2px;">结束日期</label>
-        <input type="date" name="createdTo" value="@ViewData["createdTo"]" class="form-control" style="border-radius:8px;border:1.5px solid var(--mkv-border);">
+    <div class="mkv-field">
+        <label>结束日期</label>
+        <input type="date" name="createdTo" value="@ViewData["createdTo"]" class="form-control">
     </div>
-    <div class="col-auto">
-        <button class="mkv-btn-primary" type="submit" style="padding:0.45rem 1.2rem;font-size:0.85rem;">🔍 搜索</button>
+    <div class="d-flex gap-2">
+        <button class="mkv-btn-primary" type="submit">搜索</button>
+        <a class="mkv-btn-secondary" asp-controller="Tags" asp-action="Index">管理标签</a>
     </div>
 </form>
 
@@ -62,14 +66,14 @@
 
 <div class="d-flex justify-content-between mb-2" style="gap:8px;">
     <div>
-        <button type="submit" class="btn btn-sm" style="background:var(--mkv-danger);color:#fff;border-radius:8px;" onclick="return confirm('确定批量删除选中的账号？此操作不可恢复。');" disabled id="bulkDeleteBtn">🗑 批量删除</button>
-        <button type="button" class="btn btn-sm" style="border:1.5px solid var(--mkv-border);border-radius:8px;color:var(--mkv-text-muted);" id="selectAllBtn">全选</button>
-        <button type="button" class="btn btn-sm" style="border:1.5px solid var(--mkv-border);border-radius:8px;color:var(--mkv-text-muted);" id="invertSelectBtn">反选</button>
+        <button type="submit" class="mkv-btn-danger" onclick="return confirm('确定批量删除选中的账号？此操作不可恢复。');" disabled id="bulkDeleteBtn">删除所选</button>
+        <button type="button" class="mkv-btn-quiet" id="selectAllBtn">全选</button>
+        <button type="button" class="mkv-btn-quiet" id="invertSelectBtn">反选</button>
     </div>
 </div>
 
-<div class="table-responsive">
-<table class="table" style="background:#fff;border-radius:var(--mkv-radius);overflow:hidden;box-shadow:var(--mkv-shadow);">
+<div class="table-responsive mkv-panel">
+<table class="table mkv-data-table">
     <thead style="background:var(--mkv-bg);">
         <tr>
             <th style="width:40px;">#</th>
@@ -79,7 +83,7 @@
             }
             <a href="@Url.Action("Index", new { q=ViewData["q"], tagId=ViewData["tagId"], createdFrom=ViewData["createdFrom"], createdTo=ViewData["createdTo"], sort="title", dir=sort=="title"&&dir=="asc"?"desc":"asc" })" style="color:var(--mkv-navy);text-decoration:none;">标题</a></th>
             <th>URL</th>
-            <th>账号</th>
+            <th>登录账号</th>
             <th>密码</th>
             <th><a href="@Url.Action("Index", new { q=ViewData["q"], tagId=ViewData["tagId"], createdFrom=ViewData["createdFrom"], createdTo=ViewData["createdTo"], sort="created", dir=sort=="created"&&dir=="asc"?"desc":"asc" })" style="color:var(--mkv-navy);text-decoration:none;">创建</a></th>
             <th><a href="@Url.Action("Index", new { q=ViewData["q"], tagId=ViewData["tagId"], createdFrom=ViewData["createdFrom"], createdTo=ViewData["createdTo"], sort="updated", dir=sort=="updated"&&dir=="asc"?"desc":"asc" })" style="color:var(--mkv-navy);text-decoration:none;">修改</a></th>
@@ -90,18 +94,18 @@
     @foreach (var item in Model)
     {
         <tr>
-            <td><input type="checkbox" name="selectedIds" value="@item.AccountId" class="sel-chk" /></td>
-            <td style="font-weight:600;color:var(--mkv-navy);">@item.Title</td>
-            <td style="color:var(--mkv-text-muted);font-size:0.85rem;">@item.Url</td>
-            <td>@item.AccountNameEncrypted</td>
-            <td>@item.PasswordEncrypted</td>
-            <td style="font-size:0.82rem;color:var(--mkv-text-muted);">@item.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd")</td>
-            <td style="font-size:0.82rem;color:var(--mkv-text-muted);">@item.UpdatedAt.ToLocalTime().ToString("yyyy-MM-dd")</td>
-            <td>
+            <td data-label=""><input type="checkbox" name="selectedIds" value="@item.AccountId" class="sel-chk" aria-label="选择 @item.Title" /></td>
+            <td data-label="标题" style="font-weight:600;color:var(--mkv-navy);">@item.Title</td>
+            <td data-label="网址" style="color:var(--mkv-text-muted);font-size:0.85rem;">@item.Url</td>
+            <td data-label="登录账号">@item.AccountNameEncrypted</td>
+            <td data-label="密码"><span class="mkv-password-mask" title="密码在详情页中查看">••••••••</span></td>
+            <td data-label="创建" style="font-size:0.82rem;color:var(--mkv-text-muted);">@item.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd")</td>
+            <td data-label="修改" style="font-size:0.82rem;color:var(--mkv-text-muted);">@item.UpdatedAt.ToLocalTime().ToString("yyyy-MM-dd")</td>
+            <td data-label="操作">
                 <div style="display:flex;gap:4px;">
-                    <a class="btn btn-sm" style="border:1.5px solid var(--mkv-border);border-radius:8px;color:var(--mkv-text-muted);" asp-action="Details" asp-route-id="@item.AccountId">详情</a>
-                    <a class="btn btn-sm" style="background:var(--mkv-gold-light);border-radius:8px;color:var(--mkv-gold);font-weight:600;" asp-action="Edit" asp-route-id="@item.AccountId">编辑</a>
-                    <a class="btn btn-sm" style="border:1.5px solid var(--mkv-danger);border-radius:8px;color:var(--mkv-danger);" asp-action="Delete" asp-route-id="@item.AccountId">删除</a>
+                    <a class="mkv-btn-secondary" asp-action="Details" asp-route-id="@item.AccountId">详情</a>
+                    <a class="mkv-btn-quiet" asp-action="Edit" asp-route-id="@item.AccountId">编辑</a>
+                    <a class="mkv-btn-danger" asp-action="Delete" asp-route-id="@item.AccountId">删除</a>
                 </div>
             </td>
         </tr>

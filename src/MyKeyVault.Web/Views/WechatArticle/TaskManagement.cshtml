@@ -7,46 +7,41 @@
     var serviceAvailable = (bool)ViewBag.ServiceAvailable;
 }
 
-<div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2><i class="bi bi-list-task"></i> 抓取任务管理</h2>
+<div class="mkv-app-shell">
+    <div class="mkv-page-header">
         <div>
-            <a asp-action="Index" class="btn btn-outline-secondary me-2">
-                <i class="bi bi-arrow-left"></i> 返回文章列表
-            </a>
+            <h1 class="mkv-page-heading">任务与抓取</h1>
+            <p class="mkv-page-description">提交公众号链接，跟踪抓取进度，并在完成后进入文章管理。</p>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <a asp-action="Index" class="mkv-btn-secondary">文章列表</a>
             @if (serviceAvailable)
             {
-                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createTaskModal">
-                    <i class="bi bi-plus-circle"></i> 新建任务
-                </button>
+                <button type="button" class="mkv-btn-primary" data-bs-toggle="modal" data-bs-target="#createTaskModal">新建任务</button>
             }
             else
             {
-                <button type="button" class="btn btn-secondary" disabled title="爬虫服务不可用">
-                    <i class="bi bi-plus-circle"></i> 新建任务
-                </button>
+                <button type="button" class="mkv-btn-secondary" disabled title="爬虫服务不可用">新建任务</button>
             }
         </div>
     </div>
 
     @if (!serviceAvailable)
     {
-        <div class="alert alert-warning">
-            <i class="bi bi-exclamation-triangle"></i> Python 爬虫服务当前不可用，无法创建新任务。请检查服务是否已启动。
+        <div class="mkv-panel mb-3" style="border-color:#F59E0B;background:#FFFBEB;">
+            <div class="mkv-panel-body" style="color:#92400E;">爬虫服务当前不可用，暂时无法创建新任务。请稍后重试。</div>
         </div>
     }
 
-    <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <span><i class="bi bi-table"></i> 任务列表 (共 @totalCount 条)</span>
-            <button type="button" class="btn btn-sm btn-outline-primary" onclick="refreshList()">
-                <i class="bi bi-arrow-clockwise"></i> 刷新
-            </button>
+    <div class="mkv-panel">
+        <div class="mkv-panel-body d-flex justify-content-between align-items-center">
+            <span class="fw-semibold">任务列表 · 共 @totalCount 条</span>
+            <button type="button" class="mkv-btn-quiet" onclick="refreshList()">刷新</button>
         </div>
-        <div class="card-body p-0">
+        <div class="p-0">
             <div class="table-responsive">
-                <table class="table table-hover table-striped mb-0">
-                    <thead class="table-light">
+                <table class="table mkv-data-table mb-0">
+                    <thead>
                         <tr>
                             <th style="width: 80px;">数据库ID</th>
                             <th style="width: 200px;">Python Task ID</th>

@@ -597,6 +597,7 @@ public class WechatArticleController : Controller
     /// <summary>
     /// AI 配置页面
     /// </summary>
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> AIConfig()
     {
         var userId = CurrentUserId;
@@ -615,6 +616,7 @@ public class WechatArticleController : Controller
     /// </summary>
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> AIConfig(Models.AIConfig config)
     {
         var userId = CurrentUserId;

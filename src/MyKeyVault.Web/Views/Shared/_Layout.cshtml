@@ -8,6 +8,10 @@
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/MyKeyVault.Web.styles.css" asp-append-version="true" />
 </head>
+@{
+    var isSignedIn = User?.Identity?.IsAuthenticated == true;
+    var isAdmin = isSignedIn && (User?.IsInRole("Admin") == true);
+}
 <body>
     <header>
         <nav class="navbar navbar-expand-sm navbar-dark mkv-navbar">
@@ -22,23 +26,21 @@
                 </button>
                 <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
                     <ul class="navbar-nav flex-grow-1">
-                        <li class="nav-item">
-                            <a class="nav-link" asp-area="" asp-controller="Home" asp-action="Index">首页</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" asp-area="" asp-controller="VaultAccounts" asp-action="Index">账号管理</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" asp-area="" asp-controller="Tags" asp-action="Index">标签</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" asp-area="" asp-controller="WechatArticle" asp-action="Index">微信图文</a>
-                        </li>
-                        @if (User?.Identity?.IsAuthenticated == true && User.IsInRole("Admin"))
+                        @if (isSignedIn)
                         {
-                            <li class="nav-item">
-                                <a class="nav-link" asp-controller="TushareManagement" asp-action="Apps">上市公司数据</a>
-                            </li>
+                            <li class="nav-item"><a class="nav-link" asp-area="" asp-controller="Home" asp-action="Index">概览</a></li>
+                            <li class="nav-item"><a class="nav-link" asp-area="" asp-controller="VaultAccounts" asp-action="Index">账号库</a></li>
+                            <li class="nav-item"><a class="nav-link" asp-area="" asp-controller="WechatArticle" asp-action="Index">微信图文</a></li>
+                            @if (isAdmin)
+                            {
+                                <li class="nav-item dropdown">
+                                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">管理与数据</a>
+                                    <ul class="dropdown-menu dropdown-menu-dark">
+                                        <li><a class="dropdown-item" asp-controller="TushareManagement" asp-action="Apps">上市公司数据</a></li>
+                                        <li><a class="dropdown-item" asp-controller="WechatArticle" asp-action="AIConfig">微信图文配置</a></li>
+                                    </ul>
+                                </li>
+                            }
                         }
                     </ul>
                     <partial name="_LoginPartial" />
@@ -47,7 +49,7 @@
         </nav>
     </header>
 
-    <div class="container-fluid px-4 py-3">
+    <div class="container-fluid px-4 py-3 mkv-app-shell">
         <main role="main">
             @RenderBody()
         </main>

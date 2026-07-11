@@ -1,9 +1,9 @@
-/* SAP Fiori-inspired styles for Tushare Management */
+/* Admin data workspace, aligned with the MyKeyVault design system. */
 
 .sap-page {
-    background-color: #f7f7f7;
-    min-height: 100vh;
-    padding: 20px 0;
+    background-color: var(--mkv-bg);
+    min-height: calc(100vh - 120px);
+    padding: 8px 0 20px;
 }
 
 .sap-shell-header {
@@ -24,32 +24,33 @@
 
 .sap-object-page {
     background: #fff;
-    border-radius: 4px;
-    box-shadow: 0 0 0 1px rgba(0,0,0,0.1);
+    border-radius: var(--mkv-radius);
+    border: 1px solid var(--mkv-border);
+    box-shadow: var(--mkv-shadow);
     margin-bottom: 1rem;
 }
 
 .sap-object-header {
-    padding: 1.5rem 2rem;
-    border-bottom: 1px solid #e5e5e5;
+    padding: 1.35rem 1.5rem;
+    border-bottom: 1px solid var(--mkv-border);
 }
 
 .sap-object-header h2 {
-    font-size: 20px;
-    font-weight: 400;
+    font-size: 1.4rem;
+    font-weight: 750;
     margin: 0 0 0.5rem 0;
-    color: #32363a;
+    color: var(--mkv-navy);
 }
 
 .sap-object-header .subtitle {
     font-size: 14px;
-    color: #6a6d70;
+    color: var(--mkv-text-muted);
 }
 
 .sap-toolbar {
-    padding: 0.75rem 2rem;
-    background: #fafafa;
-    border-bottom: 1px solid #e5e5e5;
+    padding: 0.75rem 1.5rem;
+    background: #fff;
+    border-bottom: 1px solid var(--mkv-border);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -90,36 +91,36 @@
     font-size: 14px;
     font-weight: 400;
     border-radius: 4px;
-    border: 1px solid #0854a0;
-    background: #0854a0;
-    color: #fff;
+    border: 1px solid var(--mkv-gold);
+    background: var(--mkv-gold);
+    color: var(--mkv-navy);
     text-decoration: none;
     cursor: pointer;
     transition: all 0.15s;
 }
 
 .sap-button:hover {
-    background: #0a5eaf;
-    border-color: #0a5eaf;
-    color: #fff;
+    background: var(--mkv-gold-hover);
+    border-color: var(--mkv-gold-hover);
+    color: var(--mkv-navy);
 }
 
 .sap-button-secondary {
     background: #fff;
-    color: #0854a0;
-    border-color: #0854a0;
+    color: var(--mkv-text);
+    border-color: var(--mkv-border);
 }
 
 .sap-button.sap-button-secondary:hover {
-    background: #ebf5fe;
-    color: #0854a0 !important;
+    background: var(--mkv-gold-light);
+    color: var(--mkv-navy) !important;
     font-weight: 600;
 }
 
 /* 确保内部文字元素也不被其他规则改为白色 */
 .sap-button.sap-button-secondary:hover *,
 .sap-button.sap-button-secondary:focus * {
-    color: #0854a0 !important;
+    color: var(--mkv-navy) !important;
 }
 
 .sap-button-danger {
@@ -143,7 +144,7 @@
     padding: 0.25rem 0.5rem;
     font-size: 12px;
     font-weight: 600;
-    border-radius: 4px;
+    border-radius: var(--mkv-radius);
     text-transform: uppercase;
 }
 
@@ -193,8 +194,8 @@
 
 .sap-card {
     background: #fff;
-    border: 1px solid #e5e5e5;
-    border-radius: 4px;
+    border: 1px solid var(--mkv-border);
+    border-radius: var(--mkv-radius);
     padding: 1.5rem;
     margin-bottom: 1rem;
 }
@@ -203,7 +204,7 @@
     font-size: 16px;
     font-weight: 600;
     margin-bottom: 1rem;
-    color: #32363a;
+    color: var(--mkv-navy);
 }
 
 .sap-stats-grid {
@@ -214,8 +215,8 @@
 
 .sap-stat-card {
     background: #fff;
-    border: 1px solid #e5e5e5;
-    border-radius: 4px;
+    border: 1px solid var(--mkv-border);
+    border-radius: var(--mkv-radius);
     padding: 1.5rem;
     text-align: center;
 }
@@ -223,13 +224,13 @@
 .sap-stat-value {
     font-size: 32px;
     font-weight: 300;
-    color: #0854a0;
+    color: var(--mkv-gold);
     margin-bottom: 0.5rem;
 }
 
 .sap-stat-label {
     font-size: 14px;
-    color: #6a6d70;
+    color: var(--mkv-text-muted);
 }
 
 .sap-pagination {
@@ -243,19 +244,23 @@
 .sap-pagination a,
 .sap-pagination span {
     padding: 0.5rem 0.75rem;
-    border: 1px solid #e5e5e5;
-    border-radius: 4px;
+    border: 1px solid var(--mkv-border);
+    border-radius: 8px;
     text-decoration: none;
-    color: #32363a;
+    color: var(--mkv-text);
     font-size: 14px;
 }
 
 .sap-pagination a:hover {
-    background: #f7f7f7;
+    background: var(--mkv-bg);
 }
 
 .sap-pagination .active {
-    background: #0854a0;
-    color: #fff;
-    border-color: #0854a0;
+    background: var(--mkv-gold);
+    color: var(--mkv-navy);
+    border-color: var(--mkv-gold);
 }
+
+.sap-section-nav { display:flex; flex-wrap:wrap; gap:.45rem; margin:0 0 1rem; }
+.sap-section-nav a { padding:.45rem .8rem; border:1px solid var(--mkv-border); border-radius:999px; color:var(--mkv-text-muted); background:#fff; font-size:.82rem; font-weight:650; text-decoration:none; }
+.sap-section-nav a:hover { border-color:var(--mkv-gold); color:var(--mkv-navy); }

@@ -27,6 +27,54 @@ body {
   color: var(--mkv-text);
 }
 
+/* ─── Shared application components ─── */
+.mkv-app-shell { max-width: 1440px; margin: 0 auto; }
+.mkv-page-header { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; margin: .5rem 0 1.5rem; }
+.mkv-page-heading { margin:0; color:var(--mkv-navy); font-size:1.5rem; font-weight:750; letter-spacing:-.02em; }
+.mkv-page-description { margin:.35rem 0 0; color:var(--mkv-text-muted); font-size:.9rem; }
+.mkv-panel { background:var(--mkv-surface); border:1px solid var(--mkv-border); border-radius:var(--mkv-radius); box-shadow:var(--mkv-shadow); }
+.mkv-panel-body { padding:1.1rem; }
+.mkv-form-card { background:var(--mkv-surface); border:1px solid var(--mkv-border); border-radius:16px; padding:2rem; box-shadow:var(--mkv-shadow-lg); }
+.mkv-form-card h2 { color:var(--mkv-navy); font-size:1.35rem; font-weight:750; }
+.mkv-toolbar { display:flex; align-items:end; justify-content:space-between; gap:.75rem; flex-wrap:wrap; }
+.mkv-field { display:flex; flex-direction:column; gap:.35rem; min-width:0; }
+.mkv-field label, .mkv-field-label { color:var(--mkv-text-muted); font-size:.78rem; font-weight:650; }
+.mkv-panel .form-control, .mkv-form-card .form-control { min-height:42px; border:1.5px solid var(--mkv-border); border-radius:9px; color:var(--mkv-text); }
+.mkv-panel .form-control:focus, .mkv-form-card .form-control:focus { border-color:var(--mkv-gold); box-shadow:0 0 0 3px var(--mkv-gold-light); }
+.mkv-btn-secondary, .mkv-btn-danger, .mkv-btn-quiet { display:inline-flex; align-items:center; justify-content:center; gap:.35rem; min-height:38px; padding:.5rem .9rem; border-radius:9px; font-size:.85rem; font-weight:650; text-decoration:none; transition:all .18s ease; }
+.mkv-btn-secondary { border:1.5px solid var(--mkv-border); background:#fff; color:var(--mkv-text); }
+.mkv-btn-secondary:hover { color:var(--mkv-navy); border-color:var(--mkv-gold); }
+.mkv-btn-danger { border:1.5px solid var(--mkv-danger); background:#fff; color:var(--mkv-danger); }
+.mkv-btn-danger:hover { background:var(--mkv-danger); color:#fff; }
+.mkv-btn-quiet { border:0; background:transparent; color:var(--mkv-text-muted); }
+.mkv-btn-quiet:hover { background:var(--mkv-bg); color:var(--mkv-navy); }
+.mkv-chip { display:inline-flex; align-items:center; gap:.25rem; padding:.35rem .75rem; border:1px solid var(--mkv-border); border-radius:999px; background:#fff; color:var(--mkv-text-muted); font-size:.82rem; font-weight:650; text-decoration:none; }
+.mkv-chip:hover { color:var(--mkv-navy); border-color:var(--mkv-gold); }
+.mkv-chip.is-active { border-color:var(--mkv-gold); background:var(--mkv-gold); color:var(--mkv-navy); }
+.mkv-data-table { margin:0; }
+.mkv-data-table thead th { padding:.85rem .75rem; background:var(--mkv-bg); border-bottom:1px solid var(--mkv-border); color:var(--mkv-text-muted); font-size:.75rem; font-weight:700; letter-spacing:.03em; white-space:nowrap; }
+.mkv-data-table tbody td { padding:.9rem .75rem; border-color:var(--mkv-border); vertical-align:middle; }
+.mkv-data-table tbody tr:hover { background:#FFFCF4; }
+.mkv-empty-state { padding:3rem 1.25rem; color:var(--mkv-text-muted); text-align:center; }
+.mkv-empty-state strong { display:block; margin-bottom:.35rem; color:var(--mkv-navy); font-size:1rem; }
+.mkv-password-mask { color:var(--mkv-text-muted); font-family:ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing:.12em; }
+
+@media (max-width: 767.98px) {
+  .mkv-app-shell { padding-left:0; padding-right:0; }
+  .mkv-page-header { align-items:stretch; flex-direction:column; }
+  .mkv-page-header > .mkv-btn-primary { align-self:flex-start; }
+  .mkv-toolbar { align-items:stretch; }
+  .mkv-toolbar .mkv-field { flex:1 1 100%; }
+  .mkv-toolbar .mkv-field input { width:100%; }
+  .mkv-form-card { padding:1.25rem; }
+  .mkv-data-table thead { display:none; }
+  .mkv-data-table, .mkv-data-table tbody, .mkv-data-table tr, .mkv-data-table td { display:block; width:100%; }
+  .mkv-data-table tr { padding:.65rem .75rem; border-bottom:1px solid var(--mkv-border); }
+  .mkv-data-table tbody td { display:flex; justify-content:space-between; gap:1rem; padding:.38rem 0; border:0; }
+  .mkv-data-table tbody td::before { content:attr(data-label); color:var(--mkv-text-muted); font-size:.76rem; font-weight:650; }
+  .mkv-data-table tbody td[data-label=""]::before { display:none; }
+}
+
 /* ─── Header / Navbar ─── */
 .mkv-navbar {
   background: var(--mkv-navy) !important;
