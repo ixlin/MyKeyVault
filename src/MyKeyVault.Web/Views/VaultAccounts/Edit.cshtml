@@ -24,18 +24,18 @@
         </div>
 
         <div class="mb-3">
-          <label asp-for="AccountNameDecrypted" class="fw-semibold" style="color:var(--mkv-navy);font-size:0.9rem;">账号</label>
-          <input asp-for="AccountNameDecrypted" class="form-control" style="border-radius:10px;border:1.5px solid var(--mkv-border);padding:0.6rem 0.8rem;" />
+          <label asp-for="AccountNameEncrypted" class="fw-semibold" style="color:var(--mkv-navy);font-size:0.9rem;">账号</label>
+          <input asp-for="AccountNameEncrypted" class="form-control" style="border-radius:10px;border:1.5px solid var(--mkv-border);padding:0.6rem 0.8rem;" />
         </div>
 
         <div class="mb-3">
-          <label asp-for="PasswordDecrypted" class="fw-semibold" style="color:var(--mkv-navy);font-size:0.9rem;">密码</label>
-          <input asp-for="PasswordDecrypted" class="form-control" type="password" style="border-radius:10px;border:1.5px solid var(--mkv-border);padding:0.6rem 0.8rem;" />
+          <label asp-for="PasswordEncrypted" class="fw-semibold" style="color:var(--mkv-navy);font-size:0.9rem;">密码</label>
+          <input asp-for="PasswordEncrypted" class="form-control" type="password" style="border-radius:10px;border:1.5px solid var(--mkv-border);padding:0.6rem 0.8rem;" />
         </div>
 
         <div class="mb-3">
-          <label asp-for="Notes" class="fw-semibold" style="color:var(--mkv-navy);font-size:0.9rem;">备注</label>
-          <textarea asp-for="Notes" class="form-control" rows="3" style="border-radius:10px;border:1.5px solid var(--mkv-border);padding:0.6rem 0.8rem;"></textarea>
+          <label asp-for="NoteEncrypted" class="fw-semibold" style="color:var(--mkv-navy);font-size:0.9rem;">备注</label>
+          <textarea asp-for="NoteEncrypted" class="form-control" rows="3" style="border-radius:10px;border:1.5px solid var(--mkv-border);padding:0.6rem 0.8rem;"></textarea>
         </div>
 
         <div class="mb-3">
@@ -47,7 +47,7 @@
               @foreach (var tag in (IEnumerable<MyKeyVault.Web.Models.Tag>)ViewBag.AllTags)
               {
                 <label style="display:flex;align-items:center;gap:4px;padding:0.4rem 0.8rem;background:@(selectedIds.Contains(tag.TagId)?"var(--mkv-gold-light)":"var(--mkv-bg)");border-radius:20px;cursor:pointer;font-size:0.85rem;">
-                  <input type="checkbox" name="selectedTags" value="@tag.TagId" checked="@selectedIds.Contains(tag.TagId)" style="accent-color:var(--mkv-gold);" />
+                  <input type="checkbox" name="selectedTagIds" value="@tag.TagId" checked="@selectedIds.Contains(tag.TagId)" style="accent-color:var(--mkv-gold);" />
                   @tag.TagName
                 </label>
               }

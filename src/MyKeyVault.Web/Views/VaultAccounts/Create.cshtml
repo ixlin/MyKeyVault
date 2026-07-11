@@ -22,20 +22,20 @@
         </div>
 
         <div class="mb-3">
-          <label asp-for="AccountNameDecrypted" class="fw-semibold" style="color:var(--mkv-navy);font-size:0.9rem;">账号</label>
-          <input asp-for="AccountNameDecrypted" class="form-control" placeholder="用户名 / 邮箱" style="border-radius:10px;border:1.5px solid var(--mkv-border);padding:0.6rem 0.8rem;" />
-          <span asp-validation-for="AccountNameDecrypted" class="text-danger"></span>
+          <label asp-for="AccountNameEncrypted" class="fw-semibold" style="color:var(--mkv-navy);font-size:0.9rem;">账号</label>
+          <input asp-for="AccountNameEncrypted" class="form-control" placeholder="用户名 / 邮箱" style="border-radius:10px;border:1.5px solid var(--mkv-border);padding:0.6rem 0.8rem;" />
+          <span asp-validation-for="AccountNameEncrypted" class="text-danger"></span>
         </div>
 
         <div class="mb-3">
-          <label asp-for="PasswordDecrypted" class="fw-semibold" style="color:var(--mkv-navy);font-size:0.9rem;">密码</label>
-          <input asp-for="PasswordDecrypted" class="form-control" type="password" placeholder="密码" style="border-radius:10px;border:1.5px solid var(--mkv-border);padding:0.6rem 0.8rem;" />
-          <span asp-validation-for="PasswordDecrypted" class="text-danger"></span>
+          <label asp-for="PasswordEncrypted" class="fw-semibold" style="color:var(--mkv-navy);font-size:0.9rem;">密码</label>
+          <input asp-for="PasswordEncrypted" class="form-control" type="password" placeholder="密码" style="border-radius:10px;border:1.5px solid var(--mkv-border);padding:0.6rem 0.8rem;" />
+          <span asp-validation-for="PasswordEncrypted" class="text-danger"></span>
         </div>
 
         <div class="mb-3">
-          <label asp-for="Notes" class="fw-semibold" style="color:var(--mkv-navy);font-size:0.9rem;">备注</label>
-          <textarea asp-for="Notes" class="form-control" rows="3" placeholder="备注信息（可选）" style="border-radius:10px;border:1.5px solid var(--mkv-border);padding:0.6rem 0.8rem;"></textarea>
+          <label asp-for="NoteEncrypted" class="fw-semibold" style="color:var(--mkv-navy);font-size:0.9rem;">备注</label>
+          <textarea asp-for="NoteEncrypted" class="form-control" rows="3" placeholder="备注信息（可选）" style="border-radius:10px;border:1.5px solid var(--mkv-border);padding:0.6rem 0.8rem;"></textarea>
         </div>
 
         <div class="mb-3">
@@ -46,7 +46,7 @@
               @foreach (var tag in (IEnumerable<MyKeyVault.Web.Models.Tag>)ViewBag.AllTags)
               {
                 <label style="display:flex;align-items:center;gap:4px;padding:0.4rem 0.8rem;background:var(--mkv-bg);border-radius:20px;cursor:pointer;font-size:0.85rem;">
-                  <input type="checkbox" name="selectedTags" value="@tag.TagId" style="accent-color:var(--mkv-gold);" />
+                  <input type="checkbox" name="selectedTagIds" value="@tag.TagId" style="accent-color:var(--mkv-gold);" />
                   @tag.TagName
                 </label>
               }
