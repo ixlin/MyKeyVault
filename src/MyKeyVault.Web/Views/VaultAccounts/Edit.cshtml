@@ -2,58 +2,64 @@
 @{
     ViewData["Title"] = "编辑账号";
 }
-<h2>@ViewData["Title"]</h2>
-<form method="post" asp-action="Edit">
-    @Html.AntiForgeryToken()
-    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-    <input type="hidden" asp-for="AccountId" />
-    <div class="mb-3">
-        <label class="form-label">标题</label>
-        <input asp-for="Title" class="form-control" />
-        <span class="text-danger" asp-validation-for="Title"></span>
-    </div>
-    <div class="mb-3">
-        <label class="form-label">标签</label>
-        @{ var tags = ViewBag.AllTags as IEnumerable<MyKeyVault.Web.Models.Tag>; var selected = ViewBag.SelectedTagIds as System.Collections.Generic.HashSet<long> ?? new System.Collections.Generic.HashSet<long>(); }
-        @if (tags != null && tags.Any())
-        {
-            foreach (var t in tags)
-            {
-                <div class="form-check form-check-inline">
-                    <input class="form-check-input" type="checkbox" name="selectedTagIds" value="@t.TagId" @(selected.Contains(t.TagId)?"checked":null) id="tag_@t.TagId">
-                    <label class="form-check-label" for="tag_@t.TagId">@t.TagName</label>
-                </div>
-            }
-        }
-        else
-        {
-            <div class="form-text">暂无标签，可到“标签管理”中新增。</div>
-        }
-    </div>
-    <div class="mb-3">
-        <label class="form-label">登录账号</label>
-        <input asp-for="AccountNameEncrypted" class="form-control" />
-        <span class="text-danger" asp-validation-for="AccountNameEncrypted"></span>
-    </div>
-    <div class="mb-3">
-        <label class="form-label">登录密码</label>
-        <input asp-for="PasswordEncrypted" class="form-control" />
-        <span class="text-danger" asp-validation-for="PasswordEncrypted"></span>
-    </div>
-    <div class="mb-3">
-        <label class="form-label">登录地址(URL)</label>
-        <input asp-for="Url" class="form-control" />
-        <span class="text-danger" asp-validation-for="Url"></span>
-    </div>
-    <div class="mb-3">
-        <label class="form-label">备注</label>
-        <textarea asp-for="NoteEncrypted" class="form-control" rows="3"></textarea>
-        <span class="text-danger" asp-validation-for="NoteEncrypted"></span>
-    </div>
-    <button type="submit" class="btn btn-primary">保存</button>
-    <a class="btn btn-outline-secondary" asp-action="Index">返回</a>
-</form>
+<div class="row justify-content-center">
+  <div class="col-md-8">
+    <div style="background:#fff;border-radius:16px;padding:2rem;box-shadow:var(--mkv-shadow-lg);">
+      <h2 class="fw-bold mb-3" style="color:var(--mkv-navy);">✏️ @ViewData["Title"]</h2>
+      <form asp-action="Edit" method="post">
+        <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+        <input type="hidden" asp-for="AccountId" />
+        <input type="hidden" asp-for="ConcurrencyStamp" />
 
-@section Scripts {
-    <partial name="_ValidationScriptsPartial" />
-}
+        <div class="mb-3">
+          <label asp-for="Title" class="fw-semibold" style="color:var(--mkv-navy);font-size:0.9rem;">标题</label>
+          <input asp-for="Title" class="form-control" style="border-radius:10px;border:1.5px solid var(--mkv-border);padding:0.6rem 0.8rem;" />
+          <span asp-validation-for="Title" class="text-danger"></span>
+        </div>
+
+        <div class="mb-3">
+          <label asp-for="Url" class="fw-semibold" style="color:var(--mkv-navy);font-size:0.9rem;">URL</label>
+          <input asp-for="Url" class="form-control" style="border-radius:10px;border:1.5px solid var(--mkv-border);padding:0.6rem 0.8rem;" />
+          <span asp-validation-for="Url" class="text-danger"></span>
+        </div>
+
+        <div class="mb-3">
+          <label asp-for="AccountNameDecrypted" class="fw-semibold" style="color:var(--mkv-navy);font-size:0.9rem;">账号</label>
+          <input asp-for="AccountNameDecrypted" class="form-control" style="border-radius:10px;border:1.5px solid var(--mkv-border);padding:0.6rem 0.8rem;" />
+        </div>
+
+        <div class="mb-3">
+          <label asp-for="PasswordDecrypted" class="fw-semibold" style="color:var(--mkv-navy);font-size:0.9rem;">密码</label>
+          <input asp-for="PasswordDecrypted" class="form-control" type="password" style="border-radius:10px;border:1.5px solid var(--mkv-border);padding:0.6rem 0.8rem;" />
+        </div>
+
+        <div class="mb-3">
+          <label asp-for="Notes" class="fw-semibold" style="color:var(--mkv-navy);font-size:0.9rem;">备注</label>
+          <textarea asp-for="Notes" class="form-control" rows="3" style="border-radius:10px;border:1.5px solid var(--mkv-border);padding:0.6rem 0.8rem;"></textarea>
+        </div>
+
+        <div class="mb-3">
+          <label class="fw-semibold" style="color:var(--mkv-navy);font-size:0.9rem;">标签</label>
+          @if (ViewBag.AllTags != null)
+          {
+            var selectedIds = ViewBag.SelectedTagIds as HashSet<long> ?? new HashSet<long>();
+            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;">
+              @foreach (var tag in (IEnumerable<MyKeyVault.Web.Models.Tag>)ViewBag.AllTags)
+              {
+                <label style="display:flex;align-items:center;gap:4px;padding:0.4rem 0.8rem;background:@(selectedIds.Contains(tag.TagId)?"var(--mkv-gold-light)":"var(--mkv-bg)");border-radius:20px;cursor:pointer;font-size:0.85rem;">
+                  <input type="checkbox" name="selectedTags" value="@tag.TagId" checked="@selectedIds.Contains(tag.TagId)" style="accent-color:var(--mkv-gold);" />
+                  @tag.TagName
+                </label>
+              }
+            </div>
+          }
+        </div>
+
+        <div style="display:flex;gap:10px;margin-top:1.5rem;">
+          <button type="submit" class="mkv-btn-primary" style="padding:0.6rem 2rem;">保存</button>
+          <a asp-action="Index" class="mkv-btn-outline" style="padding:0.6rem 1.5rem;">取消</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

@@ -1,30 +1,412 @@
-html {
-  font-size: 14px;
+/* ─────────── MyKeyVault v2 Design System ─────────── */
+:root {
+  --mkv-navy: #0F172A;
+  --mkv-navy-light: #1E293B;
+  --mkv-gold: #C8A951;
+  --mkv-gold-hover: #D4B96A;
+  --mkv-gold-light: rgba(200, 169, 81, 0.12);
+  --mkv-surface: #FFFFFF;
+  --mkv-bg: #F1F5F9;
+  --mkv-text: #1E293B;
+  --mkv-text-muted: #64748B;
+  --mkv-border: #E2E8F0;
+  --mkv-success: #059669;
+  --mkv-danger: #DC2626;
+  --mkv-radius: 12px;
+  --mkv-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+  --mkv-shadow-lg: 0 10px 25px rgba(0,0,0,0.1);
 }
 
-@media (min-width: 768px) {
-  html {
-    font-size: 16px;
-  }
-}
-
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
-}
-
-html {
-  position: relative;
-  min-height: 100%;
-}
-
+html { font-size: 14px; }
+@media (min-width: 768px) { html { font-size: 16px; } }
+html { position: relative; min-height: 100%; }
 body {
   margin-bottom: 60px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", Roboto, sans-serif;
+  background: var(--mkv-bg);
+  color: var(--mkv-text);
 }
 
-/* Ensure toolbar buttons keep text color on hover and only become bold.
-   Targets the button row used in Tushare Management pages (sap-toolbar).
-   This makes the entire toolbar (including 返回应用管理 on subpages) behave
-   the same: no text color change on hover, only font-weight increases. */
+/* ─── Header / Navbar ─── */
+.mkv-navbar {
+  background: var(--mkv-navy) !important;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  padding: 0.5rem 0;
+}
+.mkv-navbar .navbar-brand {
+  color: var(--mkv-gold) !important;
+  font-weight: 700;
+  font-size: 1.15rem;
+  letter-spacing: 0.02em;
+}
+.mkv-navbar .navbar-brand:hover {
+  color: var(--mkv-gold-hover) !important;
+}
+.mkv-navbar .nav-link {
+  color: #94A3B8 !important;
+  font-weight: 500;
+  font-size: 0.9rem;
+  padding: 0.5rem 1rem !important;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+.mkv-navbar .nav-link:hover,
+.mkv-navbar .nav-link.active {
+  color: #FFFFFF !important;
+  background: rgba(255,255,255,0.08);
+}
+.mkv-navbar .navbar-toggler {
+  border-color: rgba(255,255,255,0.2);
+}
+.mkv-navbar .navbar-toggler-icon {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba(255, 255, 255, 0.8)' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+}
+.mkv-navbar .login-partial a {
+  color: #94A3B8 !important;
+  font-size: 0.85rem;
+}
+.mkv-navbar .login-partial .btn {
+  font-size: 0.85rem;
+  padding: 0.4rem 1rem;
+  border-radius: 8px;
+}
+
+/* ─── Footer ─── */
+.mkv-footer {
+  background: #FFFFFF;
+  border-top: 1px solid var(--mkv-border);
+  padding: 1.2rem 0;
+  text-align: center;
+  color: var(--mkv-text-muted);
+  font-size: 0.8rem;
+}
+.mkv-footer a {
+  color: var(--mkv-text-muted);
+  text-decoration: none;
+}
+.mkv-footer a:hover {
+  color: var(--mkv-gold);
+}
+
+/* ─── Landing Hero ─── */
+.mkv-hero {
+  min-height: calc(100vh - 56px - 60px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--mkv-navy) 0%, #1a2744 100%);
+  padding: 3rem 1rem;
+  position: relative;
+  overflow: hidden;
+}
+.mkv-hero::before {
+  content: "";
+  position: absolute;
+  top: -50%;
+  right: -20%;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(200,169,81,0.08) 0%, transparent 70%);
+  border-radius: 50%;
+}
+.mkv-hero-card {
+  background: #FFFFFF;
+  border-radius: 20px;
+  padding: 3rem 2.5rem;
+  max-width: 560px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 25px 60px rgba(0,0,0,0.3);
+  position: relative;
+  z-index: 1;
+}
+.mkv-keyhole {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--mkv-gold-light);
+  border-radius: 50%;
+  transition: transform 0.3s ease;
+}
+.mkv-keyhole:hover {
+  transform: rotate(15deg);
+}
+.mkv-keyhole svg {
+  width: 32px;
+  height: 32px;
+  color: var(--mkv-gold);
+}
+.mkv-hero-card h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--mkv-navy);
+  margin-bottom: 0.5rem;
+}
+.mkv-hero-card .lead {
+  color: var(--mkv-text-muted);
+  font-size: 0.95rem;
+  margin-bottom: 1.5rem;
+}
+.mkv-hero-features {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+}
+.mkv-hero-features .feature-tag {
+  background: var(--mkv-bg);
+  color: var(--mkv-text);
+  padding: 0.35rem 0.8rem;
+  border-radius: 20px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.mkv-hero-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.mkv-btn-primary {
+  background: var(--mkv-gold);
+  color: var(--mkv-navy);
+  border: none;
+  font-weight: 600;
+  padding: 0.65rem 2rem;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  transition: all 0.2s;
+  text-decoration: none;
+  display: inline-block;
+}
+.mkv-btn-primary:hover {
+  background: var(--mkv-gold-hover);
+  color: var(--mkv-navy);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(200,169,81,0.4);
+}
+.mkv-btn-outline {
+  background: transparent;
+  color: var(--mkv-navy);
+  border: 1.5px solid var(--mkv-border);
+  font-weight: 600;
+  padding: 0.65rem 2rem;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  transition: all 0.2s;
+  text-decoration: none;
+  display: inline-block;
+}
+.mkv-btn-outline:hover {
+  border-color: var(--mkv-gold);
+  color: var(--mkv-gold);
+}
+
+/* ─── Login Page ─── */
+.mkv-login-page {
+  min-height: calc(100vh - 56px - 60px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--mkv-navy) 0%, #1a2744 100%);
+  padding: 2rem 1rem;
+}
+.mkv-login-card {
+  background: #FFFFFF;
+  border-radius: 20px;
+  padding: 2.5rem;
+  max-width: 440px;
+  width: 100%;
+  box-shadow: 0 25px 60px rgba(0,0,0,0.3);
+}
+.mkv-login-card h2 {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--mkv-navy);
+  text-align: center;
+  margin-bottom: 0.25rem;
+}
+.mkv-login-card .subtitle {
+  text-align: center;
+  color: var(--mkv-text-muted);
+  font-size: 0.85rem;
+  margin-bottom: 1.5rem;
+}
+.mkv-login-card .form-floating {
+  margin-bottom: 0.75rem;
+}
+.mkv-login-card .form-control {
+  border-radius: 10px;
+  border: 1.5px solid var(--mkv-border);
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+  transition: border-color 0.2s;
+}
+.mkv-login-card .form-control:focus {
+  border-color: var(--mkv-gold);
+  box-shadow: 0 0 0 3px var(--mkv-gold-light);
+}
+.mkv-login-card .form-floating label {
+  color: var(--mkv-text-muted);
+  font-size: 0.85rem;
+}
+.mkv-login-card .checkbox {
+  margin: 0.75rem 0;
+}
+.mkv-login-card .checkbox label {
+  font-size: 0.85rem;
+  color: var(--mkv-text-muted);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.mkv-login-card .checkbox input[type="checkbox"] {
+  accent-color: var(--mkv-gold);
+}
+.mkv-login-card .btn-login {
+  background: var(--mkv-gold);
+  color: var(--mkv-navy);
+  border: none;
+  font-weight: 600;
+  padding: 0.7rem;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  width: 100%;
+  transition: all 0.2s;
+}
+.mkv-login-card .btn-login:hover {
+  background: var(--mkv-gold-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(200,169,81,0.4);
+}
+.mkv-login-links {
+  text-align: center;
+  margin-top: 1.25rem;
+  font-size: 0.85rem;
+  color: var(--mkv-text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.mkv-login-links a {
+  color: var(--mkv-gold);
+  text-decoration: none;
+  font-weight: 500;
+}
+.mkv-login-links a:hover {
+  text-decoration: underline;
+}
+.mkv-login-card .validation-summary-errors,
+.mkv-login-card .text-danger {
+  font-size: 0.82rem;
+  margin-bottom: 0.5rem;
+}
+
+/* ─── Dashboard ─── */
+.mkv-dashboard-header {
+  margin-bottom: 1.5rem;
+}
+.mkv-dashboard-header h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--mkv-navy);
+}
+.mkv-stat-card {
+  background: #FFFFFF;
+  border-radius: var(--mkv-radius);
+  padding: 1.25rem;
+  box-shadow: var(--mkv-shadow);
+  transition: box-shadow 0.2s;
+  border-left: 3px solid var(--mkv-gold);
+}
+.mkv-stat-card:hover {
+  box-shadow: var(--mkv-shadow-lg);
+}
+.mkv-stat-card .stat-label {
+  font-size: 0.8rem;
+  color: var(--mkv-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.3rem;
+}
+.mkv-stat-card .stat-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--mkv-navy);
+}
+.mkv-stat-card .stat-link {
+  font-size: 0.82rem;
+  color: var(--mkv-gold);
+  font-weight: 600;
+  text-decoration: none;
+  margin-top: 0.5rem;
+  display: inline-block;
+}
+.mkv-recent-section {
+  margin-top: 2rem;
+}
+.mkv-recent-section h4 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--mkv-navy);
+  margin-bottom: 1rem;
+}
+.mkv-recent-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.mkv-recent-item {
+  background: #FFFFFF;
+  border-radius: var(--mkv-radius);
+  padding: 1rem 1.25rem;
+  margin-bottom: 0.5rem;
+  box-shadow: var(--mkv-shadow);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: box-shadow 0.2s;
+  text-decoration: none;
+  color: inherit;
+}
+.mkv-recent-item:hover {
+  box-shadow: var(--mkv-shadow-lg);
+}
+.mkv-recent-item .item-title {
+  font-weight: 600;
+  color: var(--mkv-navy);
+}
+.mkv-recent-item .item-url {
+  font-size: 0.82rem;
+  color: var(--mkv-text-muted);
+}
+.mkv-recent-item .item-time {
+  font-size: 0.78rem;
+  color: var(--mkv-text-muted);
+}
+.mkv-empty {
+  text-align: center;
+  padding: 2rem;
+  color: var(--mkv-text-muted);
+}
+.mkv-empty a {
+  color: var(--mkv-gold);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* ─── Keep existing overrides ─── */
+.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
+  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem var(--mkv-gold);
+}
+
 .sap-toolbar .sap-button {
   background-color: transparent !important;
   color: inherit !important;
@@ -37,92 +419,42 @@ body {
   text-decoration: none;
   box-shadow: none !important;
 }
-
-/* Keep small variant consistent as well */
 .sap-toolbar .sap-button.sap-button-sm {
   padding: .25rem .75rem;
 }
 
-/* ─── 手机端适配 ─── */
+/* ─── Mobile ─── */
 @media (max-width: 768px) {
-  /* 按钮组换行 */
   .btn-group { flex-wrap: wrap; gap: 4px; }
-  .btn-group .btn,
-  .btn-group-sm .btn {
-    font-size: 0.75rem;
-    padding: 4px 8px;
-    border-radius: 4px !important;
+  .btn-group .btn, .btn-group-sm .btn {
+    font-size: 0.75rem; padding: 4px 8px; border-radius: 4px !important;
   }
-
-  /* 页面标题区上下堆叠 */
   .container-fluid .d-flex.justify-content-between {
-    flex-direction: column;
-    gap: 8px;
+    flex-direction: column; gap: 8px;
   }
   .container-fluid .d-flex.justify-content-between > div {
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
+    display: flex; gap: 6px; flex-wrap: wrap;
   }
-  .container-fluid h2 {
-    font-size: 1.1rem;
-  }
-
-  /* 表格 → 卡片布局 */
-  .table-responsive table,
-  .table-responsive thead,
-  .table-responsive tbody,
-  .table-responsive th,
-  .table-responsive td,
+  .container-fluid h2 { font-size: 1.1rem; }
+  .table-responsive table, .table-responsive thead, .table-responsive tbody,
+  .table-responsive th, .table-responsive td, .table-responsive tr { display: block; }
+  .table-responsive thead { display: none; }
   .table-responsive tr {
-    display: block;
-  }
-  .table-responsive thead {
-    display: none;
-  }
-  .table-responsive tr {
-    border: 1px solid #dee2e6;
-    border-radius: 10px;
-    margin-bottom: 12px;
-    padding: 12px;
-    background: #fff;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    border: 1px solid #dee2e6; border-radius: 10px; margin-bottom: 12px;
+    padding: 12px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
   }
   .table-responsive td {
-    border: none;
-    padding: 5px 0;
-    text-align: left;
-    font-size: 0.9rem;
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
+    border: none; padding: 5px 0; text-align: left; font-size: 0.9rem;
+    display: flex; align-items: baseline; gap: 8px;
   }
   .table-responsive td::before {
-    content: attr(data-label);
-    font-weight: 600;
-    color: #6b7280;
-    font-size: 0.75rem;
-    min-width: 70px;
-    flex-shrink: 0;
+    content: attr(data-label); font-weight: 600; color: #6b7280;
+    font-size: 0.75rem; min-width: 70px; flex-shrink: 0;
   }
-  .table-responsive td:last-child {
-    border-top: 1px solid #f0f0f0;
-    margin-top: 6px;
-    padding-top: 8px;
-  }
-
-  /* 分页缩小 */
-  .pagination {
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-  .pagination .page-link {
-    padding: 4px 8px;
-    font-size: 0.8rem;
-  }
-
-  /* 模态框边距 */
-  .modal-dialog {
-    margin: 10px;
-  }
+  .table-responsive td:last-child { border-top: 1px solid #f0f0f0; margin-top: 6px; padding-top: 8px; }
+  .pagination { flex-wrap: wrap; justify-content: center; }
+  .pagination .page-link { padding: 4px 8px; font-size: 0.8rem; }
+  .modal-dialog { margin: 10px; }
+  .mkv-hero-card { padding: 2rem 1.5rem; }
+  .mkv-login-card { padding: 1.5rem; }
 }

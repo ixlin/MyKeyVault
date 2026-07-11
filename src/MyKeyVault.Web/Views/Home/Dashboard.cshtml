@@ -4,39 +4,57 @@
     var totalTags = (int)(ViewBag.TotalTags ?? 0);
     var recent = ViewBag.Recent as IEnumerable<dynamic>;
 }
-<h2>控制台概览</h2>
-<div class="row mb-4">
-  <div class="col-md-3">
-    <div class="card p-3">
-      <div class="fw-bold">账号总数</div>
-      <div class="display-6">@totalAccounts</div>
-      <a class="btn btn-sm btn-primary mt-2" href="/VaultAccounts/Create">新增账号</a>
-    </div>
-  </div>
-  <div class="col-md-3">
-    <div class="card p-3">
-      <div class="fw-bold">标签总数</div>
-      <div class="display-6">@totalTags</div>
-      <a class="btn btn-sm btn-outline-primary mt-2" href="/Tags">管理标签</a>
-    </div>
-  </div>
+<div class="mkv-dashboard-header">
+    <h2>👋 控制台概览</h2>
 </div>
-<h4>最近修改账号</h4>
-@if(recent!=null && recent.Any()){
-<table class="table table-hover">
- <thead><tr><th>标题</th><th>URL</th><th>修改时间</th></tr></thead>
- <tbody>
-  @foreach(var a in recent){
-    <tr>
-      <td><a href="/VaultAccounts/Edit/@a.AccountId">@a.Title</a></td>
-      <td>@a.Url</td>
-      <td>@a.UpdatedAt.ToLocalTime()</td>
-    </tr>
-  }
- </tbody>
-</table>
-}
-else
-{
-  <p class="text-muted">暂无数据，开始 <a href="/VaultAccounts/Create">创建账号</a>。</p>
-}
+
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="mkv-stat-card">
+            <div class="stat-label">账号总数</div>
+            <div class="stat-value">@totalAccounts</div>
+            <a class="stat-link" href="/VaultAccounts/Create">+ 新增账号</a>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="mkv-stat-card">
+            <div class="stat-label">标签总数</div>
+            <div class="stat-value">@totalTags</div>
+            <a class="stat-link" href="/Tags">管理标签</a>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="mkv-stat-card">
+            <div class="stat-label">微信图文</div>
+            <div class="stat-value" style="font-size:1.4rem;padding-top:0.4rem;">抓取与管理</div>
+            <a class="stat-link" href="/WechatArticle">查看图文</a>
+        </div>
+    </div>
+</div>
+
+<div class="mkv-recent-section">
+    <h4>最近修改账号</h4>
+    @if (recent != null && recent.Any())
+    {
+        <ul class="mkv-recent-list">
+            @foreach (var a in recent)
+            {
+                <li>
+                    <a class="mkv-recent-item" href="/VaultAccounts/Edit/@a.AccountId">
+                        <div>
+                            <div class="item-title">@a.Title</div>
+                            <div class="item-url">@a.Url</div>
+                        </div>
+                        <div class="item-time">@a.UpdatedAt.ToLocalTime().ToString("MM-dd HH:mm")</div>
+                    </a>
+                </li>
+            }
+        </ul>
+    }
+    else
+    {
+        <div class="mkv-empty">
+            暂无数据，<a href="/VaultAccounts/Create">创建第一个账号</a> 开始使用
+        </div>
+    }
+</div>

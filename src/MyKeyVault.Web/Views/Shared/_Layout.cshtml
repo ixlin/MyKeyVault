@@ -1,5 +1,5 @@
 ﻿<!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -10,9 +10,12 @@
 </head>
 <body>
     <header>
-        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
+        <nav class="navbar navbar-expand-sm navbar-dark mkv-navbar">
             <div class="container-fluid">
-                <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">我的密码本</a>
+                <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1"/></svg>
+                    我的密码本
+                </a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
                         aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
@@ -20,41 +23,40 @@
                 <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
                     <ul class="navbar-nav flex-grow-1">
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index">首页</a>
+                            <a class="nav-link" asp-area="" asp-controller="Home" asp-action="Index">首页</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="VaultAccounts" asp-action="Index">账号</a>
+                            <a class="nav-link" asp-area="" asp-controller="VaultAccounts" asp-action="Index">账号管理</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Tags" asp-action="Index">标签</a>
+                            <a class="nav-link" asp-area="" asp-controller="Tags" asp-action="Index">标签</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="WechatArticle" asp-action="Index">微信图文转PDF</a>
+                            <a class="nav-link" asp-area="" asp-controller="WechatArticle" asp-action="Index">微信图文</a>
                         </li>
                         @if (User?.Identity?.IsAuthenticated == true && User.IsInRole("Admin"))
                         {
                             <li class="nav-item">
-                                <a class="nav-link text-dark" asp-controller="TushareManagement" asp-action="Apps">上市公司数据</a>
+                                <a class="nav-link" asp-controller="TushareManagement" asp-action="Apps">上市公司数据</a>
                             </li>
                         }
                     </ul>
-                    @* 移除解锁区域 *@
                     <partial name="_LoginPartial" />
                 </div>
             </div>
         </nav>
     </header>
-    <div class="container">
-        <main role="main" class="pb-3">
+
+    <div class="container-fluid px-4 py-3">
+        <main role="main">
             @RenderBody()
         </main>
     </div>
 
-    <footer class="border-top footer text-muted">
-        <div class="container">
-            &copy; 2025 - 我的密码本 - AI实现 - <a href="https://beian.miit.gov.cn/" target="_blank">蜀ICP备2024053184号-5</a>
-        </div>
+    <footer class="mkv-footer">
+        <div>&copy; 2026 我的密码本 · AI实现 · <a href="https://beian.miit.gov.cn/" target="_blank">蜀ICP备2024053184号-5</a></div>
     </footer>
+
     <script>
         window.__isAuthenticated = @(User?.Identity?.IsAuthenticated == true ? "true" : "false");
     </script>
@@ -62,6 +64,5 @@
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
-    @* 移除解锁弹窗 *@
 </body>
 </html>

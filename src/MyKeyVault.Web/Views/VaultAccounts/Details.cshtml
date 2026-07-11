@@ -2,26 +2,50 @@
 @{
     ViewData["Title"] = "账号详情";
 }
-<h2>@ViewData["Title"]</h2>
-<dl class="row">
-  <dt class="col-sm-2">标题</dt>
-  <dd class="col-sm-10">@Model.Title</dd>
-  <dt class="col-sm-2">URL</dt>
-  <dd class="col-sm-10">@Model.Url</dd>
-  <dt class="col-sm-2">登录账号</dt>
-  <dd class="col-sm-10">
-  @Model.AccountNameEncrypted
-  </dd>
-  <dt class="col-sm-2">登录密码</dt>
-  <dd class="col-sm-10">
-  @Model.PasswordEncrypted
-  </dd>
-  <dt class="col-sm-2">备注</dt>
-  <dd class="col-sm-10">
-  @Model.NoteEncrypted
-  </dd>
-</dl>
-<a class="btn btn-outline-primary" asp-action="Edit" asp-route-id="@Model.AccountId">编辑</a>
-<a class="btn btn-outline-secondary" asp-action="Index">返回</a>
+<div class="row justify-content-center">
+  <div class="col-md-8">
+    <div style="background:#fff;border-radius:16px;padding:2rem;box-shadow:var(--mkv-shadow-lg);">
+      <h2 class="fw-bold mb-3" style="color:var(--mkv-navy);">📄 @ViewData["Title"]</h2>
+      
+      <dl class="row mb-0">
+        <dt class="col-sm-3" style="color:var(--mkv-text-muted);font-size:0.85rem;font-weight:600;padding:0.6rem 0;">标题</dt>
+        <dd class="col-sm-9" style="font-weight:600;color:var(--mkv-navy);padding:0.6rem 0;">@Model.Title</dd>
 
-@* 无脚本 *@
+        <dt class="col-sm-3" style="color:var(--mkv-text-muted);font-size:0.85rem;font-weight:600;padding:0.6rem 0;">URL</dt>
+        <dd class="col-sm-9" style="padding:0.6rem 0;"><a href="@Model.Url" target="_blank" style="color:var(--mkv-gold);">@Model.Url</a></dd>
+
+        <dt class="col-sm-3" style="color:var(--mkv-text-muted);font-size:0.85rem;font-weight:600;padding:0.6rem 0;">账号</dt>
+        <dd class="col-sm-9" style="padding:0.6rem 0;">@Model.AccountNameEncrypted</dd>
+
+        <dt class="col-sm-3" style="color:var(--mkv-text-muted);font-size:0.85rem;font-weight:600;padding:0.6rem 0;">密码</dt>
+        <dd class="col-sm-9" style="padding:0.6rem 0;">@Model.PasswordEncrypted</dd>
+
+        <dt class="col-sm-3" style="color:var(--mkv-text-muted);font-size:0.85rem;font-weight:600;padding:0.6rem 0;">备注</dt>
+        <dd class="col-sm-9" style="padding:0.6rem 0;white-space:pre-wrap;">@Model.Notes</dd>
+
+        <dt class="col-sm-3" style="color:var(--mkv-text-muted);font-size:0.85rem;font-weight:600;padding:0.6rem 0;">标签</dt>
+        <dd class="col-sm-9" style="padding:0.6rem 0;">
+          @if (Model.AccountTags != null && Model.AccountTags.Any())
+          {
+            foreach (var at in Model.AccountTags)
+            {
+              <span style="display:inline-block;padding:0.25rem 0.7rem;background:var(--mkv-gold-light);color:var(--mkv-gold);border-radius:20px;font-size:0.8rem;font-weight:600;margin:2px 4px 2px 0;">@(at.Tag?.TagName ?? "—")</span>
+            }
+          }
+          else { <span style="color:var(--mkv-text-muted);">—</span> }
+        </dd>
+
+        <dt class="col-sm-3" style="color:var(--mkv-text-muted);font-size:0.85rem;font-weight:600;padding:0.6rem 0;">创建</dt>
+        <dd class="col-sm-9" style="font-size:0.85rem;color:var(--mkv-text-muted);padding:0.6rem 0;">@Model.CreatedAt.ToLocalTime()</dd>
+
+        <dt class="col-sm-3" style="color:var(--mkv-text-muted);font-size:0.85rem;font-weight:600;padding:0.6rem 0;">修改</dt>
+        <dd class="col-sm-9" style="font-size:0.85rem;color:var(--mkv-text-muted);padding:0.6rem 0;">@Model.UpdatedAt.ToLocalTime()</dd>
+      </dl>
+
+      <div style="display:flex;gap:10px;margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--mkv-border);">
+        <a asp-action="Edit" asp-route-id="@Model.AccountId" class="mkv-btn-primary" style="padding:0.5rem 1.5rem;">✏️ 编辑</a>
+        <a asp-action="Index" class="mkv-btn-outline" style="padding:0.5rem 1.5rem;">返回列表</a>
+      </div>
+    </div>
+  </div>
+</div>

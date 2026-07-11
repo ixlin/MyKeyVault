@@ -2,20 +2,23 @@
 @{
     ViewData["Title"] = "编辑标签";
 }
-<h2>@ViewData["Title"]</h2>
-<form method="post" asp-action="Edit">
-  @Html.AntiForgeryToken()
-  <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-  <input type="hidden" asp-for="TagId" />
-  <div class="mb-3">
-    <label class="form-label">标签名</label>
-    <input asp-for="TagName" class="form-control" />
-    <span class="text-danger" asp-validation-for="TagName"></span>
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <div style="background:#fff;border-radius:16px;padding:2rem;box-shadow:var(--mkv-shadow-lg);">
+      <h2 class="fw-bold mb-3" style="color:var(--mkv-navy);">✏️ @ViewData["Title"]</h2>
+      <form asp-action="Edit">
+        <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+        <input type="hidden" asp-for="TagId" />
+        <div class="mb-3">
+          <label asp-for="TagName" class="fw-semibold" style="color:var(--mkv-navy);font-size:0.9rem;">标签名称</label>
+          <input asp-for="TagName" class="form-control" style="border-radius:10px;border:1.5px solid var(--mkv-border);padding:0.6rem 0.8rem;" />
+          <span asp-validation-for="TagName" class="text-danger"></span>
+        </div>
+        <div style="display:flex;gap:10px;">
+          <button type="submit" class="mkv-btn-primary">保存</button>
+          <a asp-action="Index" class="mkv-btn-outline">取消</a>
+        </div>
+      </form>
+    </div>
   </div>
-  <button type="submit" class="btn btn-primary">保存</button>
-  <a class="btn btn-outline-secondary" asp-action="Index">返回</a>
-</form>
-
-@section Scripts {
-  <partial name="_ValidationScriptsPartial" />
-}
+</div>

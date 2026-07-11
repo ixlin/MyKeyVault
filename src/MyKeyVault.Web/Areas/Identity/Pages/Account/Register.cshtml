@@ -1,64 +1,49 @@
-﻿@page
+@page
 @model RegisterModel
 @{
     ViewData["Title"] = "注册";
+    Layout = "/Views/Shared/_Layout.cshtml";
 }
 
-<h1>@ViewData["Title"]</h1>
+<div class="mkv-login-page">
+  <div class="mkv-login-card" style="max-width:460px;">
+    <h2>注册我的密码本</h2>
+    <p class="subtitle">创建一个新账号，开始管理你的密码</p>
 
-<div class="row">
-    <div class="col-md-4">
-        <form id="registerForm" asp-route-returnUrl="@Model.ReturnUrl" method="post">
-            <h2>创建新账户</h2>
-            <hr />
-            <div asp-validation-summary="ModelOnly" class="text-danger" role="alert"></div>
-            <div class="form-floating mb-3">
-                <input asp-for="Input.Email" class="form-control" autocomplete="username" aria-required="true" placeholder="邮箱 (可留空，仅手机号)" />
-                <label asp-for="Input.Email">邮箱</label>
-                <span asp-validation-for="Input.Email" class="text-danger"></span>
-            </div>
-            <div class="form-floating mb-3">
-                <input asp-for="Input.Password" class="form-control" autocomplete="new-password" aria-required="true" placeholder="密码" />
-                <label asp-for="Input.Password">密码</label>
-                <span asp-validation-for="Input.Password" class="text-danger"></span>
-            </div>
-            <div class="form-floating mb-3">
-                <input asp-for="Input.ConfirmPassword" class="form-control" autocomplete="new-password" aria-required="true" placeholder="确认密码" />
-                <label asp-for="Input.ConfirmPassword">确认密码</label>
-                <span asp-validation-for="Input.ConfirmPassword" class="text-danger"></span>
-            </div>
-            <button id="registerSubmit" type="submit" class="w-100 btn btn-lg btn-primary">注册</button>
-        </form>
-    </div>
-    <div class="col-md-6 col-md-offset-2">
-        <section>
-            <h3>使用外部服务注册</h3>
-            <hr />
-            @{
-                if ((Model.ExternalLogins?.Count ?? 0) == 0)
-                {
-                    <div>
-                        <p>
-                            尚未配置外部认证服务。参考 <a href="https://go.microsoft.com/fwlink/?LinkID=532715">文档</a> 以添加外部登录。
-                        </p>
-                    </div>
-                }
-                else
-                {
-                    <form id="external-account" asp-page="./ExternalLogin" asp-route-returnUrl="@Model.ReturnUrl" method="post" class="form-horizontal">
-                        <div>
-                            <p>
-                                @foreach (var provider in Model.ExternalLogins!)
-                                {
-                                    <button type="submit" class="btn btn-primary" name="provider" value="@provider.Name" title="使用 @provider.DisplayName 账户登录">@provider.DisplayName</button>
-                                }
-                            </p>
-                        </div>
-                    </form>
-                }
-            }
-        </section>
-    </div>
+    <form id="registerForm" asp-route-returnUrl="@Model.ReturnUrl" method="post">
+      <div asp-validation-summary="ModelOnly" class="text-danger" role="alert"></div>
+
+      <div class="form-floating mb-3">
+        <input asp-for="Input.Email" class="form-control" autocomplete="username" aria-required="true" placeholder="name@example.com" />
+        <label asp-for="Input.Email">邮箱</label>
+        <span asp-validation-for="Input.Email" class="text-danger"></span>
+      </div>
+
+      <div class="form-floating mb-3">
+        <input asp-for="Input.PhoneNumber" class="form-control" autocomplete="tel" placeholder="手机号（可选）" />
+        <label asp-for="Input.PhoneNumber">手机号（可选）</label>
+        <span asp-validation-for="Input.PhoneNumber" class="text-danger"></span>
+      </div>
+
+      <div class="form-floating mb-3">
+        <input asp-for="Input.Password" class="form-control" autocomplete="new-password" aria-required="true" placeholder="密码" />
+        <label asp-for="Input.Password">密码</label>
+        <span asp-validation-for="Input.Password" class="text-danger"></span>
+      </div>
+
+      <div class="form-floating mb-3">
+        <input asp-for="Input.ConfirmPassword" class="form-control" autocomplete="new-password" aria-required="true" placeholder="确认密码" />
+        <label asp-for="Input.ConfirmPassword">确认密码</label>
+        <span asp-validation-for="Input.ConfirmPassword" class="text-danger"></span>
+      </div>
+
+      <button id="registerSubmit" type="submit" class="btn-login" style="margin-top:0.5rem;">注册</button>
+
+      <div class="mkv-login-links">
+        <div>已有账号？<a asp-page="./Login" asp-route-returnUrl="@Model.ReturnUrl">立即登录</a></div>
+      </div>
+    </form>
+  </div>
 </div>
 
 @section Scripts {
