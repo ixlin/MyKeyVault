@@ -1,16 +1,21 @@
 @{
     Layout = "/Views/Shared/_Layout.cshtml";
 }
-<h1 class="mb-0">账户管理</h1>
-<p class="text-muted">修改或查看你的账户设置</p>
-<hr />
-<div class="row">
-    <div class="col-md-3 mb-3">
+<div class="mkv-manage-page">
+  <div class="mkv-page-header">
+    <div>
+      <h1 class="mkv-page-heading">账户管理</h1>
+      <p class="mkv-page-description">管理个人资料、登录方式和账户安全。</p>
+    </div>
+  </div>
+  <div class="mkv-manage-layout">
+    <aside class="mkv-manage-nav">
         <partial name="_ManageNav" />
-    </div>
-    <div class="col-md-9">
+    </aside>
+    <section class="mkv-manage-content">
         @RenderBody()
-    </div>
+    </section>
+  </div>
 </div>
 
 @section Scripts {

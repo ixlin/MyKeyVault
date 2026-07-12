@@ -11,8 +11,11 @@
 @{
     var isSignedIn = User?.Identity?.IsAuthenticated == true;
     var isAdmin = isSignedIn && (User?.IsInRole("Admin") == true);
+    var isStandaloneAuthPage = Context.Request.Path.StartsWithSegments("/Identity/Account/Login");
 }
-<body>
+<body class="@(isStandaloneAuthPage ? "mkv-auth-body" : "")">
+    @if (!isStandaloneAuthPage)
+    {
     <header>
         <nav class="navbar navbar-expand-sm navbar-dark mkv-navbar">
             <div class="container-fluid">
@@ -48,14 +51,15 @@
             </div>
         </nav>
     </header>
+    }
 
-    <div class="container-fluid px-4 py-3 mkv-app-shell">
+    <div class="@(isStandaloneAuthPage ? "mkv-auth-main" : "container-fluid px-4 py-3 mkv-app-shell")">
         <main role="main">
             @RenderBody()
         </main>
     </div>
 
-    <footer class="mkv-footer">
+    <footer class="mkv-footer @(isStandaloneAuthPage ? "mkv-auth-footer" : "")">
         <div>&copy; 2026 我的密码本 · AI实现 · <a href="https://beian.miit.gov.cn/" target="_blank">蜀ICP备2024053184号-5</a></div>
     </footer>
 

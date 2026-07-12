@@ -7,11 +7,33 @@
 }
 
 <div class="mkv-login-page">
-  <div class="mkv-login-card">
-    <h2>登录我的密码本</h2>
-    <p class="subtitle">登录后继续管理你的账号与内容任务</p>
+  <section class="mkv-login-intro" aria-label="我的密码本介绍">
+    <a class="mkv-login-brand" asp-area="" asp-controller="Home" asp-action="Index">
+      <span class="mkv-login-brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="10.5" width="17" height="10" rx="2"/><path d="M7.5 10.5V7a4.5 4.5 0 0 1 9 0v3.5"/><circle cx="12" cy="15.5" r="1"/></svg>
+      </span>
+      <span>我的密码本</span>
+    </a>
+    <div class="mkv-login-copy">
+      <p class="mkv-login-eyebrow">安全地记录，清晰地管理</p>
+      <h1>把重要账户和内容工作，放在一个放心的地方。</h1>
+      <p>集中管理账号信息、微信图文任务和数据服务，让每一次访问都更有条理。</p>
+      <ul class="mkv-login-benefits">
+        <li>账户信息加密保存</li>
+        <li>内容任务集中管理</li>
+        <li>清晰可控的数据服务</li>
+      </ul>
+    </div>
+  </section>
 
-    <form id="account" method="post">
+  <section class="mkv-login-form-area">
+    <div class="mkv-login-card">
+      <div class="mkv-login-card-heading">
+        <h2>欢迎回来</h2>
+        <p>登录后继续使用我的密码本</p>
+      </div>
+
+      <form id="account" method="post">
       <div asp-validation-summary="ModelOnly" class="text-danger" role="alert"></div>
 
       <div class="form-floating mb-3">
@@ -39,7 +61,8 @@
         <a id="forgot-password" asp-page="./ForgotPassword">忘记密码？</a>
         <div>还没有账号？<a asp-page="./Register" asp-route-returnUrl="@Model.ReturnUrl">立即注册</a></div>
       </div>
-    </form>
+      </form>
+    </div>
   </div>
 </div>
 

@@ -1,8 +1,9 @@
+@{ var action = ViewContext.RouteData.Values["action"]?.ToString(); }
 <nav class="sap-section-nav" aria-label="上市公司数据模块导航">
-    <a asp-action="Apps">应用</a>
-    <a asp-action="Stats">统计</a>
-    <a asp-action="Logs">调用日志</a>
-    <a asp-action="ApiDocs">API 文档</a>
-    <a asp-action="TestTool">测试工具</a>
-    <a asp-action="Settings">系统设置</a>
+    <a class="@(action == "Apps" ? "is-active" : "")" asp-action="Apps">应用</a>
+    <a class="@(action == "Stats" ? "is-active" : "")" asp-action="Stats">统计</a>
+    <a class="@(action == "Logs" ? "is-active" : "")" asp-action="Logs">调用日志</a>
+    <a class="@(action == "ApiDocs" ? "is-active" : "")" asp-action="ApiDocs">API 文档</a>
+    <a class="@(action == "TestTool" ? "is-active" : "")" asp-action="TestTool">测试工具</a>
+    <a class="@(action == "Settings" ? "is-active" : "")" asp-action="Settings">系统设置</a>
 </nav>

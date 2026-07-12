@@ -26,6 +26,9 @@ body {
   background: var(--mkv-bg);
   color: var(--mkv-text);
 }
+body.mkv-auth-body { min-height:100dvh; margin:0; display:grid; grid-template-rows:minmax(0, 1fr) auto; overflow:hidden; }
+.mkv-auth-main { min-height:0; }
+.mkv-auth-footer { padding:.8rem 1rem; background:#fff; }
 
 /* ─── Shared application components ─── */
 .mkv-app-shell { max-width: 1440px; margin: 0 auto; }
@@ -39,8 +42,8 @@ body {
 .mkv-toolbar { display:flex; align-items:end; justify-content:space-between; gap:.75rem; flex-wrap:wrap; }
 .mkv-field { display:flex; flex-direction:column; gap:.35rem; min-width:0; }
 .mkv-field label, .mkv-field-label { color:var(--mkv-text-muted); font-size:.78rem; font-weight:650; }
-.mkv-panel .form-control, .mkv-form-card .form-control { min-height:42px; border:1.5px solid var(--mkv-border); border-radius:9px; color:var(--mkv-text); }
-.mkv-panel .form-control:focus, .mkv-form-card .form-control:focus { border-color:var(--mkv-gold); box-shadow:0 0 0 3px var(--mkv-gold-light); }
+.mkv-panel .form-control, .mkv-panel .form-select, .mkv-form-card .form-control { min-height:42px; border:1.5px solid var(--mkv-border); border-radius:9px; color:var(--mkv-text); }
+.mkv-panel .form-control:focus, .mkv-panel .form-select:focus, .mkv-form-card .form-control:focus { border-color:var(--mkv-gold); box-shadow:0 0 0 3px var(--mkv-gold-light); }
 .mkv-btn-secondary, .mkv-btn-danger, .mkv-btn-quiet { display:inline-flex; align-items:center; justify-content:center; gap:.35rem; min-height:38px; padding:.5rem .9rem; border-radius:9px; font-size:.85rem; font-weight:650; text-decoration:none; transition:all .18s ease; }
 .mkv-btn-secondary { border:1.5px solid var(--mkv-border); background:#fff; color:var(--mkv-text); }
 .mkv-btn-secondary:hover { color:var(--mkv-navy); border-color:var(--mkv-gold); }
@@ -258,35 +261,25 @@ body {
 }
 
 /* ─── Login Page ─── */
-.mkv-login-page {
-  min-height: calc(100vh - 56px - 60px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, var(--mkv-navy) 0%, #1a2744 100%);
-  padding: 2rem 1rem;
-}
-.mkv-login-card {
-  background: #FFFFFF;
-  border-radius: 20px;
-  padding: 2.5rem;
-  max-width: 440px;
-  width: 100%;
-  box-shadow: 0 25px 60px rgba(0,0,0,0.3);
-}
-.mkv-login-card h2 {
-  font-size: 1.4rem;
-  font-weight: 700;
-  color: var(--mkv-navy);
-  text-align: center;
-  margin-bottom: 0.25rem;
-}
-.mkv-login-card .subtitle {
-  text-align: center;
-  color: var(--mkv-text-muted);
-  font-size: 0.85rem;
-  margin-bottom: 1.5rem;
-}
+.mkv-login-page { min-height:100%; display:grid; grid-template-columns:minmax(0, 1.15fr) minmax(390px, .85fr); background:#F8FAFC; }
+.mkv-login-intro { position:relative; overflow:hidden; padding:clamp(2rem, 7vw, 7rem); display:flex; flex-direction:column; justify-content:center; color:#F8FAFC; background:linear-gradient(145deg, #0B1224 0%, var(--mkv-navy) 55%, #1E293B 100%); }
+.mkv-login-intro::after { content:""; position:absolute; width:32rem; height:32rem; right:-16rem; bottom:-18rem; border:1px solid rgba(200,169,81,.24); border-radius:50%; box-shadow:0 0 0 4rem rgba(200,169,81,.035), 0 0 0 8rem rgba(200,169,81,.025); }
+.mkv-login-brand { position:absolute; top:clamp(1.5rem, 3vw, 3rem); left:clamp(1.5rem, 5vw, 5rem); display:inline-flex; align-items:center; gap:.65rem; color:var(--mkv-gold); text-decoration:none; font-size:1.05rem; font-weight:750; letter-spacing:.02em; }
+.mkv-login-brand:hover { color:var(--mkv-gold-hover); }
+.mkv-login-brand-mark { width:2rem; height:2rem; display:grid; place-items:center; padding:.42rem; border:1px solid rgba(200,169,81,.45); border-radius:8px; }
+.mkv-login-brand-mark svg { width:100%; height:100%; }
+.mkv-login-copy { position:relative; z-index:1; max-width:38rem; }
+.mkv-login-eyebrow { margin:0 0 1rem; color:var(--mkv-gold); font-size:.8rem; font-weight:700; letter-spacing:.12em; }
+.mkv-login-copy h1 { margin:0; max-width:34rem; color:#fff; font-size:clamp(2rem, 3.5vw, 3.5rem); line-height:1.22; letter-spacing:-.04em; font-weight:750; }
+.mkv-login-copy > p:not(.mkv-login-eyebrow) { margin:1.25rem 0 0; max-width:31rem; color:#CBD5E1; font-size:1rem; line-height:1.8; }
+.mkv-login-benefits { list-style:none; display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:.6rem; margin:2rem 0 0; padding:0; }
+.mkv-login-benefits li { padding:.8rem; border:1px solid rgba(255,255,255,.12); border-radius:10px; color:#E2E8F0; font-size:.78rem; line-height:1.45; background:rgba(255,255,255,.035); }
+.mkv-login-benefits li::before { content:"✓"; display:block; margin-bottom:.25rem; color:var(--mkv-gold); font-weight:800; }
+.mkv-login-form-area { display:grid; place-items:center; padding:2rem; }
+.mkv-login-card { background:#fff; border:1px solid var(--mkv-border); border-radius:16px; padding:2.5rem; max-width:430px; width:100%; box-shadow:var(--mkv-shadow-lg); }
+.mkv-login-card-heading { margin-bottom:1.75rem; }
+.mkv-login-card h2 { font-size:1.5rem; font-weight:750; color:var(--mkv-navy); margin:0 0 .4rem; }
+.mkv-login-card-heading p { margin:0; color:var(--mkv-text-muted); font-size:.9rem; }
 .mkv-login-card .form-floating {
   margin-bottom: 0.75rem;
 }
@@ -356,6 +349,24 @@ body {
   font-size: 0.82rem;
   margin-bottom: 0.5rem;
 }
+
+/* ─── Account management ─── */
+.mkv-manage-layout { display:grid; grid-template-columns:220px minmax(0, 1fr); gap:1.25rem; align-items:start; }
+.mkv-manage-nav, .mkv-manage-content { background:#fff; border:1px solid var(--mkv-border); border-radius:var(--mkv-radius); box-shadow:var(--mkv-shadow); }
+.mkv-manage-nav { padding:.6rem; }
+.mkv-manage-content { padding:clamp(1.25rem, 3vw, 2rem); max-width:760px; }
+.mkv-manage-nav-list { display:flex; flex-direction:column; gap:.2rem; margin:0; padding:0; list-style:none; }
+.mkv-manage-nav-list .nav-link { display:block; padding:.65rem .75rem; border-radius:8px; color:var(--mkv-text-muted); font-size:.88rem; font-weight:650; }
+.mkv-manage-nav-list .nav-link:hover { color:var(--mkv-navy); background:var(--mkv-bg); }
+.mkv-manage-nav-list .nav-link.active { color:var(--mkv-navy); background:var(--mkv-gold-light); }
+.mkv-manage-content h3 { margin:0 0 1.25rem; color:var(--mkv-navy); font-size:1.25rem; font-weight:750; }
+.mkv-manage-content form { max-width:520px; }
+.mkv-manage-content .form-control { min-height:48px; border:1.5px solid var(--mkv-border); border-radius:9px; }
+.mkv-manage-content .form-control:focus { border-color:var(--mkv-gold); box-shadow:0 0 0 3px var(--mkv-gold-light); }
+.mkv-manage-content .btn-primary { background:var(--mkv-gold); border-color:var(--mkv-gold); color:var(--mkv-navy); font-weight:700; }
+.mkv-manage-content .btn-primary:hover { background:var(--mkv-gold-hover); border-color:var(--mkv-gold-hover); color:var(--mkv-navy); }
+.mkv-manage-content .alert { border-radius:9px; font-size:.88rem; }
+.mkv-manage-danger { padding:1rem; border:1px solid rgba(220,38,38,.28); border-radius:10px; background:#FEF2F2; }
 
 /* ─── Dashboard ─── */
 .mkv-dashboard-header {
@@ -505,4 +516,17 @@ body {
   .modal-dialog { margin: 10px; }
   .mkv-hero-card { padding: 2rem 1.5rem; }
   .mkv-login-card { padding: 1.5rem; }
+}
+
+@media (max-width: 767.98px) {
+  body.mkv-auth-body { overflow:auto; display:block; }
+  .mkv-login-page { min-height:calc(100dvh - 54px); grid-template-columns:1fr; }
+  .mkv-login-intro { min-height:250px; padding:6rem 1.5rem 2rem; }
+  .mkv-login-copy h1 { font-size:1.75rem; }
+  .mkv-login-copy > p:not(.mkv-login-eyebrow), .mkv-login-benefits { display:none; }
+  .mkv-login-form-area { padding:1.25rem; }
+  .mkv-login-card { padding:1.5rem; }
+  .mkv-manage-layout { grid-template-columns:1fr; }
+  .mkv-manage-nav-list { flex-direction:row; overflow-x:auto; }
+  .mkv-manage-nav-list .nav-link { white-space:nowrap; }
 }
