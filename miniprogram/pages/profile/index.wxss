@@ -1,7 +1,10 @@
 .container{min-height:100vh;padding:32rpx 28rpx 156rpx;background:#f6f7f8;box-sizing:border-box}
 .loading{padding-top:120rpx;text-align:center;color:#888;font-size:28rpx}
 .profile-header{display:flex;align-items:center;padding:20rpx 8rpx 32rpx}
-.avatar{width:88rpx;height:88rpx;margin-right:20rpx;border-radius:50%;background:#07c160;color:#fff;font-size:34rpx;font-weight:600;line-height:88rpx;text-align:center}
+.avatar-button{width:88rpx;height:88rpx;margin:0 20rpx 0 0;padding:0;border:0;border-radius:50%;background:transparent;overflow:hidden;line-height:1}
+.avatar-button::after{border:0}
+.avatar,.avatar-image{display:block;width:88rpx;height:88rpx;border-radius:50%}
+.avatar{background:#07c160;color:#fff;font-size:34rpx;font-weight:600;line-height:88rpx;text-align:center}
 .profile-title{font-size:38rpx;font-weight:600;color:#222;line-height:1.25}
 .profile-subtitle{margin-top:6rpx;font-size:25rpx;color:#888}
 .section{margin-bottom:24rpx;padding:28rpx;background:#fff;border-radius:16rpx;box-shadow:0 2rpx 10rpx rgba(0,0,0,.03)}
@@ -16,3 +19,6 @@
 .save-button{margin-top:24rpx;background:#07c160;color:#fff;border-radius:10rpx;font-size:29rpx;line-height:88rpx}
 .save-button::after{border:none}
 .save-button[disabled]{background:#9bdab7;color:#fff}
+.secondary-button{margin-top:20rpx;border:1rpx solid #07c160;border-radius:10rpx;background:#fff;color:#07a650;font-size:28rpx;line-height:76rpx}
+.secondary-button::after{border:none}
+.secondary-button[disabled]{border-color:#9bdab7;color:#9bdab7}

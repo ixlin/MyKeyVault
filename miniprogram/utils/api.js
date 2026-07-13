@@ -122,12 +122,34 @@ function request(method, url, data){
   });
 }
 
+function uploadProfileAvatar(filePath){
+  return new Promise((resolve, reject) => {
+    const header = {};
+    if (sessionCookie) header.Cookie = sessionCookie.split(';')[0];
+    wx.uploadFile({
+      url: BASE + '/api/mp/auth/profile/avatar',
+      filePath,
+      name: 'avatar',
+      header,
+      success(res){
+        let data = {};
+        try { data = JSON.parse(res.data || '{}'); } catch (_) {}
+        if (res.statusCode >= 200 && res.statusCode < 300) return resolve(data);
+        reject({ code: res.statusCode, message: data.message || '头像上传失败' });
+      },
+      fail(){ reject({ code: -1, message: '头像上传失败，请检查网络' }); }
+    });
+  });
+}
+
 module.exports = {
   me(){ return request('GET', '/api/mp/auth/me'); },
   login(identifier, password){ return request('POST', '/api/mp/auth/login', { identifier, password }); },
   wechatLogin(code){ return request('POST', '/api/mp/auth/wechat/login', { code }); },
   bindExistingWechat(code, identifier, password){ return request('POST', '/api/mp/auth/wechat/bind-existing', { code, identifier, password }); },
   bindEmail(email){ return request('POST', '/api/mp/auth/email/bind', { email }); },
+  updateProfile(nickname){ return request('PUT', '/api/mp/auth/profile', { nickname }); },
+  uploadProfileAvatar,
   logout(){ return request('POST', '/api/mp/auth/logout'); },
   acceptTerms(){ return request('POST', '/api/mp/legal/accept', { version: 'v1' }); },
   // dashboard

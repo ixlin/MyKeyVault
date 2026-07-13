@@ -18,23 +18,27 @@ public class AuthController : ControllerBase
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly WechatMiniProgramService _wechatMiniProgram;
     private readonly IEmailSender _emailSender;
+    private readonly IWebHostEnvironment _environment;
 
     public AuthController(
         SignInManager<ApplicationUser> signInManager,
         UserManager<ApplicationUser> userManager,
         WechatMiniProgramService wechatMiniProgram,
-        IEmailSender emailSender)
+        IEmailSender emailSender,
+        IWebHostEnvironment environment)
     {
         _signInManager = signInManager;
         _userManager = userManager;
         _wechatMiniProgram = wechatMiniProgram;
         _emailSender = emailSender;
+        _environment = environment;
     }
 
     public record LoginRequest(string Identifier, string Password);
     public record WechatLoginRequest(string Code);
     public record WechatBindRequest(string Code, string Identifier, string Password);
     public record BindEmailRequest(string Email);
+    public record UpdateProfileRequest(string? Nickname);
 
     [HttpPost("login")]
     [AllowAnonymous]
@@ -211,9 +215,63 @@ public class AuthController : ControllerBase
             userName = name,
             email = user?.Email,
             wechatOpenId = user?.WechatOpenId,
+            wechatNickname = user?.WechatNickname,
+            wechatAvatarUrl = user?.WechatAvatarUrl,
             isEmailConfirmed = user?.EmailConfirmed ?? false,
             emailReminder = !(user?.EmailConfirmed ?? false)
         });
+    }
+
+    [HttpPut("profile")]
+    [Authorize]
+    public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileRequest req)
+    {
+        var nickname = req?.Nickname?.Trim();
+        if (string.IsNullOrWhiteSpace(nickname) || nickname.Length > 128)
+            return BadRequest(new { message = "昵称长度应为 1 至 128 个字符", code = "INVALID_NICKNAME" });
+
+        var user = await _userManager.GetUserAsync(User);
+        if (user == null) return Unauthorized();
+
+        user.WechatNickname = nickname;
+        user.UpdatedAt = DateTime.UtcNow;
+        var result = await _userManager.UpdateAsync(user);
+        if (!result.Succeeded)
+            return StatusCode(500, new { message = "昵称保存失败，请稍后重试", code = "PROFILE_UPDATE_FAILED" });
+
+        return Ok(new { ok = true, wechatNickname = user.WechatNickname, wechatAvatarUrl = user.WechatAvatarUrl });
+    }
+
+    [HttpPost("profile/avatar")]
+    [Authorize]
+    [RequestSizeLimit(2 * 1024 * 1024)]
+    public async Task<IActionResult> UploadProfileAvatar([FromForm] IFormFile avatar)
+    {
+        if (avatar == null || avatar.Length == 0 || avatar.Length > 2 * 1024 * 1024)
+            return BadRequest(new { message = "请选择不超过 2MB 的头像图片", code = "INVALID_AVATAR" });
+
+        var extension = Path.GetExtension(avatar.FileName).ToLowerInvariant();
+        if (extension is not ".jpg" and not ".jpeg" and not ".png")
+            return BadRequest(new { message = "头像仅支持 JPG 或 PNG 图片", code = "INVALID_AVATAR_TYPE" });
+
+        var user = await _userManager.GetUserAsync(User);
+        if (user == null) return Unauthorized();
+
+        var fileName = $"{Guid.NewGuid():N}{extension}";
+        var relativeDirectory = Path.Combine("uploads", "mp-avatars", user.Id);
+        var absoluteDirectory = Path.Combine(_environment.WebRootPath, relativeDirectory);
+        Directory.CreateDirectory(absoluteDirectory);
+        var absolutePath = Path.Combine(absoluteDirectory, fileName);
+        await using (var stream = System.IO.File.Create(absolutePath))
+            await avatar.CopyToAsync(stream);
+
+        user.WechatAvatarUrl = "/" + Path.Combine(relativeDirectory, fileName).Replace(Path.DirectorySeparatorChar, '/');
+        user.UpdatedAt = DateTime.UtcNow;
+        var result = await _userManager.UpdateAsync(user);
+        if (!result.Succeeded)
+            return StatusCode(500, new { message = "头像保存失败，请稍后重试", code = "AVATAR_UPDATE_FAILED" });
+
+        return Ok(new { ok = true, wechatAvatarUrl = user.WechatAvatarUrl });
     }
 
     [HttpPost("email/bind")]

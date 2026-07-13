@@ -1,4 +1,10 @@
 const api = require('../../utils/api');
+const { BASE } = require('../../utils/config');
+
+function avatarUrl(value) {
+  if (!value || /^https?:\/\//.test(value)) return value || '';
+  return BASE + value;
+}
 
 Page({
   data: {
@@ -6,6 +12,8 @@ Page({
     saving: false,
     email: '',
     savedEmail: '',
+    nickname: '',
+    avatarUrl: '',
     wechatOpenId: '',
     isEmailConfirmed: false
   },
@@ -29,6 +37,8 @@ Page({
       this.setData({
         email,
         savedEmail: email,
+        nickname: me.wechatNickname || '',
+        avatarUrl: avatarUrl(me.wechatAvatarUrl),
         wechatOpenId: me.wechatOpenId || '',
         isEmailConfirmed: !!me.isEmailConfirmed,
         loading: false
@@ -41,6 +51,44 @@ Page({
 
   onEmailInput(e) {
     this.setData({ email: e.detail.value });
+  },
+
+  onNicknameInput(e) {
+    this.setData({ nickname: e.detail.value });
+  },
+
+  async onChooseAvatar(e) {
+    const filePath = e.detail && e.detail.avatarUrl;
+    if (!filePath || this.data.saving) return;
+    this.setData({ saving: true });
+    try {
+      const result = await api.uploadProfileAvatar(filePath);
+      this.setData({ avatarUrl: avatarUrl(result.wechatAvatarUrl) });
+      wx.showToast({ title: '头像已保存', icon: 'success' });
+    } catch (err) {
+      wx.showToast({ title: err.message || '头像保存失败', icon: 'none' });
+    } finally {
+      this.setData({ saving: false });
+    }
+  },
+
+  async saveNickname() {
+    if (this.data.saving) return;
+    const nickname = this.data.nickname.trim();
+    if (!nickname) {
+      wx.showToast({ title: '请填写昵称', icon: 'none' });
+      return;
+    }
+    this.setData({ saving: true });
+    try {
+      const result = await api.updateProfile(nickname);
+      this.setData({ nickname: result.wechatNickname || nickname });
+      wx.showToast({ title: '昵称已保存', icon: 'success' });
+    } catch (err) {
+      wx.showToast({ title: err.message || '昵称保存失败', icon: 'none' });
+    } finally {
+      this.setData({ saving: false });
+    }
   },
 
   async saveEmail() {

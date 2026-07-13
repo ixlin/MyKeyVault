@@ -3,11 +3,21 @@
 
   <block wx:else>
     <view class="profile-header">
-      <view class="avatar">我</view>
+      <button class="avatar-button" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
+        <image wx:if="{{avatarUrl}}" class="avatar-image" src="{{avatarUrl}}" mode="aspectFill" />
+        <view wx:else class="avatar">我</view>
+      </button>
       <view>
-        <view class="profile-title">个人中心</view>
-        <view class="profile-subtitle">管理账号绑定信息</view>
+        <view class="profile-title">{{nickname || '个人中心'}}</view>
+        <view class="profile-subtitle">点击头像可选择并保存新头像</view>
       </view>
+    </view>
+
+    <view class="section">
+      <view class="section-title">昵称</view>
+      <input class="email-input" type="nickname" placeholder="填写昵称" value="{{nickname}}" bindinput="onNicknameInput" />
+      <view class="field-hint">昵称由你确认后保存，不会在登录时自动读取。</view>
+      <button class="secondary-button" loading="{{saving}}" disabled="{{saving}}" bindtap="saveNickname">保存昵称</button>
     </view>
 
     <view class="section">
