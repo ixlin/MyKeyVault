@@ -1,0 +1,14 @@
+{
+  "name": "mykeyvault-miniprogram-ci",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Headless CI entrypoint for the MyKeyVault WeChat Mini Program",
+  "scripts": {
+    "verify": "node runner.cjs verify",
+    "preview": "node runner.cjs preview",
+    "upload": "node runner.cjs upload"
+  },
+  "dependencies": {
+    "miniprogram-ci": "2.1.31"
+  }
+}

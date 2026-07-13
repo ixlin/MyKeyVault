@@ -9,6 +9,9 @@
 .DS_Store
 .vscode/
 
+# Node.js dependencies used by local tooling
+**/node_modules/
+
 # Local databases
 **/*.db
 

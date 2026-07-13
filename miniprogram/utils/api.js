@@ -129,7 +129,7 @@ module.exports = {
   bindExistingWechat(code, identifier, password){ return request('POST', '/api/mp/auth/wechat/bind-existing', { code, identifier, password }); },
   bindEmail(email){ return request('POST', '/api/mp/auth/email/bind', { email }); },
   logout(){ return request('POST', '/api/mp/auth/logout'); },
-  acceptTerms(){ return request('POST', '/api/mp/legal/accept'); },
+  acceptTerms(){ return request('POST', '/api/mp/legal/accept', { version: 'v1' }); },
   // dashboard
   getDashboardStats(){ return request('GET', '/api/mp/dashboard/stats'); },
   listAccounts(q, tagId){ 
