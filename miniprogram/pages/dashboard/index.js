@@ -5,7 +5,9 @@ Page({
     loading: true,
     accountCount: 0,
     tagCount: 0,
-    recentAccounts: []
+    recentAccounts: [],
+    emailReminder: false,
+    email: ''
   },
 
   onLoad() {
@@ -44,6 +46,7 @@ Page({
         wx.reLaunch({ url: '/pages/login/login' });
         return;
       }
+      this.setData({ emailReminder: !!me.emailReminder, email: me.email || '' });
 
       console.log('✅ [DASHBOARD] User is authenticated, refreshing dashboard data...');
       await this.loadDashboardData();
@@ -65,6 +68,7 @@ Page({
         wx.reLaunch({ url: '/pages/login/login' });
         return;
       }
+      this.setData({ emailReminder: !!me.emailReminder, email: me.email || '' });
 
       console.log('✅ [DASHBOARD] User is authenticated, loading dashboard data...');
       await this.loadDashboardData();
@@ -212,6 +216,22 @@ Page({
   onAddAccountTap() {
     wx.navigateTo({
       url: '/pages/account/add/add'
+    });
+  }
+  ,onBindEmailTap() {
+    wx.showModal({
+      title: '绑定邮箱',
+      content: '绑定后可接收账号安全与找回密码邮件',
+      editable: true,
+      placeholderText: '请输入邮箱地址',
+      success: async (res) => {
+        if (!res.confirm) return;
+        try {
+          await api.bindEmail(res.content);
+          this.setData({ emailReminder: true, email: res.content });
+          wx.showToast({ title: '验证邮件已发送', icon: 'success' });
+        } catch (err) { wx.showToast({ title: err.message || '发送失败', icon: 'none' }); }
+      }
     });
   }
 });

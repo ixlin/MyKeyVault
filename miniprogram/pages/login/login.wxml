@@ -1,9 +1,18 @@
 <view class="container">
   <view class="main-title">我的密码本</view>
   
-  <input class="input" placeholder="邮箱/手机号/用户名" bindinput="onInputId" />
-  <input class="input" placeholder="密码" password="true" bindinput="onInputPwd" />
-  <button class="btn" loading="{{loading}}" bindtap="onSubmit">登录</button>
+  <view wx:if="{{loginMode === 'wechat'}}" class="wechat-login">
+    <view class="wechat-login-hint">使用微信即可创建或登录密码本账号</view>
+    <button class="btn" loading="{{loading}}" bindtap="onWechatLogin">微信一键登录</button>
+    <view class="switch-link" bindtap="switchToAccountBinding">已有网站账号？绑定微信</view>
+  </view>
+  <view wx:else class="binding-login">
+    <view class="binding-hint">验证已有账号后，将此微信永久绑定到该账号</view>
+    <input class="input" placeholder="邮箱/手机号/用户名" bindinput="onInputId" />
+    <input class="input" placeholder="密码" password="true" bindinput="onInputPwd" />
+    <button class="btn" loading="{{loading}}" bindtap="onSubmit">验证并绑定微信</button>
+    <view class="switch-link" bindtap="switchToWechatLogin">返回微信一键登录</view>
+  </view>
   
   <!-- 调试信息面板 -->
   <view wx:if="{{showDebug}}" class="debug-panel">
@@ -34,7 +43,7 @@
   </view>
   
   <view class="links-container">
-    <view class="hint-text">还没有账号？忘记密码？</view>
+    <view class="hint-text">需要使用账号密码？忘记密码？</view>
     <view class="link-buttons">
       <text class="link-text" bindtap="onRegisterTap">注册账号</text>
       <text class="separator">|</text>

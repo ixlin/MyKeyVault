@@ -44,6 +44,14 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             e.Property(x => x.ConcurrencyStamp).IsConcurrencyToken();
         });
 
+        builder.Entity<ApplicationUser>(e =>
+        {
+            e.HasIndex(x => x.WechatOpenId).IsUnique();
+            e.Property(x => x.WechatOpenId).HasMaxLength(128);
+            e.Property(x => x.WechatNickname).HasMaxLength(128);
+            e.Property(x => x.WechatAvatarUrl).HasMaxLength(1024);
+        });
+
         builder.Entity<Tag>(e =>
         {
             e.HasIndex(x => new { x.UserId, x.TagName }).IsUnique();

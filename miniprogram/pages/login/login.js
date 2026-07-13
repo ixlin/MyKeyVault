@@ -5,6 +5,7 @@ Page({
     identifier: '',
     password: '',
     loading: false,
+    loginMode: 'wechat',
     showDebug: false,  // 正式环境关闭调试面板
     debugInfo: {
       env: '',
@@ -143,6 +144,26 @@ Page({
   },
   onInputId(e) { this.setData({ identifier: e.detail.value }); },
   onInputPwd(e) { this.setData({ password: e.detail.value }); },
+  switchToWechatLogin() { this.setData({ loginMode: 'wechat' }); },
+  switchToAccountBinding() { this.setData({ loginMode: 'binding' }); },
+  getWechatCode() {
+    return new Promise((resolve, reject) => wx.login({
+      success: (res) => res.code ? resolve(res.code) : reject({ message: '微信授权失败，请重试' }),
+      fail: () => reject({ message: '微信授权失败，请重试' })
+    }));
+  },
+  async onWechatLogin() {
+    if (this.data.loading) return;
+    this.setData({ loading: true });
+    try {
+      const code = await this.getWechatCode();
+      const result = await api.wechatLogin(code);
+      wx.showToast({ title: result.isNewUser ? '微信账号已创建' : '登录成功', icon: 'success' });
+      setTimeout(() => wx.reLaunch({ url: '/pages/dashboard/index' }), 600);
+    } catch (err) {
+      wx.showToast({ title: err.message || '微信登录失败', icon: 'none' });
+    } finally { this.setData({ loading: false }); }
+  },
   async onSubmit() {
     console.log('🔐 [LOGIN] Login button clicked');
     if (this.data.loading) {
@@ -161,7 +182,12 @@ Page({
     try {
       // 登录页只负责登录，登录成功后直接跳转
       console.log('🔐 [LOGIN] Calling api.login...');
-      await api.login(identifier, password);
+      if (this.data.loginMode === 'binding') {
+        const code = await this.getWechatCode();
+        await api.bindExistingWechat(code, identifier, password);
+      } else {
+        await api.login(identifier, password);
+      }
       console.log('✅ [LOGIN] Login successful, redirecting...');
       
       // 显示成功提示

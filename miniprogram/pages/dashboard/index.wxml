@@ -7,6 +7,10 @@
 
   <!-- 仪表盘内容 -->
   <view wx:else class="dashboard-content">
+    <view wx:if="{{emailReminder}}" class="email-reminder" bindtap="onBindEmailTap">
+      <view class="email-reminder-title">邮箱尚未验证</view>
+      <view class="email-reminder-text">{{email ? email + '，点击重新发送验证邮件' : '点击绑定邮箱，保障账号安全'}}</view>
+    </view>
     <!-- 数据概览卡片 -->
     <view class="stats-section">
       <view class="stats-grid">

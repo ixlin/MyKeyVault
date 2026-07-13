@@ -125,6 +125,9 @@ function request(method, url, data){
 module.exports = {
   me(){ return request('GET', '/api/mp/auth/me'); },
   login(identifier, password){ return request('POST', '/api/mp/auth/login', { identifier, password }); },
+  wechatLogin(code){ return request('POST', '/api/mp/auth/wechat/login', { code }); },
+  bindExistingWechat(code, identifier, password){ return request('POST', '/api/mp/auth/wechat/bind-existing', { code, identifier, password }); },
+  bindEmail(email){ return request('POST', '/api/mp/auth/email/bind', { email }); },
   logout(){ return request('POST', '/api/mp/auth/logout'); },
   acceptTerms(){ return request('POST', '/api/mp/legal/accept'); },
   // dashboard

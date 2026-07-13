@@ -78,6 +78,11 @@ builder.Services.Configure<WechatScraperOptions>(
 builder.Services.AddHttpClient<WechatScraperService>();
 builder.Services.AddScoped<WechatScraperService>();
 
+// 微信小程序登录：凭据从生产环境私密配置读取，绝不写入仓库。
+builder.Services.Configure<WechatMiniProgramOptions>(
+    builder.Configuration.GetSection(WechatMiniProgramOptions.SectionName));
+builder.Services.AddHttpClient<WechatMiniProgramService>();
+
 // AI 萃取服务配置
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<AIExtractionService>();

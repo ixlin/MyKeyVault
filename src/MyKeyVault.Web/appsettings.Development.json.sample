@@ -1,4 +1,8 @@
 {
+  "WechatMiniProgram": {
+    "AppId": "",
+    "AppSecret": ""
+  },
   "ConnectionStrings": {
     "DefaultConnection": "Host=localhost;Port=5432;Database=mykeyvault_dev;Username=postgres;Password=postgres"
   },
