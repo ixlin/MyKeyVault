@@ -6,7 +6,8 @@
     "pages/account/detail/detail",
     "pages/account/edit/edit",
     "pages/account/add/add",
-    "pages/tags/index/index"
+    "pages/tags/index/index",
+    "pages/profile/index"
   ],
   "window": {
   "navigationBarTextStyle": "black",
@@ -20,7 +21,8 @@
     "list": [
       { "pagePath": "pages/dashboard/index", "text": "首页" },
       { "pagePath": "pages/accounts/index", "text": "账号" },
-      { "pagePath": "pages/tags/index/index", "text": "标签" }
+      { "pagePath": "pages/tags/index/index", "text": "标签" },
+      { "pagePath": "pages/profile/index", "text": "我的" }
     ]
   },
   "componentFramework": "glass-easel",

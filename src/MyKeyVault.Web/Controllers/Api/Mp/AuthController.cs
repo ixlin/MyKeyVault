@@ -204,7 +204,16 @@ public class AuthController : ControllerBase
         var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
         var name = User.Identity?.Name ?? string.Empty;
         var user = _userManager.GetUserAsync(User).GetAwaiter().GetResult();
-        return Ok(new { isAuthenticated = true, userId, userName = name, email = user?.Email, isEmailConfirmed = user?.EmailConfirmed ?? false, emailReminder = !(user?.EmailConfirmed ?? false) });
+        return Ok(new
+        {
+            isAuthenticated = true,
+            userId,
+            userName = name,
+            email = user?.Email,
+            wechatOpenId = user?.WechatOpenId,
+            isEmailConfirmed = user?.EmailConfirmed ?? false,
+            emailReminder = !(user?.EmailConfirmed ?? false)
+        });
     }
 
     [HttpPost("email/bind")]

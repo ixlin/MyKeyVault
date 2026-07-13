@@ -1,0 +1,30 @@
+<view class="container">
+  <view wx:if="{{loading}}" class="loading">正在加载个人信息…</view>
+
+  <block wx:else>
+    <view class="profile-header">
+      <view class="avatar">我</view>
+      <view>
+        <view class="profile-title">个人中心</view>
+        <view class="profile-subtitle">管理账号绑定信息</view>
+      </view>
+    </view>
+
+    <view class="section">
+      <view class="section-title">微信 ID</view>
+      <view class="readonly-value {{wechatOpenId ? '' : 'empty'}}">{{wechatOpenId || '未绑定微信'}}</view>
+      <view class="field-hint">微信 ID 由微信授权生成，仅用于登录绑定，不能修改。</view>
+    </view>
+
+    <view class="section">
+      <view class="section-title">邮箱</view>
+      <input class="email-input" type="text" placeholder="请输入邮箱地址" value="{{email}}" bindinput="onEmailInput" />
+      <view class="email-status {{isEmailConfirmed ? 'confirmed' : 'pending'}}">
+        {{isEmailConfirmed ? '邮箱已验证' : (savedEmail ? '邮箱待验证，请查收确认邮件' : '绑定邮箱后可用于保障账号安全')}}
+      </view>
+      <button class="save-button" loading="{{saving}}" disabled="{{saving}}" bindtap="saveEmail">
+        {{savedEmail ? '保存邮箱修改' : '绑定邮箱'}}
+      </button>
+    </view>
+  </block>
+</view>
