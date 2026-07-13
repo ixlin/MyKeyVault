@@ -76,6 +76,7 @@ jobs:
               --exclude 'appsettings*.json' \
               --exclude 'wechat-articles' \
               --exclude 'html-ppt' \
+              --exclude 'wwwroot/uploads' \
               "$SRC_DIR/" "$DEST_DIR/"
           else
             echo "rsync not found on remote host, falling back to tar+find copy"
@@ -84,6 +85,8 @@ jobs:
               -not -name 'appsettings*.json' \
               -not -name 'wechat-articles' \
               -not -name 'html-ppt' \
+              -not -path "$DEST_DIR/wwwroot" \
+              -not -path "$DEST_DIR/wwwroot/uploads*" \
               -exec rm -rf {} +
             # 2) 将发布产物打包流式传输到目标目录,同时排除 appsettings*.json,避免覆盖线上配置
             sudo -n tar -C "$SRC_DIR" --exclude='appsettings*.json' -cf - . | sudo -n tar -C "$DEST_DIR" -xpf -
