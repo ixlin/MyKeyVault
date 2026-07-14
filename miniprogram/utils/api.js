@@ -123,11 +123,12 @@ function request(method, url, data){
 }
 
 function uploadProfileAvatar(filePath){
+  const uploadUrl = BASE + '/api/mp/auth/profile/avatar';
   return new Promise((resolve, reject) => {
     const header = {};
     if (sessionCookie) header.Cookie = sessionCookie.split(';')[0];
     wx.uploadFile({
-      url: BASE + '/api/mp/auth/profile/avatar',
+      url: uploadUrl,
       filePath,
       name: 'avatar',
       header,
@@ -135,9 +136,22 @@ function uploadProfileAvatar(filePath){
         let data = {};
         try { data = JSON.parse(res.data || '{}'); } catch (_) {}
         if (res.statusCode >= 200 && res.statusCode < 300) return resolve(data);
-        reject({ code: res.statusCode, message: data.message || '头像上传失败' });
+        const responseText = typeof res.data === 'string' ? res.data : JSON.stringify(data);
+        const diagnostic = `上传地址：${uploadUrl}\n服务器状态：${res.statusCode}\n服务端响应：${responseText || '无响应内容'}`.slice(0, 450);
+        reject({ code: res.statusCode, message: data.message || '头像上传失败', diagnostic });
       },
-      fail(){ reject({ code: -1, message: '头像上传失败，请检查网络' }); }
+      fail(err){
+        const detail = (err && err.errMsg) || '';
+        const diagnostic = `上传地址：${uploadUrl}\n微信错误：${detail || '未返回详细错误'}`.slice(0, 450);
+        console.error('头像上传失败:', err);
+        if (/domain|合法域名|url not in domain list/i.test(detail)) {
+          return reject({ code: -1, message: '上传服务域名校验失败', diagnostic });
+        }
+        if (/timeout/i.test(detail)) {
+          return reject({ code: -1, message: '头像上传超时，请稍后重试', diagnostic });
+        }
+        reject({ code: -1, message: detail || '头像上传失败，请检查网络', diagnostic });
+      }
     });
   });
 }

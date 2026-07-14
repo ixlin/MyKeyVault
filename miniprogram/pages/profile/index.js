@@ -15,7 +15,9 @@ Page({
     nickname: '',
     avatarUrl: '',
     wechatOpenId: '',
-    isEmailConfirmed: false
+    isEmailConfirmed: false,
+    editingNickname: false,
+    editingEmail: false
   },
 
   onShow() {
@@ -57,6 +59,14 @@ Page({
     this.setData({ nickname: e.detail.value });
   },
 
+  startNicknameEdit() {
+    this.setData({ editingNickname: true });
+  },
+
+  startEmailEdit() {
+    this.setData({ editingEmail: true });
+  },
+
   async onChooseAvatar(e) {
     const filePath = e.detail && e.detail.avatarUrl;
     if (!filePath || this.data.saving) return;
@@ -66,7 +76,15 @@ Page({
       this.setData({ avatarUrl: avatarUrl(result.wechatAvatarUrl) });
       wx.showToast({ title: '头像已保存', icon: 'success' });
     } catch (err) {
-      wx.showToast({ title: err.message || '头像保存失败', icon: 'none' });
+      if (err.diagnostic) {
+        wx.showModal({
+          title: '头像上传诊断',
+          content: err.diagnostic,
+          showCancel: false
+        });
+      } else {
+        wx.showToast({ title: err.message || '头像保存失败', icon: 'none' });
+      }
     } finally {
       this.setData({ saving: false });
     }
@@ -82,7 +100,7 @@ Page({
     this.setData({ saving: true });
     try {
       const result = await api.updateProfile(nickname);
-      this.setData({ nickname: result.wechatNickname || nickname });
+      this.setData({ nickname: result.wechatNickname || nickname, editingNickname: false });
       wx.showToast({ title: '昵称已保存', icon: 'success' });
     } catch (err) {
       wx.showToast({ title: err.message || '昵称保存失败', icon: 'none' });
@@ -113,7 +131,8 @@ Page({
       this.setData({
         email: result.email || email,
         savedEmail: result.email || email,
-        isEmailConfirmed: false
+        isEmailConfirmed: false,
+        editingEmail: false
       });
       wx.showToast({ title: '验证邮件已发送', icon: 'success' });
     } catch (err) {

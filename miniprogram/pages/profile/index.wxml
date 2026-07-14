@@ -3,38 +3,51 @@
 
   <block wx:else>
     <view class="profile-header">
-      <button class="avatar-button" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
-        <image wx:if="{{avatarUrl}}" class="avatar-image" src="{{avatarUrl}}" mode="aspectFill" />
-        <view wx:else class="avatar">我</view>
-      </button>
-      <view>
+      <view class="avatar-wrap">
+        <view class="avatar-mask">
+          <image wx:if="{{avatarUrl}}" class="avatar-image" src="{{avatarUrl}}" mode="aspectFill" />
+          <view wx:else class="avatar">我</view>
+        </view>
+        <button class="avatar-picker" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar" aria-label="更换头像"></button>
+      </view>
+      <view class="profile-main">
         <view class="profile-title">{{nickname || '个人中心'}}</view>
-        <view class="profile-subtitle">点击头像可选择并保存新头像</view>
+        <view class="profile-subtitle">微信已绑定 · 点击头像更换</view>
+      </view>
+    </view>
+
+    <view class="section settings-section">
+      <view class="section-title">个人资料</view>
+      <view class="setting-row" bindtap="startNicknameEdit">
+        <view class="setting-label">昵称</view>
+        <view class="setting-value">{{nickname || '未设置'}} <text class="chevron">›</text></view>
+      </view>
+      <view wx:if="{{editingNickname}}" class="inline-editor">
+        <input class="text-input" type="nickname" placeholder="填写或确认微信昵称" value="{{nickname}}" bindinput="onNicknameInput" />
+        <button class="inline-save" loading="{{saving}}" disabled="{{saving}}" bindtap="saveNickname">保存</button>
+      </view>
+      <view class="setting-divider"></view>
+      <view class="identity-row">
+        <view class="setting-label">微信 ID</view>
+        <view class="identity-value">{{wechatOpenId || '未绑定微信'}}</view>
       </view>
     </view>
 
     <view class="section">
-      <view class="section-title">昵称</view>
-      <input class="email-input" type="nickname" placeholder="填写昵称" value="{{nickname}}" bindinput="onNicknameInput" />
-      <view class="field-hint">昵称由你确认后保存，不会在登录时自动读取。</view>
-      <button class="secondary-button" loading="{{saving}}" disabled="{{saving}}" bindtap="saveNickname">保存昵称</button>
-    </view>
-
-    <view class="section">
-      <view class="section-title">微信 ID</view>
-      <view class="readonly-value {{wechatOpenId ? '' : 'empty'}}">{{wechatOpenId || '未绑定微信'}}</view>
-      <view class="field-hint">微信 ID 由微信授权生成，仅用于登录绑定，不能修改。</view>
-    </view>
-
-    <view class="section">
-      <view class="section-title">邮箱</view>
-      <input class="email-input" type="text" placeholder="请输入邮箱地址" value="{{email}}" bindinput="onEmailInput" />
-      <view class="email-status {{isEmailConfirmed ? 'confirmed' : 'pending'}}">
-        {{isEmailConfirmed ? '邮箱已验证' : (savedEmail ? '邮箱待验证，请查收确认邮件' : '绑定邮箱后可用于保障账号安全')}}
+      <view class="section-title">账号与安全</view>
+      <view class="setting-row" bindtap="startEmailEdit">
+        <view class="setting-label">邮箱</view>
+        <view class="setting-value {{isEmailConfirmed ? 'confirmed' : 'pending'}}">
+          {{isEmailConfirmed ? '已验证' : (savedEmail ? '待验证' : '绑定邮箱')}} <text class="chevron">›</text>
+        </view>
       </view>
-      <button class="save-button" loading="{{saving}}" disabled="{{saving}}" bindtap="saveEmail">
-        {{savedEmail ? '保存邮箱修改' : '绑定邮箱'}}
-      </button>
+      <view wx:if="{{editingEmail}}" class="inline-editor email-editor">
+        <input class="text-input" type="text" placeholder="请输入邮箱地址" value="{{email}}" bindinput="onEmailInput" />
+        <view class="field-hint">{{savedEmail ? '修改后需重新验证邮箱。' : '绑定邮箱后可用于保障账号安全。'}}</view>
+        <button class="save-button" loading="{{saving}}" disabled="{{saving}}" bindtap="saveEmail">
+          {{savedEmail ? '保存邮箱修改' : '绑定邮箱'}}
+        </button>
+      </view>
     </view>
   </block>
 </view>

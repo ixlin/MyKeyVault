@@ -111,6 +111,12 @@ jobs:
           sudo -n chown "$SERVICE_USER":"$SERVICE_USER" "$CFG_FILE" || true
           sudo -n chmod 664 "$CFG_FILE" || true
 
+          # 头像等运行时上传文件不随发布产物同步；首次部署也必须创建并交给服务账户写入。
+          UPLOAD_DIR="$DEST_DIR/wwwroot/uploads"
+          sudo -n mkdir -p "$UPLOAD_DIR"
+          sudo -n chown -R "$SERVICE_USER":"$SERVICE_USER" "$UPLOAD_DIR"
+          sudo -n chmod 750 "$UPLOAD_DIR"
+
           # 清理临时目录
           rm -rf "$SRC_DIR"
 
