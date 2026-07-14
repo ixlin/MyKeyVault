@@ -1,78 +1,13 @@
-.container{padding:24rpx}
-.title{font-size:36rpx;margin-bottom:24rpx}
-.input{border:1px solid #ddd;border-radius:8rpx;margin-bottom:16rpx;padding:16rpx}
-.btn{background:#1677ff;color:#fff}
-.wechat-login-hint,.binding-hint{color:#666;font-size:28rpx;line-height:1.6;margin:12rpx 0 24rpx;text-align:center}
-.switch-link{color:#1677ff;font-size:28rpx;padding:24rpx 0;text-align:center}
+.container{min-height:100vh;box-sizing:border-box;padding:112rpx 48rpx;background:#f0f2f5}
+.brand{color:#1877f2;font-size:54rpx;font-weight:800;letter-spacing:-2rpx;text-align:center}
+.main-title{margin-top:24rpx;color:#1c1e21;font-size:38rpx;font-weight:700;text-align:center}
+.intro{margin:18rpx 20rpx 56rpx;color:#65676b;font-size:27rpx;line-height:1.65;text-align:center}
+.wechat-login,.binding-login{padding:40rpx 32rpx;border-radius:20rpx;background:#fff;box-shadow:0 4rpx 18rpx rgba(0,0,0,.08)}
+.input{box-sizing:border-box;width:100%;height:88rpx;margin-bottom:18rpx;padding:0 24rpx;border:2rpx solid #dfe3e8;border-radius:14rpx;background:#f7f8fa;font-size:28rpx}
+.btn{height:88rpx;border-radius:14rpx;background:#1877f2;color:#fff;font-size:30rpx;font-weight:600;line-height:88rpx}
+.wechat-login-hint,.binding-hint{color:#65676b;font-size:27rpx;line-height:1.6;margin:0 0 28rpx;text-align:center}
+.switch-link{color:#1877f2;font-size:27rpx;padding:26rpx 0 0;text-align:center}
 
-/* 调试信息样式 */
-.debug-panel {
-  background: #fff3cd;
-  border: 2px solid #ffc107;
-  border-radius: 8rpx;
-  padding: 20rpx;
-  margin: 20rpx 0;
-  font-size: 24rpx;
-}
-
-.debug-title {
-  font-weight: bold;
-  color: #333;
-  margin-bottom: 16rpx;
-  font-size: 28rpx;
-  text-align: center;
-}
-
-.debug-item {
-  display: flex;
-  margin-bottom: 12rpx;
-  color: #333;
-  line-height: 1.6;
-}
-
-.debug-label {
-  font-weight: bold;
-  min-width: 120rpx;
-  color: #666;
-}
-
-.debug-value {
-  flex: 1;
-  word-break: break-all;
-  color: #333;
-}
-
-.debug-item.error {
-  background: #fff1f0;
-  border: 1px solid #ff4d4f;
-  padding: 10rpx;
-  border-radius: 4rpx;
-  flex-direction: column;
-}
-
-.debug-item.error .debug-value {
-  color: #ff4d4f;
-  font-weight: bold;
-  margin-top: 6rpx;
-}
-
-.debug-btn {
-  background: #722ed1;
-  color: #fff;
-  font-size: 24rpx;
-  padding: 16rpx;
-  margin-top: 16rpx;
-}
-
-.debug-toggle {
-  background: #52c41a;
-  color: #fff;
-  font-size: 24rpx;
-  padding: 12rpx;
-  margin-bottom: 20rpx;
-}
-
-/* 链接区域样式 */
 .links-container {
   margin-top: 40rpx;
   text-align: center;
@@ -94,7 +29,7 @@
 .link-text {
   font-size: 28rpx;
   color: #1677ff;
-  text-decoration: underline;
+  text-decoration: none;
   padding: 10rpx 20rpx;
 }
 
@@ -108,11 +43,4 @@
   font-size: 24rpx;
   color: #999;
   margin-top: 16rpx;
-}
-
-.main-title {
-  font-size: 36rpx;
-  margin-bottom: 24rpx;
-  text-align: center;
-  font-weight: bold;
 }

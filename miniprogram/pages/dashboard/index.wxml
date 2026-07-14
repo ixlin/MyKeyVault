@@ -1,85 +1,26 @@
 <view class="dashboard-container">
-  <!-- 加载状态 -->
-  <view wx:if="{{loading}}" class="loading-container">
-    <view class="loading-spinner"></view>
-    <text class="loading-text">加载中...</text>
-  </view>
-
-  <!-- 仪表盘内容 -->
-  <view wx:else class="dashboard-content">
-    <view wx:if="{{emailReminder}}" class="email-reminder" bindtap="onBindEmailTap">
-      <view class="email-reminder-title">邮箱尚未验证</view>
-      <view class="email-reminder-text">{{email ? email + '，点击重新发送验证邮件' : '点击绑定邮箱，保障账号安全'}}</view>
+  <view wx:if="{{loading}}" class="loading-container"><view class="loading-spinner"></view><text>正在准备首页…</text></view>
+  <block wx:else>
+    <view wx:if="{{isGuest}}" class="guest-home">
+      <view class="brand-row"><text class="brand">MyKeyVault</text><view class="guest-badge">访客模式</view></view>
+      <view class="hero-card">
+        <text class="hero-title">把重要账号，收进一个安全的地方</text>
+        <text class="hero-copy">记录账号、密码、网址和备注；用标签快速找到它们。先了解功能，保存时再登录。</text>
+        <button class="primary-button" bindtap="onAddAccountTap">体验新增账号</button>
+        <text class="login-link" bindtap="onLoginTap">已有密码本？登录</text>
+      </view>
+      <view class="section-heading">使用方式</view>
+      <view class="flow-card"><view class="step"><text class="step-no">1</text><view><text class="step-title">整理账号</text><text class="step-copy">填写名称、账号、密码和网址</text></view></view><view class="step"><text class="step-no">2</text><view><text class="step-title">添加标签</text><text class="step-copy">例如：工作、社交、购物</text></view></view><view class="step"><text class="step-no">3</text><view><text class="step-title">登录后保存</text><text class="step-copy">仅在你确认保存时创建或登录账户</text></view></view></view>
+      <view class="feature-grid"><view class="feature-card"><text class="feature-icon">▣</text><text class="feature-title">账号管理</text><text class="feature-copy">按名称和网址记录</text></view><view class="feature-card"><text class="feature-icon">#</text><text class="feature-title">标签分类</text><text class="feature-copy">快速筛选和查找</text></view></view>
     </view>
-    <!-- 数据概览卡片 -->
-    <view class="stats-section">
-      <view class="stats-grid">
-        <!-- 账号总数卡片 -->
-        <view class="stat-card" bindtap="onAccountsCardTap">
-          <view class="stat-icon">📱</view>
-          <view class="stat-number">{{accountCount}}</view>
-          <view class="stat-label">账号总数</view>
-        </view>
-        
-        <!-- 标签总数卡片 -->
-        <view class="stat-card" bindtap="onTagsCardTap">
-          <view class="stat-icon">🏷️</view>
-          <view class="stat-number">{{tagCount}}</view>
-          <view class="stat-label">标签总数</view>
-        </view>
-      </view>
+    <view wx:else class="dashboard-content">
+      <view class="brand-row"><text class="brand">MyKeyVault</text></view>
+      <view wx:if="{{emailReminder}}" class="email-reminder">邮箱尚未验证：{{email || '绑定邮箱可增强账号安全'}}</view>
+      <view class="stats-grid"><view class="stat-card" bindtap="onAccountsCardTap"><text class="stat-number">{{accountCount}}</text><text class="stat-label">账号</text></view><view class="stat-card" bindtap="onTagsCardTap"><text class="stat-number">{{tagCount}}</text><text class="stat-label">标签</text></view></view>
+      <view class="section-heading">最近修改</view>
+      <view wx:if="{{recentAccounts.length === 0}}" class="empty-state"><text>还没有账号记录</text><text class="empty-copy">从新增账号开始整理</text></view>
+      <view wx:else class="recent-list"><view wx:for="{{recentAccounts}}" wx:key="id" class="recent-item" bindtap="onRecentAccountTap" data-id="{{item.id}}"><view><text class="recent-title">{{item.title}}</text><text class="recent-time">{{item.formattedTime}}</text></view><text class="chevron">›</text></view></view>
+      <button class="primary-button" bindtap="onAddAccountTap">新增账号</button>
     </view>
-
-    <!-- 最近活动模块 -->
-    <view class="recent-section">
-      <view class="section-header">
-        <view class="section-title">最近修改</view>
-        <view class="section-subtitle">最近5条账号记录</view>
-      </view>
-      
-      <view wx:if="{{recentAccounts.length === 0}}" class="empty-state">
-        <view class="empty-icon">📝</view>
-        <view class="empty-text">暂无账号记录</view>
-        <view class="empty-hint">点击下方按钮创建您的第一个账号</view>
-      </view>
-      
-      <view wx:else class="recent-list">
-        <view 
-          wx:for="{{recentAccounts}}" 
-          wx:key="id" 
-          class="recent-item"
-          bindtap="onRecentAccountTap"
-          data-id="{{item.id}}"
-        >
-          <view class="recent-item-main">
-            <view class="recent-title">{{item.title}}</view>
-            <view class="recent-time">{{item.formattedTime}}</view>
-          </view>
-          <view class="recent-tags">
-            <view 
-              wx:for="{{item.tags}}" 
-              wx:for-item="tag" 
-              wx:key="*this"
-              class="recent-tag"
-            >
-              {{tag}}
-            </view>
-          </view>
-        </view>
-      </view>
-    </view>
-
-    <!-- 快速操作区域 -->
-    <view class="quick-actions">
-      <view class="quick-action-btn primary" bindtap="onAddAccountTap">
-        <view class="action-icon">➕</view>
-        <view class="action-text">新增账号</view>
-      </view>
-      
-      <navigator url="/pages/accounts/index" class="quick-action-btn secondary">
-        <view class="action-icon">🔍</view>
-        <view class="action-text">搜索账号</view>
-      </navigator>
-    </view>
-  </view>
+  </block>
 </view>

@@ -7,7 +7,8 @@ Page({
     q: '',
     tagId: null,
     tags: [],
-    searchHistory: []
+    searchHistory: [],
+    isGuest: true
   },
 
   onLoad() { 
@@ -20,27 +21,18 @@ Page({
     if (this.getTabBar && this.getTabBar()) { 
       this.getTabBar().setData({ selected: 1 }); 
     }
-    this.ensureLoginThenLoad();
+    this.loadForCurrentUser();
   },
 
-  async ensureLoginThenLoad() {
-    console.log('🔍 [ACCOUNTS] ensureLoginThenLoad starting...');
+  async loadForCurrentUser() {
     this.setData({ loading: true });
-    
     try {
-      // 检查登录状态
-      console.log('🔍 [ACCOUNTS] Checking login status...');
       const me = await api.me();
-      console.log('🔍 [ACCOUNTS] Login status result:', me);
-      
       if (!me.isAuthenticated) {
-        console.log('🚪 [ACCOUNTS] Not authenticated, redirecting to login');
-        wx.reLaunch({ url: '/pages/login/login' });
-        return;
+        this.setData({ loading: false, isGuest: true, items: [], tags: [] });
+        return this.loadSearchHistory();
       }
-
-      console.log('✅ [ACCOUNTS] User is authenticated, loading data...');
-      // 加载标签与列表，以及搜索历史
+      this.setData({ isGuest: false });
       await Promise.all([
         this.loadTags(), 
         this.loadList(),
@@ -51,8 +43,7 @@ Page({
       console.error('❌ [ACCOUNTS] Error in ensureLoginThenLoad:', e);
       
       if (e.code === 401) {
-        console.log('🚪 [ACCOUNTS] 401 error, redirecting to login');
-        wx.reLaunch({ url: '/pages/login/login' });
+        this.setData({ loading: false, isGuest: true, items: [], tags: [] });
       } else if (e.code === 451) {
         console.log('📋 [ACCOUNTS] 451 error, accepting terms...');
         try {
@@ -73,6 +64,7 @@ Page({
   },
 
   async loadList() {
+    if (this.data.isGuest) { this.setData({ loading: false, items: [] }); return; }
     console.log('📋 [ACCOUNTS] loadList starting...');
     this.setData({ loading: true });
     
@@ -175,7 +167,7 @@ Page({
 
   // 下拉刷新
   onPullDownRefresh() {
-    Promise.all([this.loadTags(), this.loadList()]).finally(() => {
+    Promise.all([this.loadForCurrentUser()]).finally(() => {
       wx.stopPullDownRefresh();
     });
   }

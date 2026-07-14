@@ -3,6 +3,7 @@
   background-color: #f8f9fa;
   min-height: 100vh;
 }
+.guest-notice{margin-bottom:20rpx;padding:22rpx 24rpx;border:1rpx solid #d8e9ff;border-radius:16rpx;background:#e7f3ff}.guest-notice-title,.guest-notice-copy{display:block}.guest-notice-title{color:#1877f2;font-size:27rpx;font-weight:650}.guest-notice-copy{margin-top:8rpx;color:#4e6d8d;font-size:23rpx;line-height:1.5}
 
 /* 搜索容器 */
 .search-container {
@@ -14,7 +15,7 @@
   align-items: center;
   gap: 16rpx;
   background: white;
-  border-radius: 16rpx;
+  border-radius: 18rpx;
   padding: 16rpx 20rpx;
   box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.05);
 }
@@ -50,7 +51,7 @@
 }
 
 .add-btn {
-  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+  background: #1877f2;
   color: white;
 }
 
@@ -81,7 +82,7 @@
 
 .history-clear {
   font-size: 24rpx;
-  color: #1677ff;
+  color: #1877f2;
   padding: 8rpx;
 }
 
@@ -136,9 +137,9 @@
 }
 
 .tag-pill.active {
-  background: #1677ff;
+  background: #1877f2;
   color: #fff;
-  border-color: #1677ff;
+  border-color: #1877f2;
 }
 
 /* 加载状态 */

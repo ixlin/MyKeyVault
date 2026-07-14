@@ -5,142 +5,9 @@ Page({
     identifier: '',
     password: '',
     loading: false,
-    loginMode: 'wechat',
-    showDebug: false,  // 正式环境关闭调试面板
-    debugInfo: {
-      env: '',
-      baseUrl: '',
-      networkType: '检测中...',
-      connectionStatus: '检测中...',
-      lastError: ''
-    }
+    loginMode: 'wechat'
   },
   onLoad() {
-    console.log('🔐 [LOGIN] Page loaded');
-    
-    // 初始化调试信息
-    this.initDebugInfo();
-    
-    // 检查网络状态
-    wx.getNetworkType({
-      success: (res) => {
-        console.log('🌐 [LOGIN] Network type:', res.networkType);
-        this.updateDebugInfo('networkType', res.networkType);
-        if (res.networkType === 'none') {
-          this.updateDebugInfo('lastError', '网络连接失败，请检查网络设置');
-          wx.showToast({ 
-            title: '网络连接失败，请检查网络设置', 
-            icon: 'none',
-            duration: 3000
-          });
-        }
-      },
-      fail: (err) => {
-        console.error('❌ [LOGIN] Failed to get network type:', err);
-        this.updateDebugInfo('networkType', '获取失败');
-        this.updateDebugInfo('lastError', '无法获取网络状态: ' + JSON.stringify(err));
-      }
-    });
-    
-    // 测试服务器连通性
-    this.testServerConnection();
-  },
-
-  // 初始化调试信息
-  initDebugInfo() {
-    const { BASE } = require('../../utils/config');
-    const env = this.detectEnv();
-    
-    this.setData({
-      'debugInfo.env': env,
-      'debugInfo.baseUrl': BASE
-    });
-  },
-
-  // 检测小程序环境
-  detectEnv() {
-    try {
-      const info = wx.getAccountInfoSync && wx.getAccountInfoSync();
-      return (info && info.miniProgram && info.miniProgram.envVersion) || 'develop';
-    } catch (_) {
-      return 'develop';
-    }
-  },
-
-  // 更新调试信息
-  updateDebugInfo(key, value) {
-    this.setData({
-      [`debugInfo.${key}`]: value
-    });
-  },
-
-  // 切换调试面板显示
-  toggleDebug() {
-    this.setData({
-      showDebug: !this.data.showDebug
-    });
-  },
-  
-  testServerConnection() {
-    const { BASE } = require('../../utils/config');
-    console.log('🔗 [LOGIN] Testing server connection to:', BASE);
-    
-    this.updateDebugInfo('connectionStatus', '正在测试连接...');
-    
-    wx.request({
-      url: BASE + '/api/mp/tags',
-      method: 'GET',
-      timeout: 15000,
-      success: (res) => {
-        console.log('✅ [LOGIN] Server connection test result:', res.statusCode);
-        if (res.statusCode === 401) {
-          console.log('✅ [LOGIN] Server is accessible (401 expected for unauthenticated request)');
-          this.updateDebugInfo('connectionStatus', '✅ 服务器可访问 (401认证失败，正常)');
-          this.updateDebugInfo('lastError', '');
-        } else if (res.statusCode === 200) {
-          this.updateDebugInfo('connectionStatus', '✅ 服务器连接正常');
-          this.updateDebugInfo('lastError', '');
-        } else {
-          this.updateDebugInfo('connectionStatus', `⚠️ 异常状态码: ${res.statusCode}`);
-          this.updateDebugInfo('lastError', `服务器返回状态码: ${res.statusCode}`);
-        }
-      },
-      fail: (err) => {
-        console.error('❌ [LOGIN] Server connection test failed:', err);
-        let errorMsg = '服务器连接失败';
-        let debugError = JSON.stringify(err);
-        
-        if (err.errMsg) {
-          if (err.errMsg.includes('timeout')) {
-            errorMsg = '⏰ 连接超时 (15秒)';
-            debugError = '请求超时，可能是网络问题或服务器响应慢';
-          } else if (err.errMsg.includes('fail')) {
-            errorMsg = '❌ 连接失败';
-            if (err.errMsg.includes('ssl')) {
-              debugError = 'SSL/HTTPS 连接失败，可能是证书问题';
-            } else if (err.errMsg.includes('domain')) {
-              debugError = '域名解析失败或域名未配置到合法域名列表';
-            } else {
-              debugError = err.errMsg;
-            }
-          }
-        }
-        
-        this.updateDebugInfo('connectionStatus', errorMsg);
-        this.updateDebugInfo('lastError', debugError);
-        
-        // 如果是关键错误，自动显示调试面板
-        if (err.errMsg && (err.errMsg.includes('domain') || err.errMsg.includes('ssl'))) {
-          this.setData({ showDebug: true });
-        }
-        
-        wx.showToast({
-          title: '服务器连接失败',
-          icon: 'none',
-          duration: 3000
-        });
-      }
-    });
   },
   onInputId(e) { this.setData({ identifier: e.detail.value }); },
   onInputPwd(e) { this.setData({ password: e.detail.value }); },
@@ -208,15 +75,11 @@ Page({
       let title = '登录失败';
       let duration = 2000;
       
-      // 记录到调试信息
-      this.updateDebugInfo('lastError', `登录失败: ${err?.message || JSON.stringify(err)}`);
-      
       // 根据错误类型提供不同的提示时长和图标
       if (err?.code === -1) {
         // 网络错误，提示时间长一些
         duration = 3000;
         title = '网络连接失败';
-        this.updateDebugInfo('connectionStatus', '❌ 网络连接失败');
       } else if (err?.message) {
         title = err.message;
       }

@@ -1,26 +1,29 @@
 const api = require('../../../utils/api')
 
 Page({
-  data: { tags: [], newName: '' },
+  data: { tags: [], newName: '', isGuest: true },
   onShow(){ if(this.getTabBar && this.getTabBar()){ this.getTabBar().setData({ selected: 2 }); } this.load() },
   async load(){
     try{
-      await this.ensureLogin();
+      const me = await api.me();
+      if (!me.isAuthenticated) return this.setData({ tags: [], isGuest: true });
+      this.setData({ isGuest: false });
       const res = await api.listTags(true);
       this.setData({ tags: res.items || [] });
     }catch(err){
-      if(err?.code===401){ wx.reLaunch({ url: '/pages/login/login' }); }
+      if(err?.code===401){ this.setData({ tags: [], isGuest: true }); }
       else if(err?.code===451){ wx.showModal({ title:'需先接受条款', content:'请前往网页端接受服务条款后重试' }) }
       else{ wx.showToast({ icon:'none', title: err.message||'加载失败' }) }
     }
-  },
-  async ensureLogin(){
-    try{ await api.me(); }catch(e){ throw e; }
   },
   onInputNew(e){ this.setData({ newName: e.detail.value }) },
   async onAdd(){
     const name = (this.data.newName||'').trim();
     if(!name){ wx.showToast({ icon:'none', title:'请输入名称' }); return; }
+    if(this.data.isGuest){
+      wx.showModal({ title:'登录后保存标签', content:'标签会在登录后保存到你的密码本。现在去登录？', confirmText:'去登录', success:({confirm})=>{ if(confirm) wx.navigateTo({url:'/pages/login/login'}); } });
+      return;
+    }
     try{
       await api.createTag(name);
       this.setData({ newName:'' });

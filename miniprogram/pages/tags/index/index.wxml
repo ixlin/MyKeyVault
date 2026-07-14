@@ -1,9 +1,11 @@
 <view class="container">
+  <view wx:if="{{isGuest}}" class="guest-notice">可以先填写标签名称；点击添加并生效时，再登录保存。</view>
   <view class="toolbar">
     <input placeholder="新标签名称" value="{{newName}}" bindinput="onInputNew" class="input" />
     <button type="primary" bindtap="onAdd">添加</button>
   </view>
-  <view class="list">
+  <view wx:if="{{isGuest}}" class="empty-state">登录后可查看并管理自己的标签</view>
+  <view wx:else class="list">
     <block wx:for="{{tags}}" wx:key="id">
       <view class="item" bindlongpress="onLongPress" data-id="{{item.id}}" data-name="{{item.name}}">
         <text class="name">{{item.name}}</text>

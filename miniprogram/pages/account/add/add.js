@@ -10,11 +10,17 @@ Page({
     loading: false,
     availableTags: [],
     selectedTagIds: [],
-    passwordVisible: false
+    passwordVisible: false,
+    isGuest: true
   },
 
   onLoad() {
-    this.loadTags();
+    this.checkSession();
+  },
+
+  async checkSession() {
+    try { const me = await api.me(); this.setData({ isGuest: !me.isAuthenticated }); if (me.isAuthenticated) this.loadTags(); }
+    catch (_) { this.setData({ isGuest: true }); }
   },
 
   // 加载可用标签
@@ -121,6 +127,10 @@ Page({
       return;
     }
 
+    if (this.data.isGuest) {
+      wx.showModal({ title: '登录后保存账号', content: '你填写的内容只有在登录后才能保存到自己的密码本。现在去登录？', confirmText: '去登录', success: ({ confirm }) => { if (confirm) wx.navigateTo({ url: '/pages/login/login' }); } });
+      return;
+    }
     this.setData({ loading: true });
 
     try {
