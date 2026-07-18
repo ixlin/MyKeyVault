@@ -142,6 +142,8 @@ jobs:
       - name: Verify public Vault pages
         run: |
           set -euo pipefail
+          # The process performs database migration on startup; wait for the service to settle.
+          sleep 45
           curl --fail --show-error --retry 3 --retry-delay 2 --max-time 20 --output /dev/null https://mykeyvault.cn/
           curl --fail --show-error --retry 3 --retry-delay 2 --max-time 20 --output /dev/null https://mykeyvault.cn/Identity/Account/Login
           test "$(curl --fail --silent --show-error --max-time 20 https://mykeyvault.cn/deploy-version.txt)" = "$GITHUB_SHA"
