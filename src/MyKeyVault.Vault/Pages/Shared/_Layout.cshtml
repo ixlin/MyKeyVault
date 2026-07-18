@@ -3,12 +3,12 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>@ViewData["Title"] - MyKeyVault</title>
+    <title>@ViewData["Title"] - 我的密码本</title>
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
 <body>
     <header class="site-header">
-        <a class="wordmark" asp-page="/Index"><span class="mark">M</span> MyKeyVault</a>
+        <a class="wordmark" asp-page="/Index"><span class="mark" aria-hidden="true">密</span> 我的密码本</a>
         <nav aria-label="主导航">
             @if (User.Identity?.IsAuthenticated == true)
             {
@@ -26,5 +26,8 @@
         </nav>
     </header>
     <main class="page-shell">@RenderBody()</main>
+    <footer class="site-footer">
+        <span>&copy; 2026 我的密码本 · AI实现 · </span><a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer">蜀ICP备2024053184号-5</a>
+    </footer>
 </body>
 </html>

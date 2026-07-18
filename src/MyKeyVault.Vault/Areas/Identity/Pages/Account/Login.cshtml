@@ -1,0 +1,9 @@
+@page
+@model LoginModel
+@{
+    ViewData["Title"] = "登录";
+}
+<section class="auth-page">
+    <div class="auth-intro"><p class="eyebrow">WELCOME BACK</p><h1>回到你的<br /><em>保险库。</em></h1><p>登录后可管理加密条目、确认受控使用请求，并查看完整的安全活动记录。</p></div>
+    <form method="post" class="auth-card"><input type="hidden" asp-for="ReturnUrl" /><div asp-validation-summary="ModelOnly" class="validation" role="alert"></div><label>邮箱地址<input asp-for="Input.Email" autocomplete="email" inputmode="email" placeholder="you@example.com" /></label><label>密码<input asp-for="Input.Password" autocomplete="current-password" placeholder="输入你的密码" /></label><label class="check"><input asp-for="Input.RememberMe" /> 在此设备保持登录</label><button class="button" type="submit">登录保险库</button><p class="auth-switch">还没有保险库？<a asp-page="./Register" asp-route-returnUrl="@Model.ReturnUrl">创建一个</a></p></form>
+</section>

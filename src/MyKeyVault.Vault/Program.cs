@@ -34,6 +34,7 @@ builder.Services.AddDefaultIdentity<VaultUser>(options =>
         options.Lockout.AllowedForNewUsers = true;
         options.Lockout.MaxFailedAccessAttempts = 5;
     })
+    .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<VaultDbContext>();
 
 builder.Services.ConfigureApplicationCookie(options =>
@@ -51,6 +52,7 @@ builder.Services.AddRazorPages(options =>
 });
 
 var app = builder.Build();
+await BootstrapAccountInitializer.InitializeAsync(app.Services, builder.Configuration);
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error");
