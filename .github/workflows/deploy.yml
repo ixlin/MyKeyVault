@@ -1,301 +1,94 @@
-# 定义工作流的名称
-name: Deploy MyKeyVault to Aliyun Server
+name: Deploy MyKeyVault Vault
 
-# 定义触发条件:当有代码推送到 main 分支时触发
 on:
   push:
-    branches: [ "main" ]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
 
 jobs:
   build-and-deploy:
-    # 使用最新的 Ubuntu 虚拟机作为运行环境
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
-    # 第一步:检出代码
-    # 这个操作会将你的仓库代码下载到虚拟机中
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - name: Check out the release commit
+        uses: actions/checkout@v4
 
-    # 第二步:设置 .NET 环境
-    # 我们需要指定一个 .NET 版本来编译你的项目
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v3
-      with:
-        dotnet-version: '8.0.x' # 假设你的项目使用 .NET 8, 如果不是,请修改这里
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
 
-    # 第三步:发布项目
-    # 这会编译你的 ASP.NET Core 项目,并生成可部署的文件
-    # --configuration Release 指定使用发布模式
-    # --output ./publish 指定输出到虚拟机里的 publish 文件夹
-    - name: Publish .NET Project
-      run: dotnet publish src/MyKeyVault.Web/MyKeyVault.Web.csproj --configuration Release --output ./publish
+      - name: Restore and publish the Vault application
+        run: dotnet publish src/MyKeyVault.Vault/MyKeyVault.Vault.csproj --configuration Release --output ./publish
 
-    # 在发布产物中写入当前部署的提交哈希与时间,便于线上核对版本
-    - name: Write deploy version file
-      run: |
-        echo "$GITHUB_SHA" > ./publish/.deploy-version
-        date -u +"%Y-%m-%dT%H:%M:%SZ" > ./publish/.deploy-time-utc
+      # This is deliberately not a hidden file: SCP globbing does not consistently include dotfiles.
+      - name: Write release identity
+        run: |
+          printf '%s\n' "$GITHUB_SHA" > ./publish/deploy-version.txt
+          date -u +'%Y-%m-%dT%H:%M:%SZ' > ./publish/deploy-time-utc.txt
 
-    # 第四步:将编译好的文件部署到服务器
+      - name: Back up the currently deployed release
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            DEST_DIR=/var/www/mykeyvault
+            BACKUP_ROOT=/var/backups/mykeyvault/releases
+            sudo -n mkdir -p "$BACKUP_ROOT"
+            if sudo -n test -d "$DEST_DIR"; then
+              stamp=$(date -u +'%Y%m%dT%H%M%SZ')
+              sudo -n tar -C "$DEST_DIR" -czf "$BACKUP_ROOT/release-$stamp-${{ github.sha }}.tar.gz" .
+              sudo -n sha256sum "$BACKUP_ROOT/release-$stamp-${{ github.sha }}.tar.gz" > "$BACKUP_ROOT/release-$stamp-${{ github.sha }}.sha256"
+            fi
+            # Retain the newest ten rollback archives.
+            sudo -n find "$BACKUP_ROOT" -type f -name 'release-*.tar.gz' -printf '%T@ %p\n' | sort -nr | tail -n +11 | cut -d' ' -f2- | xargs -r sudo -n rm -f
 
-    # 第五步:通过 SCP 将发布文件复制到服务器的临时目录(避免目标目录权限问题)
-    - name: Copy files to temp via SCP
-      uses: appleboy/scp-action@master
-      with:
-        host: ${{ secrets.SERVER_HOST }}
-        username: ${{ secrets.SERVER_USER }}
-        key: ${{ secrets.SERVER_SSH_KEY }}
-        source: "./publish/*" # 将 publish 文件夹下的所有内容
-        target: "/tmp/mykv_release_${{ github.sha }}" # 复制到服务器的临时目录
-        strip_components: 1 # 移除 publish 这一层目录
+      - name: Upload release to a unique staging directory
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          source: publish/*
+          target: /tmp/mykeyvault-release-${{ github.sha }}
+          strip_components: 1
 
-    # 第六步:在服务器上用 rsync 同步到正式目录,并保护配置文件
-    - name: Sync release to target via rsync
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ secrets.SERVER_HOST }}
-        username: ${{ secrets.SERVER_USER }}
-        key: ${{ secrets.SERVER_SSH_KEY }}
-        script: |
-          set -e
-          # 注意:这里必须在工作流渲染阶段注入 SHA,而不是依赖远端环境变量
-          SRC_DIR="/tmp/mykv_release_${{ github.sha }}"
-          DEST_DIR="/var/www/mykeyvault/"
-          echo "Source: $SRC_DIR"
-          echo "Destination: $DEST_DIR"
-
-          # 确保目标目录存在
-          sudo -n mkdir -p "$DEST_DIR"
-
-          if command -v rsync >/dev/null 2>&1; then
-            echo "Using rsync for synchronization"
-            # 同步文件到正式目录,排除本地可变配置和运行时数据目录,避免覆盖线上通过后台保存的配置
-            # --delete 保持目录一致;如需保留历史文件,可移除此参数
+      - name: Activate release and restart service
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            SRC_DIR=/tmp/mykeyvault-release-${{ github.sha }}
+            DEST_DIR=/var/www/mykeyvault
+            SERVICE=mykeyvault.service
+            sudo -n mkdir -p "$DEST_DIR"
+            # Production configuration and user uploads must survive application releases.
             sudo -n rsync -a --delete \
               --exclude 'appsettings*.json' \
-              --exclude 'wechat-articles' \
-              --exclude 'html-ppt' \
               --exclude 'wwwroot/uploads' \
               "$SRC_DIR/" "$DEST_DIR/"
-          else
-            echo "rsync not found on remote host, falling back to tar+find copy"
-            # 1) 删除目标目录中除 appsettings*.json 和运行时数据目录以外的所有内容，达到"删除同步"效果
-            sudo -n find "$DEST_DIR" -mindepth 1 \
-              -not -name 'appsettings*.json' \
-              -not -name 'wechat-articles' \
-              -not -name 'html-ppt' \
-              -not -path "$DEST_DIR/wwwroot" \
-              -not -path "$DEST_DIR/wwwroot/uploads*" \
-              -exec rm -rf {} +
-            # 2) 将发布产物打包流式传输到目标目录,同时排除 appsettings*.json,避免覆盖线上配置
-            sudo -n tar -C "$SRC_DIR" --exclude='appsettings*.json' -cf - . | sudo -n tar -C "$DEST_DIR" -xpf -
-          fi
-
-          # 为所有文件提供只读兜底权限(确保服务账户可读)
-          sudo -n chmod -R o+r "$DEST_DIR"
-
-          # 确保后台可写配置文件:appsettings.Production.json
-          # 自动探测运行 mykeyvault.service 的用户,优先使用单元文件中的 User=
-          SERVICE_USER=$(systemctl show -p User mykeyvault.service | cut -d= -f2)
-          if [ -z "$SERVICE_USER" ]; then
-            # 若未显式设置,尝试常见的 www-data,否则退回当前用户
-            if id www-data >/dev/null 2>&1; then SERVICE_USER=www-data; else SERVICE_USER=$(whoami); fi
-          fi
-          echo "Service will own config as: $SERVICE_USER"
-
-          CFG_FILE="$DEST_DIR/appsettings.Production.json"
-          # 如果文件不存在则创建;不覆盖内容,仅保证存在与权限
-          sudo -n touch "$CFG_FILE"
-          # 将文件属主设为服务账户,并授予可写权限(rw-rw-r--)
-          sudo -n chown "$SERVICE_USER":"$SERVICE_USER" "$CFG_FILE" || true
-          sudo -n chmod 664 "$CFG_FILE" || true
-
-          # 头像等运行时上传文件不随发布产物同步；首次部署也必须创建并交给服务账户写入。
-          UPLOAD_DIR="$DEST_DIR/wwwroot/uploads"
-          sudo -n mkdir -p "$UPLOAD_DIR"
-          sudo -n chown -R "$SERVICE_USER":"$SERVICE_USER" "$UPLOAD_DIR"
-          sudo -n chmod 750 "$UPLOAD_DIR"
-
-          # 清理临时目录
-          rm -rf "$SRC_DIR"
-
-    # 第七步:在服务器上重启服务
-    # 数据库迁移会在应用启动时自动执行(参见 Program.cs)
-    - name: Restart Service on Server
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ secrets.SERVER_HOST }}
-        username: ${{ secrets.SERVER_USER }}
-        key: ${{ secrets.SERVER_SSH_KEY }}
-        script: |
-          set -e
-          echo "Restarting mykeyvault service..."
-          # 使用我们之前配置好的免密 sudo 权限来重启服务
-          sudo -n systemctl restart mykeyvault.service
-          echo "Service restarted successfully!"
-          # 检查一下服务状态,确保它正常运行
-          sudo systemctl status mykeyvault.service --no-pager
-          echo "Recent service logs:"
-          journalctl -u mykeyvault.service -n 30 --no-pager || true
-          echo "Deployed commit:"
-          cat /var/www/mykeyvault/.deploy-version || true
-          echo "Deploy time (UTC):"
-          cat /var/www/mykeyvault/.deploy-time-utc || true
-
-    # 第八步:部署 Python 微信爬虫服务
-    - name: Deploy WeChat Scraper Python Service
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ secrets.SERVER_HOST }}
-        username: ${{ secrets.SERVER_USER }}
-        key: ${{ secrets.SERVER_SSH_KEY }}
-        script: |
-          set -e
-          echo "Setting up WeChat Scraper service..."
-
-          SCRAPER_DIR="/var/www/wechat-scraper"
-
-          # 确保 Python 3.10+ 和 pip 已安装
-          if ! command -v python3 &> /dev/null; then
-            echo "Installing Python3..."
-            sudo -n apt-get update
-            sudo -n apt-get install -y python3 python3-venv python3-pip
-          fi
-
-          # 确保目录存在
-          sudo -n mkdir -p "$SCRAPER_DIR"
-          sudo -n chown -R $USER:$USER "$SCRAPER_DIR"
-
-          echo "WeChat Scraper directory prepared: $SCRAPER_DIR"
-
-    # 第九步:复制 Python 爬虫代码到服务器
-    - name: Copy WeChat Scraper files via SCP
-      uses: appleboy/scp-action@master
-      with:
-        host: ${{ secrets.SERVER_HOST }}
-        username: ${{ secrets.SERVER_USER }}
-        key: ${{ secrets.SERVER_SSH_KEY }}
-        source: "src/WechatArticleScraper/*"
-        target: "/tmp/wechat_scraper_${{ github.sha }}"
-        strip_components: 2
-
-    # 第十步:安装 Python 依赖并配置服务
-    - name: Setup Python environment and service
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ secrets.SERVER_HOST }}
-        username: ${{ secrets.SERVER_USER }}
-        key: ${{ secrets.SERVER_SSH_KEY }}
-        script: |
-          set -e
-          SCRAPER_DIR="/var/www/wechat-scraper"
-          SRC_DIR="/tmp/wechat_scraper_${{ github.sha }}"
-
-          # 确保 rsync 和 python3-venv 可用
-          echo "Installing system dependencies..."
-          sudo -n apt-get update
-          # 强制安装 rsync 和 python3-venv (解决 ensurepip is not available 问题)
-          # 如果默认 python3-venv 不匹配,尝试安装 python3.11-venv
-          sudo -n apt-get install -y rsync python3-venv || sudo -n apt-get install -y rsync python3.11-venv
-
-          # 复制文件到正式目录
-          sudo -n rsync -av --delete \
-            --exclude 'venv' \
-            --exclude 'output' \
-            --exclude '__pycache__' \
-            --exclude '*.pyc' \
-            "$SRC_DIR/" "$SCRAPER_DIR/"
-
-          # 检查虚拟环境是否完整,如果不完整则删除
-          if [ -d "$SCRAPER_DIR/venv" ] && [ ! -f "$SCRAPER_DIR/venv/bin/activate" ]; then
-            echo "Virtual environment exists but seems broken (missing activate script). Removing it..."
-            sudo -n rm -rf "$SCRAPER_DIR/venv"
-          fi
-
-          # 创建虚拟环境(如果不存在)
-          if [ ! -d "$SCRAPER_DIR/venv" ]; then
-            echo "Creating Python virtual environment..."
-            cd "$SCRAPER_DIR"
-            python3 -m venv venv
-          fi
-
-          # 激活虚拟环境并安装依赖
-          echo "Installing Python dependencies..."
-          cd "$SCRAPER_DIR"
-          source venv/bin/activate
-          pip install --upgrade pip
-          pip install -r requirements.txt
-
-          # 安装 Playwright 浏览器(使用独立目录)
-          echo "Installing Playwright browsers..."
-          export PLAYWRIGHT_BROWSERS_PATH="$SCRAPER_DIR/pw-browsers"
-          playwright install chromium
-          playwright install-deps chromium || sudo -n apt-get install -y libnss3 libatk-bridge2.0-0 libxkbcommon0 libxcomposite1 libxrandr2 libgbm1 libasound2
-
-          # 设置正确的权限
-          sudo -n chown -R www-data:www-data "$SCRAPER_DIR"
-
-          # 创建文章输出目录(链接到 .NET wwwroot)
-          ARTICLES_DIR="/var/www/mykeyvault/wwwroot/wechat-articles"
-          sudo -n mkdir -p "$ARTICLES_DIR"
-          sudo -n chown -R www-data:www-data "$ARTICLES_DIR"
-
-          # 清理临时目录
-          rm -rf "$SRC_DIR"
-
-          echo "Python environment setup complete!"
-
-    # 第十一步:配置并重启 Python 服务
-    - name: Configure and restart WeChat Scraper service
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ secrets.SERVER_HOST }}
-        username: ${{ secrets.SERVER_USER }}
-        key: ${{ secrets.SERVER_SSH_KEY }}
-        script: |
-          set -e
-
-          # 复制 systemd 服务配置
-          SCRAPER_DIR="/var/www/wechat-scraper"
-
-          # 创建 systemd service 文件
-          cat << 'EOF' | sudo -n tee /etc/systemd/system/wechat-scraper.service
-          [Unit]
-          Description=MyKeyVault WeChat Scraper Python Service
-          After=network.target
-          Requires=network.target
-
-          [Service]
-          Type=simple
-          User=www-data
-          Group=www-data
-          WorkingDirectory=/var/www/wechat-scraper
-          ExecStart=/var/www/wechat-scraper/venv/bin/python -m uvicorn app:app --host 127.0.0.1 --port 5001
-          Restart=always
-          RestartSec=5
-          StandardOutput=journal
-          StandardError=journal
-          Environment=PYTHONUNBUFFERED=1
-          Environment=PLAYWRIGHT_BROWSERS_PATH=/var/www/wechat-scraper/pw-browsers
-          Environment=LANG=C.UTF-8
-          Environment=LC_ALL=C.UTF-8
-
-          [Install]
-          WantedBy=multi-user.target
-          EOF
-
-          # 重新加载 systemd 配置
-          sudo -n systemctl daemon-reload
-
-          # 启用并重启服务
-          sudo -n systemctl enable wechat-scraper.service
-          sudo -n systemctl restart wechat-scraper.service
-
-          echo "WeChat Scraper service restarted!"
-
-          # 检查服务状态
-          sleep 2
-          sudo systemctl status wechat-scraper.service --no-pager || true
-          echo "Recent WeChat Scraper logs:"
-          journalctl -u wechat-scraper.service -n 15 --no-pager || true
+            SERVICE_USER=$(systemctl show -p User "$SERVICE" | cut -d= -f2)
+            if [ -z "$SERVICE_USER" ]; then SERVICE_USER=www-data; fi
+            sudo -n mkdir -p "$DEST_DIR/wwwroot/uploads"
+            sudo -n chown -R "$SERVICE_USER":"$SERVICE_USER" "$DEST_DIR"
+            sudo -n chmod 750 "$DEST_DIR/wwwroot/uploads"
+            # Keep connection strings, encryption material and bootstrap credentials private.
+            sudo -n find "$DEST_DIR" -maxdepth 1 -type f -name 'appsettings*.json' -exec chmod 600 {} +
+            sudo -n systemctl restart "$SERVICE"
+            sudo -n systemctl is-active --quiet "$SERVICE"
+            sudo -n test "$(cat "$DEST_DIR/deploy-version.txt")" = "${{ github.sha }}"
+            rm -rf "$SRC_DIR"
