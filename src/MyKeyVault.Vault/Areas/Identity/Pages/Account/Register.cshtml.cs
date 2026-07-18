@@ -22,10 +22,11 @@ public sealed class RegisterModel(UserManager<VaultUser> userManager, SignInMana
     public async Task<IActionResult> OnPostAsync()
     {
         if (!ModelState.IsValid) return Page();
-        var user = new VaultUser { UserName = Input.Email, Email = Input.Email };
+        // This deployment has no email-confirmation delivery channel. Confirming at creation
+        // keeps self-service registration usable while preserving the configured password policy.
+        var user = new VaultUser { UserName = Input.Email, Email = Input.Email, EmailConfirmed = true };
         var result = await userManager.CreateAsync(user, Input.Password);
         if (!result.Succeeded) { foreach (var error in result.Errors) ModelState.AddModelError(string.Empty, error.Description); return Page(); }
-        if (signInManager.Options.SignIn.RequireConfirmedAccount) return RedirectToPage("./RegisterConfirmation", new { email = Input.Email, returnUrl = ReturnUrl });
         await signInManager.SignInAsync(user, isPersistent: false);
         return LocalRedirect(string.IsNullOrWhiteSpace(ReturnUrl) ? Url.Content("~/")! : ReturnUrl);
     }
