@@ -32,8 +32,8 @@ jobs:
       # This is deliberately not a hidden file: SCP globbing does not consistently include dotfiles.
       - name: Write release identity
         run: |
-          printf '%s\n' "$GITHUB_SHA" > ./publish/deploy-version.txt
-          date -u +'%Y-%m-%dT%H:%M:%SZ' > ./publish/deploy-time-utc.txt
+          printf '%s\n' "$GITHUB_SHA" > ./publish/wwwroot/deploy-version.txt
+          date -u +'%Y-%m-%dT%H:%M:%SZ' > ./publish/wwwroot/deploy-time-utc.txt
 
       - name: Back up the currently deployed release
         uses: appleboy/ssh-action@master
@@ -90,5 +90,5 @@ jobs:
             sudo -n find "$DEST_DIR" -maxdepth 1 -type f -name 'appsettings*.json' -exec chmod 600 {} +
             sudo -n systemctl restart "$SERVICE"
             sudo -n systemctl is-active --quiet "$SERVICE"
-            sudo -n test "$(cat "$DEST_DIR/deploy-version.txt")" = "${{ github.sha }}"
+            sudo -n test "$(cat "$DEST_DIR/wwwroot/deploy-version.txt")" = "${{ github.sha }}"
             rm -rf "$SRC_DIR"
