@@ -49,7 +49,7 @@ jobs:
             if sudo -n test -d "$DEST_DIR"; then
               stamp=$(date -u +'%Y%m%dT%H%M%SZ')
               sudo -n tar -C "$DEST_DIR" -czf "$BACKUP_ROOT/release-$stamp-${{ github.sha }}.tar.gz" .
-              sudo -n sha256sum "$BACKUP_ROOT/release-$stamp-${{ github.sha }}.tar.gz" > "$BACKUP_ROOT/release-$stamp-${{ github.sha }}.sha256"
+              sudo -n sha256sum "$BACKUP_ROOT/release-$stamp-${{ github.sha }}.tar.gz" | sudo -n tee "$BACKUP_ROOT/release-$stamp-${{ github.sha }}.sha256" >/dev/null
             fi
             # Retain the newest ten rollback archives.
             sudo -n find "$BACKUP_ROOT" -type f -name 'release-*.tar.gz' -printf '%T@ %p\n' | sort -nr | tail -n +11 | cut -d' ' -f2- | xargs -r sudo -n rm -f
