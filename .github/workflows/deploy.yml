@@ -54,6 +54,49 @@ jobs:
             # Retain the newest ten rollback archives.
             sudo -n find "$BACKUP_ROOT" -type f -name 'release-*.tar.gz' -printf '%T@ %p\n' | sort -nr | tail -n +11 | cut -d' ' -f2- | xargs -r sudo -n rm -f
 
+      - name: Back up Vault database and grant migration privileges
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            CFG_FILE=/var/www/mykeyvault/appsettings.Production.json
+            BACKUP_ROOT=/var/backups/mykeyvault/database
+            test -f "$CFG_FILE"
+            read -r DB_NAME DB_USER < <(sudo -n python3 - "$CFG_FILE" <<'PY'
+            import json
+            import sys
+
+            with open(sys.argv[1], encoding="utf-8") as config_file:
+                config = json.load(config_file)
+            connection = config["ConnectionStrings"]["DefaultConnection"]
+            fields = {}
+            for item in connection.split(";"):
+                if "=" in item:
+                    key, value = item.split("=", 1)
+                    fields[key.strip().lower()] = value.strip()
+            database = fields.get("database")
+            username = fields.get("username") or fields.get("user id")
+            if not database or not username:
+                raise SystemExit("Connection string must include Database and Username.")
+            print(database, username)
+            PY
+            )
+            case "$DB_NAME:$DB_USER" in (*[!A-Za-z0-9_:]*|:) echo "Unsupported database identifier." >&2; exit 1;; esac
+            sudo -n mkdir -p "$BACKUP_ROOT"
+            stamp=$(date -u +'%Y%m%dT%H%M%SZ')
+            DB_BACKUP="$BACKUP_ROOT/vault-$stamp-${{ github.sha }}.dump"
+            sudo -n -u postgres pg_dump --format=custom --no-owner --no-privileges --dbname="$DB_NAME" | sudo -n tee "$DB_BACKUP" >/dev/null
+            sudo -n sha256sum "$DB_BACKUP" | sudo -n tee "$DB_BACKUP.sha256" >/dev/null
+            sudo -n -u postgres psql --dbname="$DB_NAME" --set=ON_ERROR_STOP=1 <<SQL
+            GRANT CONNECT ON DATABASE "$DB_NAME" TO "$DB_USER";
+            GRANT USAGE, CREATE ON SCHEMA public TO "$DB_USER";
+            GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "$DB_USER";
+            GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "$DB_USER";
+            SQL
+
       - name: Upload release to a unique staging directory
         uses: appleboy/scp-action@master
         with:
