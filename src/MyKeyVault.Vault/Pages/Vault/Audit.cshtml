@@ -1,0 +1,8 @@
+@page
+@model MyKeyVault.Vault.Pages.Vault.AuditModel
+@{ ViewData["Title"] = "活动"; }
+<section class="vault-heading"><div><p class="eyebrow">ACTIVITY</p><h1>安全活动</h1><p>这里记录条目变更及未来的受控调用；不会记录私密值。</p></div></section>
+<section class="audit-list">
+@if (!Model.Events.Any()) { <p class="empty-copy">还没有安全活动。</p> }
+@foreach (var entry in Model.Events) { <article><div><strong>@entry.Action</strong><span>@entry.Result</span></div><time datetime="@entry.OccurredAtUtc.ToString("O")">@entry.OccurredAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</time></article> }
+</section>

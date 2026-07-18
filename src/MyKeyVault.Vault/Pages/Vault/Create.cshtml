@@ -1,0 +1,17 @@
+@page
+@model MyKeyVault.Vault.Pages.Vault.CreateModel
+@{
+    ViewData["Title"] = "新增条目";
+}
+<section class="form-heading"><p class="eyebrow">NEW RECORD</p><h1>新增私密条目</h1><p>只有标题和目标地址用于识别；下方内容会在保存时加密。</p></section>
+<form method="post" class="vault-form">
+    <div asp-validation-summary="ModelOnly" class="validation"></div>
+    <label>条目名称<input asp-for="Input.Title" autocomplete="off" placeholder="例如：生产环境数据库" /></label>
+    <label>类型<select asp-for="Input.Kind" asp-items="Html.GetEnumSelectList<MyKeyVault.Vault.Models.VaultItemKind>()"></select></label>
+    <label>目标地址或主机（可选）<input asp-for="Input.UrlOrHost" autocomplete="off" placeholder="例如：db.example.com" /></label>
+    <label>标签（可选）<input asp-for="Input.TagsInput" autocomplete="off" placeholder="例如：生产, 个人" /><span class="field-help">用逗号分隔，仅自己可见。</span></label>
+    <label>字段名称<input asp-for="Input.FieldName" autocomplete="off" placeholder="例如：密码、API Key" /></label>
+    <label>私密内容<textarea asp-for="Input.SecretValue" autocomplete="off" spellcheck="false" placeholder="只会加密保存，不会在审计日志中记录"></textarea></label>
+    <label class="check"><input asp-for="Input.IsFavorite" /> 收藏这个条目</label>
+    <div class="form-actions"><a asp-page="Index">取消</a><button class="button" type="submit">加密保存</button></div>
+</form>

@@ -1,0 +1,28 @@
+@page "{id:guid}"
+@model MyKeyVault.Vault.Pages.Vault.DetailsModel
+@{ ViewData["Title"] = Model.Item?.Title ?? "条目"; }
+@if (Model.Item is not null)
+{
+    <section class="vault-heading"><div><p class="eyebrow">@Model.Item.KindLabel</p><h1>@Model.Item.Title</h1><p>@(Model.Item.UrlOrHost ?? "未设置目标地址")</p></div><div><a asp-page="Edit" asp-route-id="@Model.Item.Id">编辑</a>　<a asp-page="Index">返回保险库</a></div></section>
+    <section class="detail-card"><p class="eyebrow">ENCRYPTED FIELDS</p><a asp-page="SecretEdit" asp-route-id="@Model.Item.Id">新增加密字段</a>
+    @foreach (var secret in Model.Item.Secrets)
+    {
+        <article class="secret-field"><div><strong>@secret.FieldName</strong><code id="secret-@secret.Id">@(Model.RevealedSecretId == secret.Id ? Model.RevealedValue : "••••••••••••")</code></div>
+            <div><form method="post" asp-page-handler="Reveal"><input type="hidden" name="id" value="@Model.Item.Id" /><input type="hidden" name="secretId" value="@secret.Id" /><button class="text-button" type="submit">@((Model.RevealedSecretId == secret.Id) ? "已显示" : "显示一次")</button></form><a asp-page="SecretEdit" asp-route-id="@Model.Item.Id" asp-route-secretId="@secret.Id">更新</a>@if (Model.RevealedSecretId == secret.Id) { <button class="text-button copy-secret" type="button" data-secret-id="@secret.Id">复制</button> }</div>
+        </article>
+    }
+    </section>
+    <div class="danger-zone"><form method="post" asp-page-handler="Archive"><input type="hidden" name="id" value="@Model.Item.Id" /><button class="text-button" type="submit">归档此条目</button></form><a asp-page="Delete" asp-route-id="@Model.Item.Id">彻底删除</a></div>
+}
+@if (Model.Item is not null && Model.RevealedSecretId is not null)
+{
+<script>
+document.querySelectorAll('.copy-secret').forEach(button => button.addEventListener('click', async () => {
+  const id = button.dataset.secretId, value = document.getElementById(`secret-${id}`).textContent;
+  await navigator.clipboard.writeText(value);
+  const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+  await fetch(`?handler=Copy&id=@Model.Item.Id&secretId=${id}`, { method: 'POST', headers: { 'RequestVerificationToken': token } });
+  button.textContent = '已复制';
+}));
+</script>
+}

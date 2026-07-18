@@ -1,0 +1,8 @@
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=127.0.0.1;Port=5432;Database=mykeyvault_next;Username=REPLACE_ME;Password=REPLACE_ME"
+  },
+  "VaultEncryption": {
+    "MasterKey": "SET_ONLY_IN_ENVIRONMENT_OR_USER_SECRETS_BASE64_32_BYTES"
+  }
+}

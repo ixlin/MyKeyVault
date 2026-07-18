@@ -1,0 +1,12 @@
+@page
+@model MyKeyVault.Vault.Pages.Vault.RequestsModel
+@{ ViewData["Title"] = "受控使用"; }
+<section class="vault-heading"><div><p class="eyebrow">CONTROLLED USE</p><h1>待确认的使用请求</h1><p>外部工具只能提出请求，不能读取私密值。确认后仍需要完成轮换或失效。</p></div></section>
+<section class="audit-list">
+@if (!Model.Requests.Any()) { <p class="empty-copy">暂无待处理的请求。</p> }
+@foreach (var request in Model.Requests) {
+    <article class="request-card"><div><strong>@request.RequestedAction · @request.ItemTitle</strong><span>来自 @request.RequestedBy · @request.Reason</span><span>将于 @request.ExpiresAtUtc.ToLocalTime().ToString("HH:mm") 失效</span></div>
+        <form method="post"><input type="hidden" name="id" value="@request.Id" />@if (request.Status == MyKeyVault.Vault.Models.ControlledUseRequestStatus.Pending) { <button class="button compact" name="decision" value="approve">确认使用</button><button class="text-button" name="decision" value="reject">拒绝</button> } else { <button class="button compact" name="decision" value="rotation-confirmed">已轮换 / 已失效</button> }</form>
+    </article>
+}
+</section>

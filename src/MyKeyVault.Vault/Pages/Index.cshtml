@@ -1,0 +1,23 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "你的私密信息，只在需要时受控使用";
+}
+<section class="landing">
+    <p class="eyebrow">PRIVATE BY DEFAULT</p>
+    <h1>把重要凭据放进<br /><em>可控的保险库。</em></h1>
+    <p class="lede">账号、API Key、服务器和数据库连接信息。默认加密、默认掩码、每次受控使用都有记录。</p>
+    @if (User.Identity?.IsAuthenticated == true)
+    {
+        <a class="button" asp-page="/Vault/Index">打开我的保险库</a>
+    }
+    else
+    {
+        <a class="button" asp-area="Identity" asp-page="/Account/Register">创建我的保险库</a>
+    }
+    <dl class="assurance-strip">
+        <div><dt>加密存储</dt><dd>敏感字段不以明文落库</dd></div>
+        <div><dt>受控调用</dt><dd>AI 默认拿不到原始秘密</dd></div>
+        <div><dt>可追溯</dt><dd>查看与使用均留审计</dd></div>
+    </dl>
+</section>

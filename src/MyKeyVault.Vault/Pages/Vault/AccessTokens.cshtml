@@ -1,0 +1,9 @@
+@page
+@model MyKeyVault.Vault.Pages.Vault.AccessTokensModel
+@{ ViewData["Title"] = "连接凭据"; }
+<section class="vault-heading"><div><p class="eyebrow">CONNECTION TOKENS</p><h1>连接凭据</h1><p>用于让 MCP 或本地连接器提出受控使用请求。它不能读取私密字段。</p></div></section>
+@if (Model.NewToken is not null) { <section class="token-once"><p class="eyebrow">COPY ONCE</p><strong>请立即复制；关闭页面后不能再次查看。</strong><code>@Model.NewToken</code></section> }
+<form method="post" class="token-form"><label>凭据名称<input asp-for="Name" placeholder="例如：Claude Desktop" maxlength="80" /></label><button class="button" type="submit">创建连接凭据</button></form>
+<section class="audit-list">
+@foreach (var token in Model.Tokens) { <article><div><strong>@token.Name</strong><span>@token.Prefix•••• · 创建于 @token.CreatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd")</span></div><form method="post" asp-page-handler="Revoke"><input type="hidden" name="id" value="@token.Id" /><button class="text-button" type="submit">撤销</button></form></article> }
+</section>

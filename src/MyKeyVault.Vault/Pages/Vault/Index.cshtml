@@ -1,0 +1,30 @@
+@page
+@model MyKeyVault.Vault.Pages.Vault.IndexModel
+@{
+    ViewData["Title"] = "保险库";
+}
+<section class="vault-heading">
+    <div><p class="eyebrow">MY VAULT</p><h1>你的私密信息</h1><p>敏感字段已加密保存；默认不会展示或复制。</p></div>
+    <a class="button" asp-page="Create">新增条目</a>
+</section>
+<form method="get" class="search-bar"><label for="query">搜索条目</label><input id="query" asp-for="Query" placeholder="名称、地址或标签" autocomplete="off" /><button class="text-button" type="submit">搜索</button></form>
+
+@if (!Model.Items.Any())
+{
+    <section class="empty-state"><p class="eyebrow">EMPTY VAULT</p><h2>从第一条私密信息开始</h2><p>保存账号、API Key 或服务器连接信息。你可以随时归档或撤销后续调用授权。</p><a class="button" asp-page="Create">新增条目</a></section>
+}
+else
+{
+    <section class="item-grid" aria-label="保险库条目">
+    @foreach (var item in Model.Items)
+    {
+        <a class="vault-item" asp-page="Details" asp-route-id="@item.Id">
+            <div class="item-top"><span class="kind">@item.KindLabel</span>@if (item.IsFavorite) { <span aria-label="已收藏">★</span> }</div>
+            <h2>@item.Title</h2>
+            <p>@(item.UrlOrHost ?? "未设置目标地址")</p>
+            @if (item.Tags.Any()) { <div class="tag-list">@foreach (var tag in item.Tags) { <span>@tag</span> }</div> }
+            <footer><span>@item.SecretFieldCount 个加密字段</span><time datetime="@item.UpdatedAtUtc.ToString("O")">更新于 @item.UpdatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd")</time></footer>
+        </a>
+    }
+    </section>
+}

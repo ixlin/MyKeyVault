@@ -1,0 +1,5 @@
+@page "{id:guid}"
+@model MyKeyVault.Vault.Pages.Vault.DeleteModel
+@{ ViewData["Title"] = "删除条目"; }
+<section class="form-heading"><p class="eyebrow">IRREVERSIBLE</p><h1>彻底删除条目</h1><p>将删除“@Model.Title”及其全部加密字段。此操作无法撤销。</p></section>
+<form method="post" class="vault-form"><input type="hidden" name="id" value="@Model.Id" /><label>输入“删除”以确认<input name="confirmation" autocomplete="off" /></label><div class="form-actions"><a asp-page="Details" asp-route-id="@Model.Id">取消</a><button class="button" type="submit">彻底删除</button></div></form>

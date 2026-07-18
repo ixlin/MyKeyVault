@@ -8,6 +8,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MyKeyVault.Web", "src\MyKey
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MyKeyVault.Finance.CLI", "src\MyKeyVault.Finance.CLI\MyKeyVault.Finance.CLI.csproj", "{60489BCB-30AD-4096-922B-B575A6FDFA3B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MyKeyVault.Vault", "src\MyKeyVault.Vault\MyKeyVault.Vault.csproj", "{AA1D05CE-40B8-4DF8-BB34-7B0800E5D2A3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -22,6 +24,10 @@ Global
 		{60489BCB-30AD-4096-922B-B575A6FDFA3B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{60489BCB-30AD-4096-922B-B575A6FDFA3B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{60489BCB-30AD-4096-922B-B575A6FDFA3B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AA1D05CE-40B8-4DF8-BB34-7B0800E5D2A3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AA1D05CE-40B8-4DF8-BB34-7B0800E5D2A3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AA1D05CE-40B8-4DF8-BB34-7B0800E5D2A3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AA1D05CE-40B8-4DF8-BB34-7B0800E5D2A3}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -29,6 +35,7 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{323887BF-A90F-29ED-AABB-BCAF950C129E} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{60489BCB-30AD-4096-922B-B575A6FDFA3B} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{AA1D05CE-40B8-4DF8-BB34-7B0800E5D2A3} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {314A5F83-AA34-4486-81F1-D5F8A653E708}

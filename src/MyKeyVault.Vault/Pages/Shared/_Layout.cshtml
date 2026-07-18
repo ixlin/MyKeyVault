@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"] - MyKeyVault</title>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+    <header class="site-header">
+        <a class="wordmark" asp-page="/Index"><span class="mark">M</span> MyKeyVault</a>
+        <nav aria-label="主导航">
+            @if (User.Identity?.IsAuthenticated == true)
+            {
+                <a asp-page="/Vault/Index">保险库</a>
+                <a asp-page="/Vault/Requests">受控使用</a>
+                <a asp-page="/Vault/AccessTokens">连接凭据</a>
+                <a asp-page="/Vault/Audit">活动</a>
+                <form class="inline-form" asp-area="Identity" asp-page="/Account/Logout" asp-route-returnUrl="/" method="post"><button class="text-button">退出</button></form>
+            }
+            else
+            {
+                <a asp-area="Identity" asp-page="/Account/Login">登录</a>
+                <a class="button compact" asp-area="Identity" asp-page="/Account/Register">创建保险库</a>
+            }
+        </nav>
+    </header>
+    <main class="page-shell">@RenderBody()</main>
+</body>
+</html>
