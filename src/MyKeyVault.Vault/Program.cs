@@ -52,6 +52,11 @@ builder.Services.AddRazorPages(options =>
 });
 
 var app = builder.Build();
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<VaultDbContext>();
+    await db.Database.MigrateAsync();
+}
 await BootstrapAccountInitializer.InitializeAsync(app.Services, builder.Configuration);
 if (!app.Environment.IsDevelopment())
 {
