@@ -91,6 +91,8 @@ jobs:
             sudo -n systemctl restart "$SERVICE"
             sudo -n systemctl is-active --quiet "$SERVICE"
             sudo -n test "$(cat "$DEST_DIR/wwwroot/deploy-version.txt")" = "${{ github.sha }}"
+            # Keep the last startup diagnostics available in the Action log if health checks fail.
+            sudo -n journalctl -u "$SERVICE" -n 40 --no-pager || true
             rm -rf "$SRC_DIR"
 
       # A deployment is only successful when the public site serves the released revision.
