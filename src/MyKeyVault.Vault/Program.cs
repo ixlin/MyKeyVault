@@ -21,6 +21,10 @@ builder.Services.AddDbContext<VaultDbContext>(options => options.UseNpgsql(conne
 builder.Services.Configure<VaultEncryptionOptions>(builder.Configuration.GetSection(VaultEncryptionOptions.SectionName));
 builder.Services.AddSingleton<SecretCipher>();
 builder.Services.AddScoped<McpTokenService>();
+builder.Services.Configure<ArticleScraperOptions>(builder.Configuration.GetSection(ArticleScraperOptions.SectionName));
+builder.Services.AddHttpClient();
+builder.Services.AddScoped<ArticleScraperService>();
+builder.Services.AddScoped<ArticleExtractionService>();
 
 builder.Services.AddDefaultIdentity<VaultUser>(options =>
     {
@@ -49,15 +53,18 @@ builder.Services.ConfigureApplicationCookie(options =>
 builder.Services.AddRazorPages(options =>
 {
     options.Conventions.AuthorizeFolder("/Vault");
+    options.Conventions.AuthorizeFolder("/Articles");
 });
 
 var app = builder.Build();
-using (var scope = app.Services.CreateScope())
+var isEfDesignTime = string.Equals(Environment.GetEnvironmentVariable("MYKEYVAULT_EF_DESIGN"), "1", StringComparison.Ordinal);
+if (!isEfDesignTime)
 {
+    using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<VaultDbContext>();
     await db.Database.MigrateAsync();
+    await BootstrapAccountInitializer.InitializeAsync(app.Services, builder.Configuration);
 }
-await BootstrapAccountInitializer.InitializeAsync(app.Services, builder.Configuration);
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error");
@@ -65,9 +72,31 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-app.UseStaticFiles();
 app.UseRouting();
 app.UseAuthentication();
+app.Use(async (context, next) =>
+{
+    if (context.Request.Path.StartsWithSegments("/wechat-articles") && context.User.Identity?.IsAuthenticated != true)
+    {
+        context.Response.StatusCode = StatusCodes.Status404NotFound;
+        return;
+    }
+    await next();
+});
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = context =>
+    {
+        if (context.Context.Request.Path.StartsWithSegments("/wechat-articles"))
+        {
+            // Keep article scripts disabled, but retain the site's origin so authenticated
+            // image/media subrequests carry the Identity cookie instead of being rejected.
+            context.Context.Response.Headers.ContentSecurityPolicy = "sandbox allow-same-origin; default-src 'none'; img-src 'self' data:; media-src 'self' data:; style-src 'unsafe-inline'";
+            context.Context.Response.Headers.XContentTypeOptions = "nosniff";
+            context.Context.Response.Headers.CacheControl = "private, no-store";
+        }
+    }
+});
 app.UseAuthorization();
 
 app.MapPost("/api/controlled-use-requests", async (HttpRequest request, ControlledUseRequestInput input, McpTokenService tokenService, VaultDbContext db, CancellationToken cancellationToken) =>
@@ -97,6 +126,7 @@ app.MapGet("/api/controlled-use-requests/{id:guid}", async (Guid id, HttpRequest
     return Results.Ok(new { requestId = controlledRequest.Id, status = controlledRequest.Status.ToString(), expiresAtUtc = controlledRequest.ExpiresAtUtc, resolvedAtUtc = controlledRequest.ResolvedAtUtc });
 });
 app.MapRazorPages();
+app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 app.Run();
 
 public sealed record ControlledUseRequestInput(Guid VaultItemId, string RequestedAction, string? Reason);

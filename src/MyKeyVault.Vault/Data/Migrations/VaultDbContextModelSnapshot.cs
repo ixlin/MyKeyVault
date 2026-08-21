@@ -154,6 +154,71 @@ namespace MyKeyVault.Vault.Data.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("MyKeyVault.Vault.Models.ArticleAiSettings", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
+                    b.Property<byte[]>("ApiKeyAuthenticationTag").IsRequired().HasColumnType("bytea");
+                    b.Property<byte[]>("ApiKeyCiphertext").IsRequired().HasColumnType("bytea");
+                    b.Property<byte[]>("ApiKeyNonce").IsRequired().HasColumnType("bytea");
+                    b.Property<string>("BaseUrl").IsRequired().HasMaxLength(300).HasColumnType("character varying(300)");
+                    b.Property<string>("EncryptionVersion").IsRequired().HasMaxLength(32).HasColumnType("character varying(32)");
+                    b.Property<byte[]>("KeyWrapAuthenticationTag").IsRequired().HasColumnType("bytea");
+                    b.Property<byte[]>("KeyWrapNonce").IsRequired().HasColumnType("bytea");
+                    b.Property<string>("ModelName").IsRequired().HasMaxLength(120).HasColumnType("character varying(120)");
+                    b.Property<string>("OwnerId").IsRequired().HasMaxLength(450).HasColumnType("character varying(450)");
+                    b.Property<string>("Provider").IsRequired().HasMaxLength(40).HasColumnType("character varying(40)");
+                    b.Property<DateTime>("UpdatedAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<byte[]>("WrappedDataKey").IsRequired().HasColumnType("bytea");
+                    b.HasKey("Id");
+                    b.HasIndex("OwnerId").IsUnique();
+                    b.ToTable("ArticleAiSettings");
+                });
+
+            modelBuilder.Entity("MyKeyVault.Vault.Models.ArticleExtraction", b =>
+                {
+                    b.Property<long>("Id").ValueGeneratedOnAdd().HasColumnType("bigint");
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                    b.Property<long>("ArticleId").HasColumnType("bigint");
+                    b.Property<DateTime?>("CompletedAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<DateTime>("CreatedAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<string>("ErrorMessage").HasMaxLength(600).HasColumnType("character varying(600)");
+                    b.Property<string>("ModelUsed").HasMaxLength(100).HasColumnType("character varying(100)");
+                    b.Property<string>("OwnerId").IsRequired().HasMaxLength(450).HasColumnType("character varying(450)");
+                    b.Property<string>("Prompt").IsRequired().HasMaxLength(4000).HasColumnType("character varying(4000)");
+                    b.Property<string>("Result").HasColumnType("text");
+                    b.Property<string>("Status").IsRequired().HasMaxLength(24).HasColumnType("character varying(24)");
+                    b.Property<int?>("TokensUsed").HasColumnType("integer");
+                    b.HasKey("Id");
+                    b.HasIndex("ArticleId");
+                    b.HasIndex("OwnerId", "CreatedAtUtc");
+                    b.ToTable("ArticleExtractions");
+                });
+
+            modelBuilder.Entity("MyKeyVault.Vault.Models.KnowledgeArticle", b =>
+                {
+                    b.Property<long>("Id").ValueGeneratedOnAdd().HasColumnType("bigint");
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                    b.Property<string>("Author").HasMaxLength(120).HasColumnType("character varying(120)");
+                    b.Property<DateTime?>("CompletedAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<DateTime>("CreatedAtUtc").HasColumnType("timestamp with time zone");
+                    b.Property<string>("ErrorMessage").HasMaxLength(600).HasColumnType("character varying(600)");
+                    b.Property<string>("HtmlFileName").HasMaxLength(240).HasColumnType("character varying(240)");
+                    b.Property<int>("ImagesCount").HasColumnType("integer");
+                    b.Property<string>("OwnerId").IsRequired().HasMaxLength(450).HasColumnType("character varying(450)");
+                    b.Property<string>("PdfFileName").HasMaxLength(240).HasColumnType("character varying(240)");
+                    b.Property<string>("PublishedText").HasMaxLength(80).HasColumnType("character varying(80)");
+                    b.Property<string>("SourceUrl").IsRequired().HasMaxLength(500).HasColumnType("character varying(500)");
+                    b.Property<string>("Status").IsRequired().HasMaxLength(24).HasColumnType("character varying(24)");
+                    b.Property<string>("StorageKey").HasMaxLength(100).HasColumnType("character varying(100)");
+                    b.Property<string>("TaskId").HasMaxLength(120).HasColumnType("character varying(120)");
+                    b.Property<string>("Title").HasMaxLength(240).HasColumnType("character varying(240)");
+                    b.Property<int>("VideosCount").HasColumnType("integer");
+                    b.HasKey("Id");
+                    b.HasIndex("OwnerId", "CreatedAtUtc");
+                    b.HasIndex("OwnerId", "SourceUrl");
+                    b.ToTable("KnowledgeArticles");
+                });
+
             modelBuilder.Entity("MyKeyVault.Vault.Models.ControlledUseRequest", b =>
                 {
                     b.Property<Guid>("Id")
@@ -389,6 +454,16 @@ namespace MyKeyVault.Vault.Data.Migrations
                     b.ToTable("VaultSecrets");
                 });
 
+            modelBuilder.Entity("MyKeyVault.Vault.Models.ArticleExtraction", b =>
+                {
+                    b.HasOne("MyKeyVault.Vault.Models.KnowledgeArticle", "Article")
+                        .WithMany("Extractions")
+                        .HasForeignKey("ArticleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                    b.Navigation("Article");
+                });
+
             modelBuilder.Entity("MyKeyVault.Vault.Models.VaultTag", b =>
                 {
                     b.Property<Guid>("Id")
@@ -578,6 +653,11 @@ namespace MyKeyVault.Vault.Data.Migrations
             modelBuilder.Entity("MyKeyVault.Vault.Models.VaultItem", b =>
                 {
                     b.Navigation("Secrets");
+                });
+
+            modelBuilder.Entity("MyKeyVault.Vault.Models.KnowledgeArticle", b =>
+                {
+                    b.Navigation("Extractions");
                 });
 #pragma warning restore 612, 618
         }

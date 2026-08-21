@@ -1,0 +1,43 @@
+[Unit]
+Description=DeepSeek Harness Web Portal for sfrost.cn
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=deepseek-harness
+Group=deepseek-harness
+WorkingDirectory=/srv/sfrost-workspaces
+Environment=HOME=/var/lib/deepseek-harness
+Environment=DSH_HOME=/var/lib/deepseek-harness/.dsh
+Environment=PATH=/opt/node-v22.19.0/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/opt/deepseek-harness/node_modules/.bin/dsh web --host 127.0.0.1 --port 3080 --no-open --trusted-host sfrost.cn --trusted-host www.sfrost.cn
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=20s
+
+# Keep the portal from starving MyKeyVault on this 2 GiB host.
+MemoryHigh=650M
+MemoryMax=900M
+MemorySwapMax=512M
+CPUQuota=150%
+Nice=10
+OOMScoreAdjust=500
+
+# The upstream package stays untouched; only its state/workspace are writable.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/deepseek-harness /srv/sfrost-workspaces
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target

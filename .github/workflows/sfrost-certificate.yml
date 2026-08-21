@@ -1,0 +1,134 @@
+name: Renew sfrost.cn certificate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/sfrost-certificate.yml
+  schedule:
+    - cron: "23 3 * * 1,4"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sfrost-certificate
+  cancel-in-progress: false
+
+jobs:
+  issue-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Install Certbot
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y certbot
+
+      - name: Configure the existing deployment key
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SERVER_SSH_KEY" > ~/.ssh/sfrost-deploy
+          chmod 600 ~/.ssh/sfrost-deploy
+          ssh-keyscan -H "$SERVER_HOST" >> ~/.ssh/known_hosts
+
+      - name: Restore isolated Certbot state
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p certbot-state certbot-work certbot-logs
+          ssh -i ~/.ssh/sfrost-deploy "$SERVER_USER@$SERVER_HOST" \
+            'sudo -n test -d /var/lib/sfrost-certbot && sudo -n tar -C /var/lib/sfrost-certbot -czf - . || true' \
+            | tar -xzf - -C certbot-state 2>/dev/null || true
+
+      - name: Create remote HTTP-01 hooks
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+        run: |
+          set -euo pipefail
+          cat > auth-hook.sh <<'HOOK'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          printf '%s' "$CERTBOT_VALIDATION" | ssh -i ~/.ssh/sfrost-deploy "$SERVER_USER@$SERVER_HOST" \
+            "sudo -n install -d -m 755 /var/www/letsencrypt/.well-known/acme-challenge && sudo -n tee /var/www/letsencrypt/.well-known/acme-challenge/$CERTBOT_TOKEN >/dev/null"
+          HOOK
+          cat > cleanup-hook.sh <<'HOOK'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          ssh -i ~/.ssh/sfrost-deploy "$SERVER_USER@$SERVER_HOST" \
+            "sudo -n rm -f /var/www/letsencrypt/.well-known/acme-challenge/$CERTBOT_TOKEN"
+          HOOK
+          chmod 700 auth-hook.sh cleanup-hook.sh
+
+      - name: Issue or renew the certificate
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+        run: |
+          set -euo pipefail
+          certbot certonly \
+            --manual \
+            --preferred-challenges http \
+            --manual-auth-hook "$PWD/auth-hook.sh" \
+            --manual-cleanup-hook "$PWD/cleanup-hook.sh" \
+            --config-dir "$PWD/certbot-state" \
+            --work-dir "$PWD/certbot-work" \
+            --logs-dir "$PWD/certbot-logs" \
+            --cert-name sfrost.cn \
+            --email sfrost@qq.com \
+            --agree-tos \
+            --no-eff-email \
+            --non-interactive \
+            --keep-until-expiring \
+            -d sfrost.cn \
+            -d www.sfrost.cn
+
+      - name: Deploy certificate and persist renewal state
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+        run: |
+          set -euo pipefail
+          test -s certbot-state/live/sfrost.cn/fullchain.pem
+          test -s certbot-state/live/sfrost.cn/privkey.pem
+          tar -C certbot-state -czf sfrost-certbot-state.tar.gz .
+          scp -i ~/.ssh/sfrost-deploy sfrost-certbot-state.tar.gz "$SERVER_USER@$SERVER_HOST:/tmp/sfrost-certbot-state.tar.gz"
+          ssh -i ~/.ssh/sfrost-deploy "$SERVER_USER@$SERVER_HOST" <<'REMOTE'
+          set -euo pipefail
+          stage=/var/lib/sfrost-certbot.stage
+          sudo -n rm -rf "$stage"
+          sudo -n install -d -m 700 "$stage"
+          sudo -n tar -xzf /tmp/sfrost-certbot-state.tar.gz -C "$stage"
+          sudo -n chown -R root:root "$stage"
+          sudo -n rm -rf /var/lib/sfrost-certbot.previous
+          if sudo -n test -d /var/lib/sfrost-certbot; then
+            sudo -n mv /var/lib/sfrost-certbot /var/lib/sfrost-certbot.previous
+          fi
+          sudo -n mv "$stage" /var/lib/sfrost-certbot
+          sudo -n install -d -m 700 /etc/nginx/ssl/sfrost.cn
+          sudo -n install -m 644 /var/lib/sfrost-certbot/live/sfrost.cn/fullchain.pem /etc/nginx/ssl/sfrost.cn/fullchain.pem.new
+          sudo -n install -m 600 /var/lib/sfrost-certbot/live/sfrost.cn/privkey.pem /etc/nginx/ssl/sfrost.cn/privkey.pem.new
+          sudo -n mv /etc/nginx/ssl/sfrost.cn/fullchain.pem.new /etc/nginx/ssl/sfrost.cn/fullchain.pem
+          sudo -n mv /etc/nginx/ssl/sfrost.cn/privkey.pem.new /etc/nginx/ssl/sfrost.cn/privkey.pem
+          sudo -n nginx -t
+          sudo -n systemctl reload nginx
+          rm -f /tmp/sfrost-certbot-state.tar.gz
+          REMOTE
+
+      - name: Verify HTTPS routing and certificate lifetime
+        run: |
+          set -euo pipefail
+          sleep 5
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' https://sfrost.cn/)" = "401"
+          echo | openssl s_client -connect sfrost.cn:443 -servername sfrost.cn 2>/dev/null \
+            | openssl x509 -checkend 2592000 -noout

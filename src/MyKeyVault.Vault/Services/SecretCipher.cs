@@ -38,45 +38,18 @@ public sealed class SecretCipher
         ArgumentException.ThrowIfNullOrWhiteSpace(fieldName);
         ArgumentNullException.ThrowIfNull(plaintext);
 
-        var dataKey = RandomNumberGenerator.GetBytes(KeyBytes);
-        var nonce = RandomNumberGenerator.GetBytes(NonceBytes);
-        var plaintextBytes = Encoding.UTF8.GetBytes(plaintext);
-        var ciphertext = new byte[plaintextBytes.Length];
-        var tag = new byte[TagBytes];
-        var wrappedDataKey = new byte[KeyBytes];
-
-        try
+        var payload = EncryptValue(fieldName, plaintext);
+        return new VaultSecret
         {
-            using (var dataCipher = new AesGcm(dataKey, TagBytes))
-            {
-                dataCipher.Encrypt(nonce, plaintextBytes, ciphertext, tag, Encoding.UTF8.GetBytes(fieldName));
-            }
-
-            // A KEK wraps only a random DEK; no secret field is encrypted directly with a static key.
-            using (var keyCipher = new AesGcm(_masterKey, TagBytes))
-            {
-                var keyNonce = RandomNumberGenerator.GetBytes(NonceBytes);
-                var wrapTag = new byte[TagBytes];
-                keyCipher.Encrypt(keyNonce, dataKey, wrappedDataKey, wrapTag);
-
-                return new VaultSecret
-                {
-                    VaultItemId = vaultItemId,
-                    FieldName = fieldName,
-                    Ciphertext = ciphertext,
-                    Nonce = nonce,
-                    AuthenticationTag = tag,
-                    WrappedDataKey = wrappedDataKey,
-                    KeyWrapNonce = keyNonce,
-                    KeyWrapAuthenticationTag = wrapTag
-                };
-            }
-        }
-        finally
-        {
-            CryptographicOperations.ZeroMemory(dataKey);
-            CryptographicOperations.ZeroMemory(plaintextBytes);
-        }
+            VaultItemId = vaultItemId,
+            FieldName = fieldName,
+            Ciphertext = payload.Ciphertext,
+            Nonce = payload.Nonce,
+            AuthenticationTag = payload.AuthenticationTag,
+            WrappedDataKey = payload.WrappedDataKey,
+            KeyWrapNonce = payload.KeyWrapNonce,
+            KeyWrapAuthenticationTag = payload.KeyWrapAuthenticationTag
+        };
     }
 
     public string Decrypt(VaultSecret secret)
@@ -101,4 +74,60 @@ public sealed class SecretCipher
         }
     }
 
+    public EncryptedPayload EncryptValue(string context, string plaintext)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(context);
+        ArgumentNullException.ThrowIfNull(plaintext);
+        var dataKey = RandomNumberGenerator.GetBytes(KeyBytes);
+        var nonce = RandomNumberGenerator.GetBytes(NonceBytes);
+        var plaintextBytes = Encoding.UTF8.GetBytes(plaintext);
+        var ciphertext = new byte[plaintextBytes.Length];
+        var tag = new byte[TagBytes];
+        var wrappedDataKey = new byte[KeyBytes];
+        try
+        {
+            using (var dataCipher = new AesGcm(dataKey, TagBytes))
+                dataCipher.Encrypt(nonce, plaintextBytes, ciphertext, tag, Encoding.UTF8.GetBytes(context));
+            var keyNonce = RandomNumberGenerator.GetBytes(NonceBytes);
+            var wrapTag = new byte[TagBytes];
+            using (var keyCipher = new AesGcm(_masterKey, TagBytes))
+                keyCipher.Encrypt(keyNonce, dataKey, wrappedDataKey, wrapTag);
+            return new EncryptedPayload(ciphertext, nonce, tag, wrappedDataKey, keyNonce, wrapTag);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(dataKey);
+            CryptographicOperations.ZeroMemory(plaintextBytes);
+        }
+    }
+
+    public string DecryptValue(string context, EncryptedPayload payload)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(context);
+        var dataKey = new byte[KeyBytes];
+        byte[]? plaintextBytes = null;
+        try
+        {
+            using (var keyCipher = new AesGcm(_masterKey, TagBytes))
+                keyCipher.Decrypt(payload.KeyWrapNonce, payload.WrappedDataKey, payload.KeyWrapAuthenticationTag, dataKey);
+            plaintextBytes = new byte[payload.Ciphertext.Length];
+            using (var dataCipher = new AesGcm(dataKey, TagBytes))
+                dataCipher.Decrypt(payload.Nonce, payload.Ciphertext, payload.AuthenticationTag, plaintextBytes, Encoding.UTF8.GetBytes(context));
+            return Encoding.UTF8.GetString(plaintextBytes);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(dataKey);
+            if (plaintextBytes is not null) CryptographicOperations.ZeroMemory(plaintextBytes);
+        }
+    }
+
 }
+
+public sealed record EncryptedPayload(
+    byte[] Ciphertext,
+    byte[] Nonce,
+    byte[] AuthenticationTag,
+    byte[] WrappedDataKey,
+    byte[] KeyWrapNonce,
+    byte[] KeyWrapAuthenticationTag);

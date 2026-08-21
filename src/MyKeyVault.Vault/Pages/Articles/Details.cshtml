@@ -1,0 +1,19 @@
+@page "{id:long}"
+@model MyKeyVault.Vault.Pages.Articles.DetailsModel
+@{ ViewData["Title"] = Model.Article?.Title ?? "文章"; }
+@if (Model.Article is not null)
+{
+<section class="article-detail-head"><a asp-page="Index">← 返回资料库</a><div><p class="eyebrow">@Model.Article.Status.ToUpperInvariant()</p><h1>@(Model.Article.Title ?? "正在抓取文章…")</h1><p>@(Model.Article.Author ?? "未知公众号") @if (!string.IsNullOrWhiteSpace(Model.Article.PublishedText)) { <text>· @Model.Article.PublishedText</text> }</p></div><div class="detail-actions">@if (Model.PreviewUrl is not null) { <a class="button" href="@Model.PreviewUrl" target="_blank" rel="noopener">阅读原文</a> } @if (Model.PdfUrl is not null) { <a href="@Model.PdfUrl" target="_blank" rel="noopener">打开 PDF</a> } <a href="@Model.Article.SourceUrl" target="_blank" rel="noopener noreferrer">微信链接</a></div></section>
+@if (!string.IsNullOrWhiteSpace(Model.Notice)) { <div class="notice" role="status">@Model.Notice</div> }
+<div class="extraction-layout">
+<section class="extract-compose"><p class="eyebrow">NEW EXTRACTION</p><h2>你想从这篇文章得到什么？</h2>
+@if (!Model.AiConfigured) { <p>萃取前需要先保存 AI 服务配置。</p><a class="button" asp-page="Settings">配置萃取模型</a> }
+else if (Model.Article.Status != "completed") { <p>文章抓取完成后才能萃取。</p> }
+else { <form method="post" asp-page-handler="Extract"><textarea asp-for="Prompt" placeholder="例如：提炼核心论点，列出关键数据，并指出作者的假设与可能遗漏。"></textarea><span asp-validation-for="Prompt" class="validation"></span><div class="prompt-chips"><button type="button" data-prompt="提炼核心观点，并区分事实、观点与推断。">核心观点</button><button type="button" data-prompt="整理文章中的关键数据、人物、日期和结论。">关键事实</button><button type="button" data-prompt="生成可执行的行动清单，注明每项行动的依据。">行动清单</button></div><button class="button" type="submit">开始萃取</button></form> }
+</section>
+<section class="extraction-history"><div class="section-title"><h2>萃取记录</h2><span>@Model.Extractions.Count 次</span></div>
+@if (Model.Extractions.Count == 0) { <p class="empty-copy">还没有萃取结果。</p> }
+else { @foreach (var item in Model.Extractions) { <details class="extraction-card" @(Request.Query["extraction"] == item.Id.ToString() ? "open" : null)><summary><span><strong>@(item.Prompt.Length > 80 ? item.Prompt[..80] + "…" : item.Prompt)</strong><small>@item.ModelUsed · @item.CreatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</small></span><i class="status-pill status-@item.Status">@(item.Status == "completed" ? "完成" : "失败")</i></summary>@if (item.Status == "completed") { <pre>@item.Result</pre> } else { <p class="validation">@item.ErrorMessage</p> }</details> } }
+</section></div>
+<script>document.querySelectorAll('[data-prompt]').forEach(b=>b.addEventListener('click',()=>document.getElementById('Prompt').value=b.dataset.prompt));</script>
+}

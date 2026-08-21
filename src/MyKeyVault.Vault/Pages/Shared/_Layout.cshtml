@@ -12,10 +12,10 @@
         <nav aria-label="主导航">
             @if (User.Identity?.IsAuthenticated == true)
             {
-                <a asp-page="/Vault/Index">保险库</a>
-                <a asp-page="/Vault/Requests">受控使用</a>
-                <a asp-page="/Vault/AccessTokens">连接凭据</a>
-                <a asp-page="/Vault/Audit">活动</a>
+                <a asp-page="/Index">工作台</a>
+                <a asp-page="/Vault/Index">密码本</a>
+                <a asp-page="/Articles/Index">公众号资料库</a>
+                <details class="nav-more"><summary>安全</summary><div><a asp-page="/Vault/Requests">受控使用</a><a asp-page="/Vault/AccessTokens">连接凭据</a><a asp-page="/Vault/Audit">活动记录</a></div></details>
                 <form class="inline-form" asp-area="Identity" asp-page="/Account/Logout" asp-route-returnUrl="/" method="post"><button class="text-button">退出</button></form>
             }
             else
@@ -27,7 +27,7 @@
     </header>
     <main class="page-shell">@RenderBody()</main>
     <footer class="site-footer">
-        <span>&copy; 2026 我的密码本 · AI实现 · </span><a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer">蜀ICP备2024053184号-5</a>
+        <span>&copy; 2026 我的密码本 · </span><a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer">蜀ICP备2024053184号-5</a>
     </footer>
 </body>
 </html>

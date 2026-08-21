@@ -12,6 +12,9 @@ public sealed class VaultDbContext(DbContextOptions<VaultDbContext> options) : I
     public DbSet<ControlledUseRequest> ControlledUseRequests => Set<ControlledUseRequest>();
     public DbSet<McpAccessToken> McpAccessTokens => Set<McpAccessToken>();
     public DbSet<VaultTag> VaultTags => Set<VaultTag>();
+    public DbSet<KnowledgeArticle> KnowledgeArticles => Set<KnowledgeArticle>();
+    public DbSet<ArticleExtraction> ArticleExtractions => Set<ArticleExtraction>();
+    public DbSet<ArticleAiSettings> ArticleAiSettings => Set<ArticleAiSettings>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -36,5 +39,13 @@ public sealed class VaultDbContext(DbContextOptions<VaultDbContext> options) : I
             entity.HasIndex(x => new { x.OwnerId, x.RevokedAtUtc });
         });
         builder.Entity<VaultTag>(entity => entity.HasIndex(x => new { x.OwnerId, x.Name }).IsUnique());
+        builder.Entity<KnowledgeArticle>(entity =>
+        {
+            entity.HasIndex(x => new { x.OwnerId, x.CreatedAtUtc });
+            entity.HasIndex(x => new { x.OwnerId, x.SourceUrl });
+            entity.HasMany(x => x.Extractions).WithOne(x => x.Article).HasForeignKey(x => x.ArticleId).OnDelete(DeleteBehavior.Cascade);
+        });
+        builder.Entity<ArticleExtraction>(entity => entity.HasIndex(x => new { x.OwnerId, x.CreatedAtUtc }));
+        builder.Entity<ArticleAiSettings>(entity => entity.HasIndex(x => x.OwnerId).IsUnique());
     }
 }

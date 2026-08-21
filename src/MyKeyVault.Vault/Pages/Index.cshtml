@@ -1,23 +1,36 @@
 @page
 @model IndexModel
-@{
-    ViewData["Title"] = "你的私密信息，只在需要时受控使用";
-}
-<section class="landing">
+@{ ViewData["Title"] = User.Identity?.IsAuthenticated == true ? "工作台" : "我的密码本"; }
+@if (User.Identity?.IsAuthenticated != true)
+{
+<section class="landing public-landing">
     <p class="eyebrow">PRIVATE BY DEFAULT</p>
     <h1>把重要凭据放进<br /><em>可控的保险库。</em></h1>
     <p class="lede">账号、API Key、服务器和数据库连接信息。默认加密、默认掩码、每次受控使用都有记录。</p>
-    @if (User.Identity?.IsAuthenticated == true)
-    {
-        <a class="button" asp-page="/Vault/Index">打开我的保险库</a>
-    }
-    else
-    {
-        <a class="button" asp-area="Identity" asp-page="/Account/Register">创建我的保险库</a>
-    }
+    <a class="button" asp-area="Identity" asp-page="/Account/Login">进入我的密码本</a>
     <dl class="assurance-strip">
         <div><dt>加密存储</dt><dd>敏感字段不以明文落库</dd></div>
         <div><dt>受控调用</dt><dd>AI 默认拿不到原始秘密</dd></div>
         <div><dt>可追溯</dt><dd>查看与使用均留审计</dd></div>
     </dl>
 </section>
+}
+else
+{
+<section class="workspace-head">
+    <div><p class="eyebrow">WORKSPACE</p><h1>今天要处理什么？</h1><p>保存凭据，收集文章，或把长文变成可用的信息。</p></div>
+    <a class="button" asp-page="/Vault/Create">新增密码条目</a>
+</section>
+<section class="tool-grid" aria-label="核心功能">
+    <a class="tool-card tool-vault" asp-page="/Vault/Index"><span class="tool-symbol" aria-hidden="true">钥</span><div><p class="eyebrow">PASSWORDS</p><h2>密码本</h2><p>管理登录信息、API Key、服务器和私密笔记。</p></div><strong>@Model.VaultCount 条</strong></a>
+    <a class="tool-card tool-library" asp-page="/Articles/Index"><span class="tool-symbol" aria-hidden="true">文</span><div><p class="eyebrow">WECHAT LIBRARY</p><h2>公众号资料库</h2><p>粘贴链接抓取原文，在一个地方阅读与归档。</p></div><strong>@Model.ArticleCount 篇</strong></a>
+    <a class="tool-card tool-extract" asp-page="/Articles/Index" asp-fragment="library"><span class="tool-symbol" aria-hidden="true">萃</span><div><p class="eyebrow">EXTRACTIONS</p><h2>文章萃取</h2><p>按自己的问题总结文章，保留每次分析结果。</p></div><strong>@Model.ExtractionCount 次</strong></a>
+</section>
+<section class="workspace-lower">
+    <div><div class="section-title"><h2>最近文章</h2><a asp-page="/Articles/Index">查看全部</a></div>
+    @if (Model.Recent.Count == 0) { <p class="empty-copy">还没有文章。粘贴微信公众号链接即可开始。</p> }
+    else { <div class="recent-list">@foreach (var item in Model.Recent) { <a asp-page="/Articles/Details" asp-route-id="@item.Id"><span class="status-dot status-@item.Status"></span><span><strong>@item.Title</strong><small>@(item.Author ?? "公众号文章") · @item.CreatedAtUtc.ToLocalTime().ToString("MM-dd HH:mm")</small></span><em>@(item.Status == "completed" ? "打开" : item.Status == "failed" ? "失败" : "处理中")</em></a> }</div> }
+    </div>
+    <aside class="security-note"><p class="eyebrow">SECURITY MODEL</p><h2>秘密与内容分开保存</h2><p>密码字段使用 AES-256-GCM 信封加密；文章和萃取结果按账户隔离。AI 不会通过受控调用接口读取密码明文。</p><a asp-page="/Vault/Audit">查看安全活动</a></aside>
+</section>
+}

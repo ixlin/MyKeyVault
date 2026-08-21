@@ -1,0 +1,16 @@
+@page
+@model MyKeyVault.Vault.Pages.Articles.SettingsModel
+@{ ViewData["Title"] = "萃取模型设置"; }
+<section class="form-heading"><p class="eyebrow">ARTICLE AI</p><h1>萃取模型设置</h1><p>支持 DeepSeek、OpenAI 及兼容 Chat Completions 的 HTTPS 服务。</p></section>
+@if (!string.IsNullOrWhiteSpace(Model.Notice)) { <div class="notice" role="status">@Model.Notice</div> }
+<div class="settings-layout">
+<form method="post" class="vault-form settings-form">
+    <div asp-validation-summary="ModelOnly" class="validation"></div>
+    <label>提供商<input asp-for="Input.Provider" autocomplete="off" placeholder="deepseek" /></label>
+    <label>API Base URL<input asp-for="Input.BaseUrl" inputmode="url" autocomplete="url" /></label>
+    <label>模型名称<input asp-for="Input.ModelName" autocomplete="off" /></label>
+    <label>API Key<input asp-for="Input.ApiKey" type="password" autocomplete="new-password" placeholder="@(Model.HasApiKey ? "已加密保存；留空则不修改" : "输入 API Key")" /><small>Key 仅在发起萃取请求时短暂解密，不会显示在页面或日志中。</small></label>
+    <div class="form-actions"><a asp-page="Index">返回资料库</a><button class="button" type="submit">保存配置</button></div>
+</form>
+<aside class="security-note"><p class="eyebrow">ENCRYPTED AT REST</p><h2>与密码字段相同的加密模型</h2><p>每个 API Key 使用独立随机数据密钥和 AES-256-GCM 加密；数据密钥再由部署主密钥包裹。数据库中不保存 API Key 明文。</p></aside>
+</div>

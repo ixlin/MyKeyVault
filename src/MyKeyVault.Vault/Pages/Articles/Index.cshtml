@@ -1,0 +1,18 @@
+@page
+@model MyKeyVault.Vault.Pages.Articles.IndexModel
+@{ ViewData["Title"] = "公众号资料库"; }
+<section class="library-head">
+    <div><p class="eyebrow">WECHAT LIBRARY</p><h1>公众号资料库</h1><p>抓取原文，保留 PDF，并按你的问题萃取内容。</p></div>
+    <a class="settings-link" asp-page="Settings"><span class="status-dot @(Model.AiConfigured ? "status-completed" : "status-failed")"></span>@(Model.AiConfigured ? "AI 已配置" : "配置萃取模型")</a>
+</section>
+@if (!string.IsNullOrWhiteSpace(Model.Notice)) { <div class="notice" role="status">@Model.Notice</div> }
+<section class="capture-panel">
+    <div><p class="eyebrow">ADD ARTICLES</p><h2>粘贴公众号文章链接</h2><p>每行一个，单次最多 10 篇。重复完成的文章不会再次抓取。</p></div>
+    <form method="post"><textarea asp-for="Urls" placeholder="https://mp.weixin.qq.com/s/..." aria-label="微信公众号文章链接"></textarea><span asp-validation-for="Urls" class="validation"></span><div><span class="service-state"><i class="status-dot @(Model.ScraperAvailable ? "status-completed" : "status-failed")"></i>@(Model.ScraperAvailable ? "抓取服务正常" : "抓取服务不可用")</span>@if (Model.ScraperAvailable) { <button class="button" type="submit">开始抓取</button> } else { <button class="button" type="button" disabled>开始抓取</button> }</div></form>
+</section>
+<section id="library" class="article-library">
+    <div class="section-title"><h2>全部文章</h2><span>@Model.Articles.Count 篇记录</span></div>
+    @if (Model.Articles.Count == 0) { <div class="empty-state"><h2>资料库还是空的</h2><p>从上方粘贴第一篇公众号文章链接。</p></div> }
+    else { <div class="article-list">@foreach (var article in Model.Articles) { <a asp-page="Details" asp-route-id="@article.Id" class="article-row"><span class="article-index">@article.Id.ToString("D3")</span><span class="article-main"><strong>@(article.Title ?? (article.Status == "failed" ? "抓取失败" : "正在抓取文章…"))</strong><small>@(article.Author ?? "公众号文章") @if (!string.IsNullOrWhiteSpace(article.PublishedText)) { <text>· @article.PublishedText</text> }</small>@if (!string.IsNullOrWhiteSpace(article.Error)) { <small class="validation">@article.Error</small> }</span><span class="article-meta">@if (article.ExtractionCount > 0) { <em>@article.ExtractionCount 次萃取</em> }<i class="status-pill status-@article.Status">@(article.Status == "completed" ? "已收录" : article.Status == "failed" ? "失败" : "处理中")</i></span></a> }</div> }
+</section>
+@if (Model.Articles.Any(x => x.Status is "pending" or "processing")) { <script>setTimeout(() => location.reload(), 5000);</script> }

@@ -123,12 +123,15 @@ jobs:
             sudo -n rsync -a --delete \
               --exclude 'appsettings*.json' \
               --exclude 'wwwroot/uploads' \
+              --exclude 'wwwroot/wechat-articles' \
               "$SRC_DIR/" "$DEST_DIR/"
             SERVICE_USER=$(systemctl show -p User "$SERVICE" | cut -d= -f2)
             if [ -z "$SERVICE_USER" ]; then SERVICE_USER=www-data; fi
             sudo -n mkdir -p "$DEST_DIR/wwwroot/uploads"
+            sudo -n mkdir -p "$DEST_DIR/wwwroot/wechat-articles"
             sudo -n chown -R "$SERVICE_USER":"$SERVICE_USER" "$DEST_DIR"
             sudo -n chmod 750 "$DEST_DIR/wwwroot/uploads"
+            sudo -n chmod 750 "$DEST_DIR/wwwroot/wechat-articles"
             # Keep connection strings, encryption material and bootstrap credentials private.
             sudo -n find "$DEST_DIR" -maxdepth 1 -type f -name 'appsettings*.json' -exec chmod 600 {} +
             sudo -n systemctl restart "$SERVICE"
