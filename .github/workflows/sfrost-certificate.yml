@@ -90,8 +90,7 @@ jobs:
             --no-eff-email \
             --non-interactive \
             --keep-until-expiring \
-            -d sfrost.cn \
-            -d www.sfrost.cn
+            -d sfrost.cn
 
       - name: Deploy certificate and persist renewal state
         env:
