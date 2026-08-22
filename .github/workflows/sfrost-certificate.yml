@@ -1,12 +1,9 @@
 name: Renew sfrost.cn certificate
 
+# sfrost.cn is renewed on the server with acme.sh DNS-PERSIST-01.
+# Keep this legacy HTTP-01 workflow manual-only because Alibaba Cloud's
+# ICP interception returns 403 for public port-80 validation requests.
 on:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/sfrost-certificate.yml
-  schedule:
-    - cron: "23 3 * * 1,4"
   workflow_dispatch:
 
 permissions:
