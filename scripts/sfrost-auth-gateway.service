@@ -9,11 +9,15 @@ DynamicUser=true
 WorkingDirectory=/opt/sfrost-auth-gateway
 EnvironmentFile=/etc/sfrost-auth-gateway.env
 Environment=PORT=3081
+Environment=SFROST_AUTH_CREDENTIALS_FILE=/var/lib/sfrost-auth-gateway/credentials.json
 Environment=PATH=/opt/node-v22.19.0/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ExecStart=/opt/node-v22.19.0/bin/node /opt/sfrost-auth-gateway/server.mjs
 Restart=on-failure
 RestartSec=3s
 TimeoutStopSec=10s
+StateDirectory=sfrost-auth-gateway
+StateDirectoryMode=0700
+UMask=0077
 
 NoNewPrivileges=true
 PrivateTmp=true

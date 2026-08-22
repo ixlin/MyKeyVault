@@ -1,17 +1,19 @@
 import http from "node:http";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import {
   createHmac,
+  randomBytes,
   scrypt as scryptCallback,
   timingSafeEqual,
 } from "node:crypto";
+import { dirname } from "node:path";
 import { promisify } from "node:util";
 
 const scrypt = promisify(scryptCallback);
 const port = parseInteger(process.env.PORT, 3081, 1, 65535);
-const username = requireEnvironment("SFROST_AUTH_USERNAME");
-const passwordRecord = parsePasswordRecord(
-  requireEnvironment("SFROST_AUTH_PASSWORD_SCRYPT"),
-);
+const credentialsFile = process.env.SFROST_AUTH_CREDENTIALS_FILE || "";
+const initialUsername = requireEnvironment("SFROST_AUTH_USERNAME");
+const initialPasswordRecord = requireEnvironment("SFROST_AUTH_PASSWORD_SCRYPT");
 const cookieSecret = Buffer.from(
   requireEnvironment("SFROST_AUTH_COOKIE_SECRET"),
   "hex",
@@ -26,6 +28,18 @@ const SESSION_SECONDS = 12 * 60 * 60;
 const REMEMBER_SECONDS = 30 * 24 * 60 * 60;
 const MAX_FORM_BYTES = 8 * 1024;
 const failedAttempts = new Map();
+const initialCredentials = await loadCredentialState();
+let username = initialCredentials.username;
+let passwordRecord = parsePasswordRecord(initialCredentials.passwordRecord);
+let credentialRevision = initialCredentials.revision;
+
+if (credentialsFile && !initialCredentials.persisted) {
+  await persistCredentialState({
+    username,
+    passwordRecord: formatPasswordRecord(passwordRecord),
+    revision: credentialRevision,
+  });
+}
 
 const server = http.createServer(async (request, response) => {
   try {
@@ -87,6 +101,68 @@ const server = http.createServer(async (request, response) => {
       return redirect(response, safeNext(form.get("next")));
     }
 
+    if (request.method === "GET" && requestUrl.pathname === "/account") {
+      if (!verifySession(request)) {
+        return redirect(response, "/__sfrost-auth/login");
+      }
+
+      return sendAccountPage(response, {
+        changed: requestUrl.searchParams.get("changed") === "1",
+      });
+    }
+
+    if (request.method === "POST" && requestUrl.pathname === "/account/password") {
+      if (!verifySession(request)) {
+        return send(response, 401, "Unauthorized");
+      }
+      if (!isSameOrigin(request)) {
+        return send(response, 403, "Forbidden");
+      }
+
+      const form = await readForm(request);
+      const currentPassword = form.get("currentPassword") ?? "";
+      const newPassword = form.get("newPassword") ?? "";
+      const confirmPassword = form.get("confirmPassword") ?? "";
+
+      if (!(await verifyPassword(currentPassword))) {
+        return sendAccountPage(response, {
+          error: "当前密码不正确。",
+          status: 400,
+        });
+      }
+      if (newPassword.length < 12 || newPassword.length > 256) {
+        return sendAccountPage(response, {
+          error: "新密码长度必须为 12–256 个字符。",
+          status: 400,
+        });
+      }
+      if (newPassword !== confirmPassword) {
+        return sendAccountPage(response, {
+          error: "两次输入的新密码不一致。",
+          status: 400,
+        });
+      }
+      if (await verifyPassword(newPassword)) {
+        return sendAccountPage(response, {
+          error: "新密码不能与当前密码相同。",
+          status: 400,
+        });
+      }
+
+      const nextPasswordRecord = await hashPassword(newPassword);
+      const nextRevision = credentialRevision + 1;
+      await persistCredentialState({
+        username,
+        passwordRecord: formatPasswordRecord(nextPasswordRecord),
+        revision: nextRevision,
+      });
+      passwordRecord = nextPasswordRecord;
+      credentialRevision = nextRevision;
+
+      response.setHeader("Set-Cookie", serializeSessionCookie(SESSION_SECONDS, false));
+      return redirect(response, "/__sfrost-auth/account?changed=1");
+    }
+
     if (request.method === "POST" && requestUrl.pathname === "/logout") {
       if (!isSameOrigin(request)) {
         return send(response, 403, "Forbidden");
@@ -134,6 +210,21 @@ function parsePasswordRecord(value) {
   return { salt, hash };
 }
 
+function formatPasswordRecord(record) {
+  return `scrypt$${record.salt.toString("hex")}$${record.hash.toString("hex")}`;
+}
+
+async function hashPassword(password) {
+  const salt = randomBytes(16);
+  const hash = await scrypt(password, salt, 64, {
+    N: 32768,
+    r: 8,
+    p: 1,
+    maxmem: 64 * 1024 * 1024,
+  });
+  return { salt, hash };
+}
+
 async function verifyPassword(password) {
   const actual = await scrypt(password, passwordRecord.salt, 64, {
     N: 32768,
@@ -152,7 +243,11 @@ function safeEqualText(left, right) {
 
 function serializeSessionCookie(maxAge, persistent) {
   const payload = Buffer.from(
-    JSON.stringify({ user: username, expires: Date.now() + maxAge * 1000 }),
+    JSON.stringify({
+      user: username,
+      revision: credentialRevision,
+      expires: Date.now() + maxAge * 1000,
+    }),
   ).toString("base64url");
   const signature = sign(payload);
   const persistence = persistent ? `; Max-Age=${maxAge}` : "";
@@ -173,10 +268,58 @@ function verifySession(request) {
 
   try {
     const data = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
-    return data.user === username && Number(data.expires) > Date.now();
+    return data.user === username
+      && data.revision === credentialRevision
+      && Number(data.expires) > Date.now();
   } catch {
     return false;
   }
+}
+
+async function loadCredentialState() {
+  if (!credentialsFile) {
+    return {
+      username: initialUsername,
+      passwordRecord: initialPasswordRecord,
+      revision: 1,
+      persisted: false,
+    };
+  }
+
+  try {
+    const document = JSON.parse(await readFile(credentialsFile, "utf8"));
+    if (
+      document.version !== 1
+      || typeof document.username !== "string"
+      || typeof document.passwordRecord !== "string"
+      || !Number.isInteger(document.revision)
+      || document.revision < 1
+    ) {
+      throw new Error("Credential state has an invalid schema.");
+    }
+    parsePasswordRecord(document.passwordRecord);
+    return { ...document, persisted: true };
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+    return {
+      username: initialUsername,
+      passwordRecord: initialPasswordRecord,
+      revision: 1,
+      persisted: false,
+    };
+  }
+}
+
+async function persistCredentialState(state) {
+  if (!credentialsFile) {
+    throw new Error("SFROST_AUTH_CREDENTIALS_FILE is required for password changes.");
+  }
+
+  await mkdir(dirname(credentialsFile), { recursive: true, mode: 0o700 });
+  const temporaryFile = `${credentialsFile}.${process.pid}.${Date.now()}.tmp`;
+  const document = `${JSON.stringify({ version: 1, ...state }, null, 2)}\n`;
+  await writeFile(temporaryFile, document, { encoding: "utf8", mode: 0o600 });
+  await rename(temporaryFile, credentialsFile);
 }
 
 function sign(payload) {
@@ -249,6 +392,27 @@ function sendLoginPage(response, options = {}) {
   const next = escapeHtml(options.next ?? "/");
   const displayUsername = escapeHtml(username);
 
+  setPageSecurityHeaders(response);
+  return send(response, status, loginDocument({ displayUsername, error, next }));
+}
+
+function sendAccountPage(response, options = {}) {
+  const status = options.status ?? 200;
+  const error = options.error
+    ? `<p class="notice error" role="alert">${escapeHtml(options.error)}</p>`
+    : "";
+  const success = options.changed
+    ? '<p class="notice success" role="status">密码已更新，其他设备上的旧会话已退出。</p>'
+    : "";
+  setPageSecurityHeaders(response);
+  return send(
+    response,
+    status,
+    accountDocument({ displayUsername: escapeHtml(username), error, success }),
+  );
+}
+
+function setPageSecurityHeaders(response) {
   response.setHeader("Cache-Control", "no-store");
   response.setHeader("Content-Type", "text/html; charset=utf-8");
   response.setHeader(
@@ -258,7 +422,6 @@ function sendLoginPage(response, options = {}) {
   response.setHeader("Referrer-Policy", "no-referrer");
   response.setHeader("X-Content-Type-Options", "nosniff");
   response.setHeader("X-Frame-Options", "DENY");
-  return send(response, status, loginDocument({ displayUsername, error, next }));
 }
 
 function send(response, status, body = "") {
@@ -329,6 +492,9 @@ function loginDocument({ displayUsername, error, next }) {
     .submit:focus-visible, .toggle:focus-visible { outline:2px solid var(--frost); outline-offset:3px; }
     .error { margin:-8px 0 18px; padding:12px 14px; border:1px solid rgba(255,126,126,.28); border-radius:10px; color:#ffc0c0; background:rgba(117,31,45,.2); font-size:14px; }
     .privacy { margin:24px 0 0; color:#6f849a; font-size:12px; line-height:1.6; }
+    .filing { margin:12px 0 0; font-size:12px; }
+    .filing a { color:#70879d; text-decoration:none; }
+    .filing a:hover { color:var(--frost); text-decoration:underline; text-underline-offset:3px; }
     @media (max-width:820px) { .shell{grid-template-columns:1fr}.identity{min-height:34vh;padding:28px 24px}.intro{padding:8vh 0 1vh}.intro p,.status{display:none}h1{font-size:clamp(44px,14vw,72px)}.gate{border-left:0;border-top:1px solid var(--line);padding:42px 24px 56px}.gate::before{width:32%;height:1px;background:linear-gradient(90deg,var(--frost),transparent)} }
     @media (prefers-reduced-motion:no-preference) { .card{animation:enter .55s cubic-bezier(.2,.8,.2,1) both}.intro{animation:enter .7s .06s cubic-bezier(.2,.8,.2,1) both}@keyframes enter{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}} }
   </style>
@@ -366,6 +532,7 @@ function loginDocument({ displayUsername, error, next }) {
           <button class="submit" type="submit">验证并进入</button>
         </form>
         <p class="privacy">凭据只用于本服务器身份验证。浏览器可按你的设置保存密码。</p>
+        <p class="filing"><a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">蜀ICP备2024053184号</a></p>
       </div>
     </section>
   </main>
@@ -373,6 +540,89 @@ function loginDocument({ displayUsername, error, next }) {
     const button=document.querySelector('.toggle');
     const password=document.querySelector('#password');
     button.addEventListener('click',()=>{const visible=password.type==='text';password.type=visible?'password':'text';button.textContent=visible?'◉':'—';button.setAttribute('aria-label',visible?'显示密码':'隐藏密码');password.focus();});
+  </script>
+</body>
+</html>`;
+}
+
+function accountDocument({ displayUsername, error, success }) {
+  return `<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1320">
+  <title>账户设置 · SFROST</title>
+  <style>
+    :root { color-scheme:dark; --ink:#0b1320; --panel:#111d2c; --frost:#78d9ff; --blue:#4c78ff; --paper:#f4f8fc; --muted:#91a4b9; --line:rgba(151,211,238,.18); }
+    * { box-sizing:border-box; }
+    html,body { min-height:100%; }
+    body { margin:0; color:var(--paper); background:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB",sans-serif; }
+    body::before { content:""; position:fixed; inset:0; pointer-events:none; opacity:.38; background:repeating-radial-gradient(ellipse at 13% 14%,transparent 0 58px,rgba(120,217,255,.08) 59px 60px,transparent 61px 86px); mask-image:linear-gradient(115deg,#000,transparent 66%); }
+    .shell { position:relative; width:min(100% - 36px,1060px); margin:0 auto; padding:34px 0 64px; }
+    .topbar { display:flex; align-items:center; justify-content:space-between; gap:18px; margin-bottom:clamp(58px,9vw,112px); }
+    .brand { display:flex; align-items:center; gap:12px; color:var(--paper); text-decoration:none; font:700 13px/1 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.18em; }
+    .mark { width:28px; aspect-ratio:1; border:1px solid var(--frost); border-radius:50% 50% 44% 44%; display:grid; place-items:center; box-shadow:0 0 28px rgba(120,217,255,.18); }
+    .mark::after { content:""; width:5px; height:11px; border-radius:5px 5px 2px 2px; background:var(--frost); box-shadow:0 0 14px var(--frost); }
+    .back { color:#a9bbcc; text-decoration:none; font-size:14px; }
+    .back:hover { color:var(--frost); }
+    .layout { display:grid; grid-template-columns:minmax(0,.8fr) minmax(430px,1fr); gap:clamp(48px,10vw,128px); align-items:start; }
+    .eyebrow { color:var(--frost); font:600 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.2em; }
+    h1 { margin:18px 0; font-family:"Iowan Old Style","Songti SC","Noto Serif SC",serif; font-size:clamp(44px,6vw,76px); font-weight:500; line-height:1; letter-spacing:-.045em; }
+    .lead { max-width:28em; margin:0; color:var(--muted); font-size:17px; line-height:1.75; }
+    .identity { margin-top:38px; padding-top:20px; border-top:1px solid var(--line); color:#a8bacb; font-size:13px; }
+    .identity strong { display:block; margin-top:7px; color:var(--paper); font:650 15px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; }
+    .card { padding:clamp(25px,4vw,42px); border:1px solid var(--line); border-radius:18px; background:rgba(17,29,44,.76); box-shadow:0 28px 80px rgba(0,0,0,.22); backdrop-filter:blur(20px); }
+    h2 { margin:0 0 8px; font-size:25px; letter-spacing:-.025em; }
+    .hint { margin:0 0 28px; color:var(--muted); font-size:14px; line-height:1.6; }
+    .field { margin:0 0 18px; }
+    label { display:block; margin-bottom:8px; color:#c7d5e2; font-size:13px; font-weight:650; }
+    .control { position:relative; }
+    input { width:100%; height:52px; padding:0 48px 0 15px; border:1px solid rgba(157,183,207,.22); border-radius:11px; outline:0; color:var(--paper); background:rgba(5,12,22,.58); font:500 16px/1 inherit; transition:border-color .18s,box-shadow .18s; }
+    input:focus { border-color:var(--frost); box-shadow:0 0 0 4px rgba(120,217,255,.1); }
+    input[readonly] { color:#9fb2c5; cursor:default; }
+    .toggle { position:absolute; right:7px; top:6px; width:40px; height:40px; border:0; border-radius:9px; color:var(--muted); background:transparent; cursor:pointer; font-size:18px; }
+    .toggle:hover { color:var(--paper); background:rgba(255,255,255,.06); }
+    .submit { width:100%; height:54px; margin-top:6px; border:0; border-radius:11px; color:#fff; background:linear-gradient(105deg,#315fe6,var(--blue) 52%,#4e9df5); box-shadow:0 18px 40px rgba(38,87,225,.22); font-size:15px; font-weight:750; cursor:pointer; }
+    .submit:hover { filter:brightness(1.08); }
+    .submit:focus-visible,.toggle:focus-visible,.back:focus-visible { outline:2px solid var(--frost); outline-offset:3px; }
+    .notice { margin:0 0 20px; padding:12px 14px; border-radius:10px; font-size:14px; line-height:1.55; }
+    .error { border:1px solid rgba(255,126,126,.28); color:#ffc0c0; background:rgba(117,31,45,.2); }
+    .success { border:1px solid rgba(110,231,183,.25); color:#b8f3dc; background:rgba(23,99,75,.2); }
+    .filing { margin:54px 0 0; text-align:center; font-size:12px; }
+    .filing a { color:#70879d; text-decoration:none; }
+    .filing a:hover { color:var(--frost); text-decoration:underline; text-underline-offset:3px; }
+    @media(max-width:780px){.shell{padding-top:24px}.topbar{margin-bottom:54px}.layout{grid-template-columns:1fr;gap:38px}.lead{font-size:16px}.card{padding:24px 20px}.identity{margin-top:26px}}
+    @media(prefers-reduced-motion:no-preference){.copy,.card{animation:enter .5s cubic-bezier(.2,.8,.2,1) both}.card{animation-delay:.06s}@keyframes enter{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}}
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <nav class="topbar"><a class="brand" href="/"><span class="mark" aria-hidden="true"></span>SFROST / PRIVATE</a><a class="back" href="/">返回工作台 →</a></nav>
+    <div class="layout">
+      <section class="copy">
+        <div class="eyebrow">ACCOUNT CONTROL</div>
+        <h1>掌管你的通行密钥。</h1>
+        <p class="lead">修改后，其他设备上的旧会话会立即失效。当前设备将保持登录。</p>
+        <div class="identity">当前账户<strong>${displayUsername}</strong></div>
+      </section>
+      <section class="card" aria-label="修改密码">
+        <h2>修改密码</h2>
+        <p class="hint">使用至少 12 个字符，建议包含不同类型的字符。</p>
+        ${error}${success}
+        <form method="post" action="/__sfrost-auth/account/password">
+          <div class="field"><label for="username">用户名</label><div class="control"><input id="username" name="username" type="text" value="${displayUsername}" autocomplete="username" readonly></div></div>
+          <div class="field"><label for="currentPassword">当前密码</label><div class="control"><input id="currentPassword" name="currentPassword" type="password" autocomplete="current-password" required autofocus><button class="toggle" type="button" aria-label="显示当前密码">◉</button></div></div>
+          <div class="field"><label for="newPassword">新密码</label><div class="control"><input id="newPassword" name="newPassword" type="password" autocomplete="new-password" minlength="12" maxlength="256" required><button class="toggle" type="button" aria-label="显示新密码">◉</button></div></div>
+          <div class="field"><label for="confirmPassword">再次输入新密码</label><div class="control"><input id="confirmPassword" name="confirmPassword" type="password" autocomplete="new-password" minlength="12" maxlength="256" required><button class="toggle" type="button" aria-label="显示确认密码">◉</button></div></div>
+          <button class="submit" type="submit">保存新密码</button>
+        </form>
+      </section>
+    </div>
+    <p class="filing"><a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">蜀ICP备2024053184号</a></p>
+  </main>
+  <script>
+    document.querySelectorAll('.toggle').forEach((button)=>button.addEventListener('click',()=>{const input=button.parentElement.querySelector('input');const visible=input.type==='text';input.type=visible?'password':'text';button.textContent=visible?'◉':'—';button.setAttribute('aria-label',visible?'显示密码':'隐藏密码');input.focus();}));
   </script>
 </body>
 </html>`;

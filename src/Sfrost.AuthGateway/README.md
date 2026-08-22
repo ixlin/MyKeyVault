@@ -14,6 +14,13 @@ Required environment variables:
 Production stores them in `/etc/sfrost-auth-gateway.env` with mode `0600`.
 Neither plaintext passwords nor session secrets belong in this repository.
 
+After the first start, the gateway copies the password hash into its protected
+systemd state directory. An authenticated administrator can then change the
+password at `/__sfrost-auth/account`. Password changes are written atomically
+and increment the credential revision, invalidating sessions on other devices.
+The initial environment password remains a recovery seed only when no state
+file exists.
+
 The Nginx `auth_request` check fails closed: if the gateway is unavailable or a
 cookie is invalid, Harness is not proxied to the requester. The original
 DeepSeek Harness installation is not modified, so its package can still be
