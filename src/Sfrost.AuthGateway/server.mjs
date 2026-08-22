@@ -12,6 +12,15 @@ import { promisify } from "node:util";
 const scrypt = promisify(scryptCallback);
 const port = parseInteger(process.env.PORT, 3081, 1, 65535);
 const credentialsFile = process.env.SFROST_AUTH_CREDENTIALS_FILE || "";
+const harnessApiUrl = new URL(
+  process.env.SFROST_HARNESS_API_URL || "http://127.0.0.1:3080",
+);
+if (
+  harnessApiUrl.protocol !== "http:"
+  || !["127.0.0.1", "::1", "localhost"].includes(harnessApiUrl.hostname)
+) {
+  throw new Error("SFROST_HARNESS_API_URL must use HTTP on a loopback host.");
+}
 const initialUsername = requireEnvironment("SFROST_AUTH_USERNAME");
 const initialPasswordRecord = requireEnvironment("SFROST_AUTH_PASSWORD_SCRYPT");
 const cookieSecret = Buffer.from(
@@ -27,6 +36,7 @@ const COOKIE_NAME = "sfrost_session";
 const SESSION_SECONDS = 12 * 60 * 60;
 const REMEMBER_SECONDS = 30 * 24 * 60 * 60;
 const MAX_FORM_BYTES = 8 * 1024;
+const DEEPSEEK_CREDENTIAL_REF = "DEEPSEEK_API_KEY";
 const failedAttempts = new Map();
 const initialCredentials = await loadCredentialState();
 let username = initialCredentials.username;
@@ -109,6 +119,79 @@ const server = http.createServer(async (request, response) => {
       return sendAccountPage(response, {
         changed: requestUrl.searchParams.get("changed") === "1",
       });
+    }
+
+    if (request.method === "GET" && requestUrl.pathname === "/models") {
+      if (!verifySession(request)) {
+        return redirect(response, "/__sfrost-auth/login?next=/__sfrost-auth/models");
+      }
+
+      const credential = await describeDeepSeekCredential();
+      return sendModelsPage(response, {
+        credential,
+        changed: requestUrl.searchParams.get("changed") === "1",
+        removed: requestUrl.searchParams.get("removed") === "1",
+      });
+    }
+
+    if (request.method === "GET" && requestUrl.pathname === "/models/status") {
+      if (!verifySession(request)) return send(response, 401, "Unauthorized");
+      const credential = await describeDeepSeekCredential();
+      response.setHeader("Cache-Control", "no-store");
+      response.setHeader("Content-Type", "application/json; charset=utf-8");
+      return send(response, 200, JSON.stringify({ configured: credential.configured }));
+    }
+
+    if (request.method === "GET" && requestUrl.pathname === "/models-entry.js") {
+      if (!verifySession(request)) return send(response, 401, "Unauthorized");
+      response.setHeader("Cache-Control", "no-store");
+      response.setHeader("Content-Type", "text/javascript; charset=utf-8");
+      response.setHeader("X-Content-Type-Options", "nosniff");
+      return send(response, 200, modelsEntryScript());
+    }
+
+    if (request.method === "POST" && requestUrl.pathname === "/models/key") {
+      if (!verifySession(request)) return send(response, 401, "Unauthorized");
+      if (!isSameOrigin(request)) return send(response, 403, "Forbidden");
+
+      const form = await readForm(request);
+      const apiKey = form.get("apiKey") ?? "";
+      if (
+        apiKey.length < 10
+        || apiKey.length > 512
+        || apiKey.trim() !== apiKey
+        || /[\r\n]/.test(apiKey)
+      ) {
+        return sendModelsPage(response, {
+          credential: await describeDeepSeekCredential(),
+          error: "Key 格式无效：请输入 10–512 个字符，且首尾不要有空格。",
+          status: 400,
+        });
+      }
+
+      await harnessCredentialRpc("credentials.set", {
+        ref: DEEPSEEK_CREDENTIAL_REF,
+        value: apiKey,
+      });
+      return redirect(response, "/__sfrost-auth/models?changed=1");
+    }
+
+    if (request.method === "POST" && requestUrl.pathname === "/models/key/delete") {
+      if (!verifySession(request)) return send(response, 401, "Unauthorized");
+      if (!isSameOrigin(request)) return send(response, 403, "Forbidden");
+
+      const form = await readForm(request);
+      if (form.get("confirmation") !== "REMOVE") {
+        return sendModelsPage(response, {
+          credential: await describeDeepSeekCredential(),
+          error: "删除确认无效，请重新操作。",
+          status: 400,
+        });
+      }
+      await harnessCredentialRpc("credentials.unset", {
+        ref: DEEPSEEK_CREDENTIAL_REF,
+      });
+      return redirect(response, "/__sfrost-auth/models?removed=1");
     }
 
     if (request.method === "POST" && requestUrl.pathname === "/account/password") {
@@ -412,6 +495,66 @@ function sendAccountPage(response, options = {}) {
   );
 }
 
+function sendModelsPage(response, options = {}) {
+  const status = options.status ?? 200;
+  const error = options.error
+    ? `<p class="notice error" role="alert">${escapeHtml(options.error)}</p>`
+    : "";
+  const success = options.changed
+    ? '<p class="notice success" role="status">DeepSeek API Key 已保存并立即生效。</p>'
+    : options.removed
+      ? '<p class="notice success" role="status">DeepSeek API Key 已删除。</p>'
+      : "";
+  setPageSecurityHeaders(response);
+  return send(
+    response,
+    status,
+    modelsDocument({
+      configured: options.credential.configured,
+      writable: options.credential.writable,
+      source: options.credential.source,
+      error,
+      success,
+    }),
+  );
+}
+
+async function describeDeepSeekCredential() {
+  const result = await harnessCredentialRpc("credentials.describe", {
+    refs: [DEEPSEEK_CREDENTIAL_REF],
+  });
+  const credential = result.credentials?.[DEEPSEEK_CREDENTIAL_REF];
+  if (!credential || typeof credential.configured !== "boolean") {
+    throw new Error("Harness returned an invalid credential status.");
+  }
+  return credential;
+}
+
+async function harnessCredentialRpc(method, payload) {
+  const rpcId = randomBytes(16).toString("hex");
+  const endpoint = new URL(`/api/${method}`, harnessApiUrl);
+  const upstream = await fetch(endpoint, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      type: "client-request",
+      rpcId,
+      method,
+      payload,
+    }),
+    signal: AbortSignal.timeout(5_000),
+  });
+  if (!upstream.ok) {
+    throw new Error(`Harness credential service returned HTTP ${upstream.status}.`);
+  }
+  const document = await upstream.json();
+  if (document?.rpcId !== rpcId || document?.result?.ok !== true) {
+    const message = document?.result?.error?.message || "credential operation failed";
+    throw new Error(`Harness credential service rejected the request: ${message}`);
+  }
+  return document.result.value ?? {};
+}
+
 function setPageSecurityHeaders(response) {
   response.setHeader("Cache-Control", "no-store");
   response.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -564,6 +707,7 @@ function accountDocument({ displayUsername, error, success }) {
     .brand { display:flex; align-items:center; gap:12px; color:var(--paper); text-decoration:none; font:700 13px/1 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.18em; }
     .mark { width:28px; aspect-ratio:1; border:1px solid var(--frost); border-radius:50% 50% 44% 44%; display:grid; place-items:center; box-shadow:0 0 28px rgba(120,217,255,.18); }
     .mark::after { content:""; width:5px; height:11px; border-radius:5px 5px 2px 2px; background:var(--frost); box-shadow:0 0 14px var(--frost); }
+    .navlinks { display:flex; align-items:center; gap:20px; }
     .back { color:#a9bbcc; text-decoration:none; font-size:14px; }
     .back:hover { color:var(--frost); }
     .layout { display:grid; grid-template-columns:minmax(0,.8fr) minmax(430px,1fr); gap:clamp(48px,10vw,128px); align-items:start; }
@@ -598,7 +742,7 @@ function accountDocument({ displayUsername, error, success }) {
 </head>
 <body>
   <main class="shell">
-    <nav class="topbar"><a class="brand" href="/"><span class="mark" aria-hidden="true"></span>SFROST / PRIVATE</a><a class="back" href="/">返回工作台 →</a></nav>
+    <nav class="topbar"><a class="brand" href="/"><span class="mark" aria-hidden="true"></span>SFROST / PRIVATE</a><div class="navlinks"><a class="back" href="/__sfrost-auth/models">模型密钥</a><a class="back" href="/">返回工作台 →</a></div></nav>
     <div class="layout">
       <section class="copy">
         <div class="eyebrow">ACCOUNT CONTROL</div>
@@ -626,4 +770,71 @@ function accountDocument({ displayUsername, error, success }) {
   </script>
 </body>
 </html>`;
+}
+
+function modelsDocument({ configured, writable, source, error, success }) {
+  const stateClass = configured ? "ready" : "missing";
+  const stateLabel = configured ? "已配置" : "未配置";
+  const sourceLabel = source === "process"
+    ? "启动环境（只读）"
+    : source === "file"
+      ? "Harness 凭据文件"
+      : configured
+        ? "已配置来源"
+        : "尚无凭据";
+  const inputDisabled = writable ? "" : " disabled";
+  const inputHint = writable
+    ? "保存后只显示状态，不会回显 Key。"
+    : "当前 Key 来自只读启动环境，需在服务器环境配置中修改。";
+  const deleteForm = configured && writable
+    ? `<form method="post" action="/__sfrost-auth/models/key/delete" onsubmit="return confirm('确定删除 DeepSeek API Key？删除后模型将无法调用。')"><input type="hidden" name="confirmation" value="REMOVE"><button class="danger" type="submit">删除当前 Key</button></form>`
+    : "";
+
+  return `<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1320">
+  <title>模型密钥 · SFROST</title>
+  <style>
+    :root{color-scheme:dark;--ink:#0b1320;--panel:#111d2c;--frost:#78d9ff;--blue:#4c78ff;--paper:#f4f8fc;--muted:#91a4b9;--line:rgba(151,211,238,.18);--green:#6ee7b7;--red:#ff9999}
+    *{box-sizing:border-box}html,body{min-height:100%}body{margin:0;color:var(--paper);background:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB",sans-serif}body::before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.38;background:repeating-radial-gradient(ellipse at 13% 14%,transparent 0 58px,rgba(120,217,255,.08) 59px 60px,transparent 61px 86px);mask-image:linear-gradient(115deg,#000,transparent 66%)}
+    .shell{position:relative;width:min(100% - 36px,1060px);margin:0 auto;padding:34px 0 64px}.topbar{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:clamp(58px,9vw,112px)}.brand{display:flex;align-items:center;gap:12px;color:var(--paper);text-decoration:none;font:700 13px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.18em}.mark{width:28px;aspect-ratio:1;border:1px solid var(--frost);border-radius:50% 50% 44% 44%;display:grid;place-items:center;box-shadow:0 0 28px rgba(120,217,255,.18)}.mark::after{content:"";width:5px;height:11px;border-radius:5px 5px 2px 2px;background:var(--frost);box-shadow:0 0 14px var(--frost)}.navlinks{display:flex;align-items:center;gap:20px}.back{color:#a9bbcc;text-decoration:none;font-size:14px}.back:hover{color:var(--frost)}
+    .layout{display:grid;grid-template-columns:minmax(0,.8fr) minmax(430px,1fr);gap:clamp(48px,10vw,128px);align-items:start}.eyebrow{color:var(--frost);font:600 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.2em}h1{margin:18px 0;font-family:"Iowan Old Style","Songti SC","Noto Serif SC",serif;font-size:clamp(44px,6vw,76px);font-weight:500;line-height:1;letter-spacing:-.045em}.lead{max-width:29em;margin:0;color:var(--muted);font-size:17px;line-height:1.75}.status{display:flex;align-items:center;gap:10px;margin-top:34px;color:#bdccda;font-size:14px}.dot{width:9px;height:9px;border-radius:50%;background:var(--red);box-shadow:0 0 14px rgba(255,153,153,.55)}.status.ready .dot{background:var(--green);box-shadow:0 0 14px rgba(110,231,183,.7)}.source{margin:10px 0 0 19px;color:#72889e;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}
+    .card{padding:clamp(25px,4vw,42px);border:1px solid var(--line);border-radius:18px;background:rgba(17,29,44,.76);box-shadow:0 28px 80px rgba(0,0,0,.22);backdrop-filter:blur(20px)}h2{margin:0 0 8px;font-size:25px;letter-spacing:-.025em}.hint{margin:0 0 28px;color:var(--muted);font-size:14px;line-height:1.6}.field{margin:0 0 18px}label{display:block;margin-bottom:8px;color:#c7d5e2;font-size:13px;font-weight:650}.control{position:relative}input[type=password]{width:100%;height:52px;padding:0 48px 0 15px;border:1px solid rgba(157,183,207,.22);border-radius:11px;outline:0;color:var(--paper);background:rgba(5,12,22,.58);font:500 16px/1 inherit}input:focus{border-color:var(--frost);box-shadow:0 0 0 4px rgba(120,217,255,.1)}input:disabled{opacity:.5;cursor:not-allowed}.toggle{position:absolute;right:7px;top:6px;width:40px;height:40px;border:0;border-radius:9px;color:var(--muted);background:transparent;cursor:pointer;font-size:18px}.toggle:hover{color:var(--paper);background:rgba(255,255,255,.06)}.submit{width:100%;height:54px;margin-top:6px;border:0;border-radius:11px;color:#fff;background:linear-gradient(105deg,#315fe6,var(--blue) 52%,#4e9df5);box-shadow:0 18px 40px rgba(38,87,225,.22);font-size:15px;font-weight:750;cursor:pointer}.submit:hover{filter:brightness(1.08)}.submit:disabled{opacity:.5;cursor:not-allowed}.formhint{margin:11px 0 0;color:#71869b;font-size:12px;line-height:1.55}.danger{margin-top:22px;padding:0;border:0;color:#d79797;background:transparent;font-size:13px;cursor:pointer}.danger:hover{color:#ffc0c0;text-decoration:underline;text-underline-offset:3px}.notice{margin:0 0 20px;padding:12px 14px;border-radius:10px;font-size:14px;line-height:1.55}.error{border:1px solid rgba(255,126,126,.28);color:#ffc0c0;background:rgba(117,31,45,.2)}.success{border:1px solid rgba(110,231,183,.25);color:#b8f3dc;background:rgba(23,99,75,.2)}.filing{margin:54px 0 0;text-align:center;font-size:12px}.filing a{color:#70879d;text-decoration:none}.filing a:hover{color:var(--frost)}
+    @media(max-width:780px){.shell{padding-top:24px}.topbar{margin-bottom:54px}.layout{grid-template-columns:1fr;gap:38px}.lead{font-size:16px}.card{padding:24px 20px}.navlinks{gap:12px}}
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <nav class="topbar"><a class="brand" href="/"><span class="mark" aria-hidden="true"></span>SFROST / PRIVATE</a><div class="navlinks"><a class="back" href="/__sfrost-auth/account">账户</a><a class="back" href="/">返回工作台 →</a></div></nav>
+    <div class="layout">
+      <section>
+        <div class="eyebrow">MODEL CREDENTIAL</div>
+        <h1>连接你的模型。</h1>
+        <p class="lead">为 DeepSeek 官方模型保存 API Key。页面只能写入和查看配置状态，任何时候都不会读取或显示 Key 原文。</p>
+        <div class="status ${stateClass}"><span class="dot" aria-hidden="true"></span><strong>${stateLabel}</strong></div>
+        <p class="source">${escapeHtml(sourceLabel)}</p>
+      </section>
+      <section class="card" aria-label="DeepSeek API Key 设置">
+        <h2>${configured ? "替换 API Key" : "配置 API Key"}</h2>
+        <p class="hint">凭据将由 DeepSeek Harness 的本机凭据服务保存。</p>
+        ${error}${success}
+        <form method="post" action="/__sfrost-auth/models/key">
+          <div class="field"><label for="apiKey">DeepSeek API Key</label><div class="control"><input id="apiKey" name="apiKey" type="password" autocomplete="off" minlength="10" maxlength="512" placeholder="sk-…" required${inputDisabled}><button class="toggle" type="button" aria-label="显示 Key"${inputDisabled}>◉</button></div><p class="formhint">${inputHint}</p></div>
+          <button class="submit" type="submit"${inputDisabled}>${configured ? "安全替换" : "安全保存"}</button>
+        </form>
+        ${deleteForm}
+      </section>
+    </div>
+    <p class="filing"><a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">蜀ICP备2024053184号</a></p>
+  </main>
+  <script>const button=document.querySelector('.toggle');const key=document.querySelector('#apiKey');if(button&&!button.disabled){button.addEventListener('click',()=>{const visible=key.type==='text';key.type=visible?'password':'text';button.textContent=visible?'◉':'—';button.setAttribute('aria-label',visible?'显示 Key':'隐藏 Key');key.focus()})}</script>
+</body>
+</html>`;
+}
+
+function modelsEntryScript() {
+  return `(()=>{if(document.getElementById('sfrost-model-key-entry'))return;const css=document.createElement('style');css.textContent='#sfrost-model-key-entry{position:fixed;right:18px;bottom:18px;z-index:2147483000;padding:10px 14px;border:1px solid rgba(120,217,255,.35);border-radius:999px;color:#eaf7ff;background:rgba(11,19,32,.92);box-shadow:0 12px 34px rgba(0,0,0,.32);backdrop-filter:blur(14px);font:600 13px/1.2 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif;text-decoration:none}#sfrost-model-key-entry:hover{border-color:#78d9ff;background:#14243a}#sfrost-key-prompt{position:fixed;inset:0;z-index:2147483001;display:grid;place-items:center;padding:20px;background:rgba(3,8,15,.66);backdrop-filter:blur(8px)}#sfrost-key-prompt>div{width:min(100%,430px);padding:28px;border:1px solid rgba(120,217,255,.24);border-radius:18px;color:#f4f8fc;background:#111d2c;box-shadow:0 28px 90px rgba(0,0,0,.48);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif}#sfrost-key-prompt h2{margin:0 0 10px;font-size:24px}#sfrost-key-prompt p{margin:0 0 24px;color:#91a4b9;line-height:1.65}#sfrost-key-prompt nav{display:flex;gap:12px}#sfrost-key-prompt a,#sfrost-key-prompt button{height:42px;padding:0 17px;border-radius:9px;font:650 14px/42px inherit;cursor:pointer}#sfrost-key-prompt a{color:white;background:#4c78ff;text-decoration:none}#sfrost-key-prompt button{border:1px solid rgba(255,255,255,.14);color:#b8c7d6;background:transparent}';document.head.append(css);const entry=document.createElement('a');entry.id='sfrost-model-key-entry';entry.href='/__sfrost-auth/models';entry.textContent='模型密钥';document.body.append(entry);fetch('/__sfrost-auth/models/status',{credentials:'same-origin'}).then(r=>r.ok?r.json():null).then(s=>{if(!s||s.configured||sessionStorage.getItem('sfrost-key-prompt-dismissed'))return;const prompt=document.createElement('section');prompt.id='sfrost-key-prompt';prompt.setAttribute('role','dialog');prompt.setAttribute('aria-modal','true');prompt.setAttribute('aria-labelledby','sfrost-key-title');prompt.innerHTML='<div><h2 id="sfrost-key-title">还差一个模型 Key</h2><p>DeepSeek API Key 尚未配置。保存后即可正常发起模型请求。</p><nav><a href="/__sfrost-auth/models">现在配置</a><button type="button">稍后</button></nav></div>';prompt.querySelector('button').onclick=()=>{sessionStorage.setItem('sfrost-key-prompt-dismissed','1');prompt.remove()};document.body.append(prompt)}).catch(()=>{})})();`;
 }

@@ -25,3 +25,10 @@ The Nginx `auth_request` check fails closed: if the gateway is unavailable or a
 cookie is invalid, Harness is not proxied to the requester. The original
 DeepSeek Harness installation is not modified, so its package can still be
 upgraded independently.
+
+The authenticated `/__sfrost-auth/models` page manages the write-only
+`DEEPSEEK_API_KEY` through Harness's loopback-only credential API. The public
+browser never receives credential values. Nginx adds the gateway's small model
+key entry script to Harness HTML, because upstream intentionally disables its
+configuration plane in non-loopback browsers. This integration does not patch
+the Harness package and therefore survives normal package upgrades.
