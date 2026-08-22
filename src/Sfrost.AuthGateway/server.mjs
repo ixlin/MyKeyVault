@@ -3,11 +3,35 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import {
   createHmac,
   randomBytes,
+  randomUUID,
   scrypt as scryptCallback,
   timingSafeEqual,
 } from "node:crypto";
 import { dirname } from "node:path";
 import { promisify } from "node:util";
+import {
+  createPost,
+  createTag,
+  deletePost,
+  deleteTag,
+  getBlogStats,
+  getPost,
+  getPublishedPost,
+  initializeBlogStore,
+  listAllPosts,
+  listPublishedPosts,
+  listTags,
+  updatePost,
+} from "./blog-store.mjs";
+import {
+  blogAccountDocument,
+  blogAdminDocument,
+  blogEditorDocument,
+  blogHomeDocument,
+  blogNotFoundDocument,
+  blogPostDocument,
+  blogTagsDocument,
+} from "./blog-pages.mjs";
 
 const scrypt = promisify(scryptCallback);
 const port = parseInteger(process.env.PORT, 3081, 1, 65535);
@@ -35,7 +59,7 @@ if (cookieSecret.length < 32) {
 const COOKIE_NAME = "sfrost_session";
 const SESSION_SECONDS = 12 * 60 * 60;
 const REMEMBER_SECONDS = 30 * 24 * 60 * 60;
-const MAX_FORM_BYTES = 8 * 1024;
+const MAX_FORM_BYTES = 512 * 1024;
 const DEEPSEEK_CREDENTIAL_REF = "DEEPSEEK_API_KEY";
 const failedAttempts = new Map();
 const initialCredentials = await loadCredentialState();
@@ -51,6 +75,8 @@ if (credentialsFile && !initialCredentials.persisted) {
   });
 }
 
+await initializeBlogStore();
+
 const server = http.createServer(async (request, response) => {
   try {
     const requestUrl = new URL(request.url ?? "/", "http://auth.internal");
@@ -59,9 +85,23 @@ const server = http.createServer(async (request, response) => {
       return send(response, 204);
     }
 
+    if (request.method === "GET" && requestUrl.pathname === "/home") {
+      return verifySession(request)
+        ? redirect(response, "/blog")
+        : redirect(response, "/__sfrost-auth/login?next=/blog");
+    }
+
     // Nginx auth_request subrequests can retain the original HTTP method.
     if (requestUrl.pathname === "/check") {
       return verifySession(request) ? send(response, 204) : send(response, 401);
+    }
+
+    if (requestUrl.pathname === "/blog" || requestUrl.pathname.startsWith("/blog/")) {
+      if (!verifySession(request)) {
+        const next = encodeURIComponent(`${requestUrl.pathname}${requestUrl.search}`);
+        return redirect(response, `/__sfrost-auth/login?next=${next}`);
+      }
+      return await handleBlogRequest(request, response, requestUrl);
     }
 
     if (request.method === "GET" && requestUrl.pathname === "/login") {
@@ -260,7 +300,7 @@ const server = http.createServer(async (request, response) => {
     return send(response, 404, "Not found");
   } catch (error) {
     console.error(error);
-    return send(response, 500, "Authentication service unavailable");
+    return send(response, 500, "Service unavailable");
   }
 });
 
@@ -269,6 +309,209 @@ server.headersTimeout = 12_000;
 server.listen(port, "127.0.0.1", () => {
   console.log(`sfrost auth gateway listening on 127.0.0.1:${port}`);
 });
+
+async function handleBlogRequest(request, response, requestUrl) {
+  if (request.method === "POST" && !isSameOrigin(request)) {
+    return send(response, 403, "Forbidden");
+  }
+
+  if (request.method === "GET" && requestUrl.pathname === "/blog") {
+    const tagId = parsePositiveInteger(requestUrl.searchParams.get("tag"));
+    const [posts, tags] = await Promise.all([
+      listPublishedPosts(tagId),
+      listTags(),
+    ]);
+    const selectedTag = tagId === undefined
+      ? undefined
+      : tags.find((tag) => Number(tag.id) === tagId);
+    return sendBlogDocument(response, 200, blogHomeDocument({
+      posts,
+      tags,
+      selectedTag,
+      username,
+    }));
+  }
+
+  const publishedMatch = requestUrl.pathname.match(/^\/blog\/posts\/([0-9a-f-]{36})$/i);
+  if (request.method === "GET" && publishedMatch) {
+    const post = isUuid(publishedMatch[1])
+      ? await getPublishedPost(publishedMatch[1])
+      : undefined;
+    return post
+      ? sendBlogDocument(response, 200, blogPostDocument({ post, username }))
+      : sendBlogDocument(response, 404, blogNotFoundDocument({ username }));
+  }
+
+  if (request.method === "GET" && requestUrl.pathname === "/blog/admin") {
+    const [posts, stats] = await Promise.all([listAllPosts(), getBlogStats()]);
+    const notice = new Map([
+      ["created", "文章已创建。"],
+      ["updated", "文章已保存。"],
+      ["deleted", "文章已删除。"],
+    ]).get(requestUrl.searchParams.get("notice"));
+    return sendBlogDocument(response, 200, blogAdminDocument({
+      posts,
+      stats,
+      username,
+      notice,
+    }));
+  }
+
+  if (request.method === "GET" && requestUrl.pathname === "/blog/admin/posts/new") {
+    return sendBlogDocument(response, 200, blogEditorDocument({
+      post: { title: "", summary: "", content: "", status: "draft", tags: [] },
+      tags: await listTags(),
+      username,
+      mode: "create",
+    }));
+  }
+
+  if (request.method === "POST" && requestUrl.pathname === "/blog/admin/posts") {
+    const form = await readForm(request);
+    const draft = postDraftFromForm(form);
+    const error = validatePostDraft(draft);
+    if (error) {
+      return sendBlogDocument(response, 400, blogEditorDocument({
+        post: draft,
+        tags: await listTags(),
+        username,
+        error,
+        mode: "create",
+      }));
+    }
+    await createPost({ id: randomUUID(), ...draft, tagIds: draft.tags.map((tag) => tag.id) });
+    return redirect(response, "/blog/admin?notice=created");
+  }
+
+  const editMatch = requestUrl.pathname.match(/^\/blog\/admin\/posts\/([0-9a-f-]{36})\/edit$/i);
+  if (request.method === "GET" && editMatch) {
+    const post = isUuid(editMatch[1]) ? await getPost(editMatch[1]) : undefined;
+    return post
+      ? sendBlogDocument(response, 200, blogEditorDocument({
+        post,
+        tags: await listTags(),
+        username,
+        mode: "edit",
+      }))
+      : sendBlogDocument(response, 404, blogNotFoundDocument({ username }));
+  }
+
+  const updateMatch = requestUrl.pathname.match(/^\/blog\/admin\/posts\/([0-9a-f-]{36})$/i);
+  if (request.method === "POST" && updateMatch && isUuid(updateMatch[1])) {
+    const existing = await getPost(updateMatch[1]);
+    if (!existing) return sendBlogDocument(response, 404, blogNotFoundDocument({ username }));
+    const form = await readForm(request);
+    const draft = { id: existing.id, ...postDraftFromForm(form) };
+    const error = validatePostDraft(draft);
+    if (error) {
+      return sendBlogDocument(response, 400, blogEditorDocument({
+        post: draft,
+        tags: await listTags(),
+        username,
+        error,
+        mode: "edit",
+      }));
+    }
+    await updatePost(existing.id, {
+      ...draft,
+      tagIds: draft.tags.map((tag) => tag.id),
+    });
+    return redirect(response, "/blog/admin?notice=updated");
+  }
+
+  const deleteMatch = requestUrl.pathname.match(/^\/blog\/admin\/posts\/([0-9a-f-]{36})\/delete$/i);
+  if (request.method === "POST" && deleteMatch && isUuid(deleteMatch[1])) {
+    await readForm(request);
+    await deletePost(deleteMatch[1]);
+    return redirect(response, "/blog/admin?notice=deleted");
+  }
+
+  if (request.method === "GET" && requestUrl.pathname === "/blog/admin/tags") {
+    return sendBlogDocument(response, 200, blogTagsDocument({
+      tags: await listTags(),
+      username,
+      created: requestUrl.searchParams.get("created") === "1",
+    }));
+  }
+
+  if (request.method === "POST" && requestUrl.pathname === "/blog/admin/tags") {
+    const form = await readForm(request);
+    const name = (form.get("name") ?? "").normalize("NFKC").trim();
+    const tags = await listTags();
+    if (name.length < 1 || name.length > 40 || /[\r\n]/.test(name)) {
+      return sendBlogDocument(response, 400, blogTagsDocument({
+        tags,
+        username,
+        error: "标签名称必须为 1–40 个字符。",
+      }));
+    }
+    const created = await createTag(name);
+    if (!created) {
+      return sendBlogDocument(response, 409, blogTagsDocument({
+        tags,
+        username,
+        error: "这个标签已经存在。",
+      }));
+    }
+    return redirect(response, "/blog/admin/tags?created=1");
+  }
+
+  const tagDeleteMatch = requestUrl.pathname.match(/^\/blog\/admin\/tags\/(\d+)\/delete$/);
+  if (request.method === "POST" && tagDeleteMatch) {
+    await readForm(request);
+    await deleteTag(Number(tagDeleteMatch[1]));
+    return redirect(response, "/blog/admin/tags");
+  }
+
+  if (request.method === "GET" && requestUrl.pathname === "/blog/account") {
+    const credential = await describeDeepSeekCredential();
+    return sendBlogDocument(response, 200, blogAccountDocument({
+      username,
+      credentialConfigured: credential.configured,
+    }));
+  }
+
+  return sendBlogDocument(response, 404, blogNotFoundDocument({ username }));
+}
+
+function postDraftFromForm(form) {
+  const tagIds = [...new Set(form.getAll("tagId")
+    .map((value) => parsePositiveInteger(value))
+    .filter((value) => value !== undefined))];
+  return {
+    title: (form.get("title") ?? "").normalize("NFKC").trim(),
+    summary: (form.get("summary") ?? "").normalize("NFKC").trim(),
+    content: (form.get("content") ?? "").replaceAll("\r\n", "\n").trim(),
+    status: form.get("status") === "published" ? "published" : "draft",
+    tags: tagIds.map((id) => ({ id, name: String(id) })),
+  };
+}
+
+function validatePostDraft(post) {
+  if (post.title.length < 1 || post.title.length > 160) {
+    return "标题必须为 1–160 个字符。";
+  }
+  if (post.summary.length > 320) return "摘要不能超过 320 个字符。";
+  if (post.content.length < 1 || post.content.length > 100_000) {
+    return "正文必须为 1–100000 个字符。";
+  }
+  return "";
+}
+
+function parsePositiveInteger(value) {
+  if (!/^\d+$/.test(value ?? "")) return undefined;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function isUuid(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function sendBlogDocument(response, status, document) {
+  setPageSecurityHeaders(response);
+  return send(response, status, document);
+}
 
 function requireEnvironment(name) {
   const value = process.env[name];
@@ -420,9 +663,10 @@ function parseCookies(header) {
 }
 
 function safeNext(value) {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/";
-  if (value.startsWith("/__sfrost-auth/")) return "/";
-  return value.replace(/[\r\n]/g, "");
+  const normalized = String(value ?? "").replace(/[\r\n\\]/g, "");
+  if (normalized === "/harness") return normalized;
+  if (normalized === "/blog" || normalized.startsWith("/blog/")) return normalized;
+  return "/blog";
 }
 
 function isSameOrigin(request) {
@@ -647,9 +891,9 @@ function loginDocument({ displayUsername, error, next }) {
     <section class="identity" aria-label="SFROST 私有工作台">
       <div class="brand"><span class="mark" aria-hidden="true"></span>SFROST / PRIVATE</div>
       <div class="intro">
-        <div class="eyebrow">DeepSeek Harness Portal</div>
-        <h1>把工作留在霜线以内。</h1>
-        <p>你的私有 AI 工作台。会话、工作区与工具入口仅在身份验证后开放。</p>
+        <div class="eyebrow">BLOG &amp; AI WORKSPACE</div>
+        <h1>把想法留在霜线以内。</h1>
+        <p>你的私人 Blog 与 AI 工作空间。文章、管理后台和 Harness 仅在身份验证后开放。</p>
       </div>
       <div class="status">TLS 加密连接 · 私有访问</div>
     </section>
@@ -657,7 +901,7 @@ function loginDocument({ displayUsername, error, next }) {
       <div class="card">
         <header class="card-head">
           <div class="number">ACCESS GATE / 01</div>
-          <h2>进入工作台</h2>
+          <h2>进入 AI Space</h2>
           <p class="hint">使用你的 SFROST 访问凭据。</p>
         </header>
         <form method="post" action="/__sfrost-auth/login">
@@ -742,7 +986,7 @@ function accountDocument({ displayUsername, error, success }) {
 </head>
 <body>
   <main class="shell">
-    <nav class="topbar"><a class="brand" href="/"><span class="mark" aria-hidden="true"></span>SFROST / PRIVATE</a><div class="navlinks"><a class="back" href="/__sfrost-auth/models">模型密钥</a><a class="back" href="/">返回工作台 →</a></div></nav>
+    <nav class="topbar"><a class="brand" href="/blog"><span class="mark" aria-hidden="true"></span>SFROST / PRIVATE</a><div class="navlinks"><a class="back" href="/__sfrost-auth/models">模型密钥</a><a class="back" href="/blog/account">返回个人中心 →</a></div></nav>
     <div class="layout">
       <section class="copy">
         <div class="eyebrow">ACCOUNT CONTROL</div>
@@ -808,7 +1052,7 @@ function modelsDocument({ configured, writable, source, error, success }) {
 </head>
 <body>
   <main class="shell">
-    <nav class="topbar"><a class="brand" href="/"><span class="mark" aria-hidden="true"></span>SFROST / PRIVATE</a><div class="navlinks"><a class="back" href="/__sfrost-auth/account">账户</a><a class="back" href="/">返回工作台 →</a></div></nav>
+    <nav class="topbar"><a class="brand" href="/blog"><span class="mark" aria-hidden="true"></span>SFROST / PRIVATE</a><div class="navlinks"><a class="back" href="/__sfrost-auth/account">账户</a><a class="back" href="/blog/account">返回个人中心 →</a></div></nav>
     <div class="layout">
       <section>
         <div class="eyebrow">MODEL CREDENTIAL</div>

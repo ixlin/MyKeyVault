@@ -1,9 +1,9 @@
 # SFROST authentication gateway
 
-Small dependency-free Node.js gateway used by the `sfrost.cn` Nginx virtual
-host. It replaces browser Basic Auth with a password-manager-compatible login
-form and a signed, HTTPS-only session cookie. DeepSeek Harness remains bound to
-`127.0.0.1:3080`; this gateway binds to `127.0.0.1:3081`.
+Node.js application used by the `sfrost.cn` Nginx virtual host. It combines a
+password-manager-compatible login gateway, a private Blog, account controls,
+and the secure model-key bridge. DeepSeek Harness remains independently bound
+to `127.0.0.1:3080`; this application binds to `127.0.0.1:3081`.
 
 Required environment variables:
 
@@ -20,6 +20,13 @@ password at `/__sfrost-auth/account`. Password changes are written atomically
 and increment the credential revision, invalidating sessions on other devices.
 The initial environment password remains a recovery seed only when no state
 file exists.
+
+The Blog stores posts and tags in the local PostgreSQL service, using the
+dedicated `sfrost_blog` database and same-named peer-authenticated system role.
+Its schema is namespaced with `sfrost_blog_*` tables. No MyKeyVault application
+tables or database credentials are shared. The service therefore uses the same
+database technology and server as MyKeyVault while retaining an independent
+security boundary.
 
 The Nginx `auth_request` check fails closed: if the gateway is unavailable or a
 cookie is invalid, Harness is not proxied to the requester. The original
