@@ -7,6 +7,7 @@ Wants=network-online.target
 Type=simple
 User=sfrost_blog
 Group=sfrost_blog
+SupplementaryGroups=sfrost_publish
 WorkingDirectory=/opt/sfrost-auth-gateway
 EnvironmentFile=/etc/sfrost-auth-gateway.env
 Environment=PORT=3081
@@ -14,6 +15,8 @@ Environment=SFROST_AUTH_CREDENTIALS_FILE=/var/lib/sfrost-auth-gateway/credential
 Environment=SFROST_BLOG_DB_HOST=/var/run/postgresql
 Environment=SFROST_BLOG_DB_NAME=sfrost_blog
 Environment=SFROST_BLOG_DB_USER=sfrost_blog
+Environment=SFROST_KB_FILES_DIR=/var/lib/sfrost-auth-gateway/kb-files
+Environment=SFROST_KB_INBOX_DIR=/var/lib/sfrost-kb-inbox
 Environment=PATH=/opt/node-v22.19.0/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ExecStart=/opt/node-v22.19.0/bin/node /opt/sfrost-auth-gateway/server.mjs
 Restart=on-failure
@@ -28,6 +31,7 @@ PrivateTmp=true
 PrivateDevices=true
 ProtectSystem=strict
 ProtectHome=true
+ReadWritePaths=/var/lib/sfrost-kb-inbox
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true

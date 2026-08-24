@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+exec /opt/node-v22.19.0/bin/node /opt/sfrost-auth-gateway/queue-kb.mjs "$@"

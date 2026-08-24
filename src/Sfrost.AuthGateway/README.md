@@ -1,8 +1,8 @@
 # SFROST authentication gateway
 
 Node.js application used by the `sfrost.cn` Nginx virtual host. It combines a
-password-manager-compatible login gateway, a private Blog, account controls,
-and the secure model-key bridge. DeepSeek Harness remains independently bound
+password-manager-compatible login gateway, a private Blog and knowledge base,
+account controls, and the secure model-key bridge. DeepSeek Harness remains independently bound
 to `127.0.0.1:3080`; this application binds to `127.0.0.1:3081`.
 
 Required environment variables:
@@ -27,6 +27,28 @@ Its schema is namespaced with `sfrost_blog_*` tables. No MyKeyVault application
 tables or database credentials are shared. The service therefore uses the same
 database technology and server as MyKeyVault while retaining an independent
 security boundary.
+
+Knowledge-base metadata uses `sfrost_kb_docs` in the same portal database.
+Original files are held under the gateway's private systemd state directory;
+HTML is displayed through a CSP-sandboxed authenticated preview and is never
+executed as a trusted portal page. Word and other binary artifacts remain
+authenticated downloads.
+
+Harness publishes artifacts without sudo through a setgid inbox shared only by
+the `deepseek-harness` and `sfrost_blog` services. The `sfrost-publish` command
+copies a supported file into that inbox and returns its authenticated
+`https://sfrost.cn/kb/d/<uuid>` URL. The gateway validates and imports the
+manifest on first access. Harness receives no database credentials and cannot
+write the production file store. The persistent DSH skill in
+`scripts/deepseek-harness-publish-artifacts.md` instructs agents to use this
+route instead of `localhost` links. The publisher rejects symbolic links and,
+by default, only accepts source files below `/var/lib/deepseek-harness` or
+`/srv/sfrost-workspaces`; deployments can narrow or extend that list with
+`SFROST_KB_SOURCE_ROOTS`.
+
+Vectorization is deliberately not simulated. Documents are recorded as not
+vectorized; a real embedding/indexing worker can later update that state after
+successful ingestion.
 
 The Nginx `auth_request` check fails closed: if the gateway is unavailable or a
 cookie is invalid, Harness is not proxied to the requester. The original

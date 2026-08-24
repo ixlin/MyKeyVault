@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "check": "node --check server.mjs"
+    "check": "node --check server.mjs && node --check blog-pages.mjs && node --check blog-store.mjs && node --check kb-files.mjs && node --check kb-inbox.mjs && node --check kb-pages.mjs && node --check kb-store.mjs && node --check queue-kb.mjs"
   },
   "engines": {
     "node": ">=22"

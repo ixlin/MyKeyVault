@@ -1,5 +1,5 @@
 import http from "node:http";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import {
   createHmac,
   randomBytes,
@@ -7,7 +7,7 @@ import {
   scrypt as scryptCallback,
   timingSafeEqual,
 } from "node:crypto";
-import { dirname } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { promisify } from "node:util";
 import {
   createPost,
@@ -31,7 +31,22 @@ import {
   blogNotFoundDocument,
   blogPostDocument,
   blogTagsDocument,
+  workspaceHomeDocument,
 } from "./blog-pages.mjs";
+import { isHtmlKbMime, isInlineKbMime } from "./kb-files.mjs";
+import { ingestKbInbox } from "./kb-inbox.mjs";
+import {
+  deleteKbDoc,
+  getKbDoc,
+  getKbStats,
+  initializeKbStore,
+  listKbDocs,
+} from "./kb-store.mjs";
+import {
+  kbDocumentDocument,
+  kbHomeDocument,
+  kbNotFoundDocument,
+} from "./kb-pages.mjs";
 
 const scrypt = promisify(scryptCallback);
 const port = parseInteger(process.env.PORT, 3081, 1, 65535);
@@ -61,6 +76,8 @@ const SESSION_SECONDS = 12 * 60 * 60;
 const REMEMBER_SECONDS = 30 * 24 * 60 * 60;
 const MAX_FORM_BYTES = 512 * 1024;
 const DEEPSEEK_CREDENTIAL_REF = "DEEPSEEK_API_KEY";
+const KB_FILES_DIR = process.env.SFROST_KB_FILES_DIR || "/var/lib/sfrost-auth-gateway/kb-files";
+const KB_INBOX_DIR = process.env.SFROST_KB_INBOX_DIR || "/var/lib/sfrost-kb-inbox";
 const failedAttempts = new Map();
 const initialCredentials = await loadCredentialState();
 let username = initialCredentials.username;
@@ -76,6 +93,7 @@ if (credentialsFile && !initialCredentials.persisted) {
 }
 
 await initializeBlogStore();
+await initializeKbStore();
 
 const server = http.createServer(async (request, response) => {
   try {
@@ -86,9 +104,23 @@ const server = http.createServer(async (request, response) => {
     }
 
     if (request.method === "GET" && requestUrl.pathname === "/home") {
-      return verifySession(request)
-        ? redirect(response, "/blog")
-        : redirect(response, "/__sfrost-auth/login?next=/blog");
+      if (!verifySession(request)) {
+        return redirect(response, "/__sfrost-auth/login?next=/");
+      }
+      const [kbStats, blogStats, credential] = await Promise.all([
+        getKbStats(),
+        getBlogStats(),
+        describeDeepSeekCredential().catch((error) => {
+          console.error("Unable to read Harness credential status for workspace home:", error.message);
+          return { configured: false };
+        }),
+      ]);
+      return sendBlogDocument(response, 200, workspaceHomeDocument({
+        username,
+        kbCount: kbStats.total,
+        blogCount: blogStats.total,
+        credentialConfigured: credential.configured,
+      }));
     }
 
     // Nginx auth_request subrequests can retain the original HTTP method.
@@ -102,6 +134,14 @@ const server = http.createServer(async (request, response) => {
         return redirect(response, `/__sfrost-auth/login?next=${next}`);
       }
       return await handleBlogRequest(request, response, requestUrl);
+    }
+
+    if (requestUrl.pathname === "/kb" || requestUrl.pathname.startsWith("/kb/")) {
+      if (!verifySession(request)) {
+        const next = encodeURIComponent(`${requestUrl.pathname}${requestUrl.search}`);
+        return redirect(response, `/__sfrost-auth/login?next=${next}`);
+      }
+      return await handleKbRequest(request, response, requestUrl);
     }
 
     if (request.method === "GET" && requestUrl.pathname === "/login") {
@@ -474,6 +514,123 @@ async function handleBlogRequest(request, response, requestUrl) {
   return sendBlogDocument(response, 404, blogNotFoundDocument({ username }));
 }
 
+async function handleKbRequest(request, response, requestUrl) {
+  if (request.method === "POST" && !isSameOrigin(request)) {
+    return send(response, 403, "Forbidden");
+  }
+
+  const imported = await ingestKbInbox({
+    inboxDirectory: KB_INBOX_DIR,
+    filesDirectory: KB_FILES_DIR,
+  });
+
+  if (request.method === "GET" && requestUrl.pathname === "/kb") {
+    const query = requestUrl.searchParams.get("q")?.normalize("NFKC").trim() ?? "";
+    if (query.length > 80) return send(response, 400, "Search query is too long");
+    const notice = requestUrl.searchParams.get("notice") === "deleted"
+      ? "文档已删除。"
+      : "";
+    return sendKbDocument(response, 200, kbHomeDocument({
+      docs: await listKbDocs(query),
+      username,
+      query,
+      imported: imported.length,
+      notice,
+    }));
+  }
+
+  const documentMatch = requestUrl.pathname.match(/^\/kb\/d\/([0-9a-f-]{36})$/i);
+  if (request.method === "GET" && documentMatch && isUuid(documentMatch[1])) {
+    const document = await getKbDoc(documentMatch[1]);
+    return document
+      ? sendKbDocument(response, 200, kbDocumentDocument({ document, username }))
+      : sendKbDocument(response, 404, kbNotFoundDocument({ username }));
+  }
+
+  const rawMatch = requestUrl.pathname.match(/^\/kb\/raw\/([0-9a-f-]{36})$/i);
+  if (request.method === "GET" && rawMatch && isUuid(rawMatch[1])) {
+    const document = await getKbDoc(rawMatch[1]);
+    return document
+      ? sendKbFile(response, document, { download: false })
+      : sendKbDocument(response, 404, kbNotFoundDocument({ username }));
+  }
+
+  const downloadMatch = requestUrl.pathname.match(/^\/kb\/d\/([0-9a-f-]{36})\/download$/i);
+  if (request.method === "GET" && downloadMatch && isUuid(downloadMatch[1])) {
+    const document = await getKbDoc(downloadMatch[1]);
+    return document
+      ? sendKbFile(response, document, { download: true })
+      : sendKbDocument(response, 404, kbNotFoundDocument({ username }));
+  }
+
+  const deleteMatch = requestUrl.pathname.match(/^\/kb\/d\/([0-9a-f-]{36})\/delete$/i);
+  if (request.method === "POST" && deleteMatch && isUuid(deleteMatch[1])) {
+    const form = await readForm(request);
+    if (form.get("confirmation") !== "DELETE") return send(response, 400, "Invalid confirmation");
+    const storedName = await deleteKbDoc(deleteMatch[1]);
+    if (storedName) {
+      try {
+        await unlink(kbFilePath(deleteMatch[1], storedName));
+      } catch (error) {
+        if (error?.code !== "ENOENT") console.error("Failed to remove knowledge-base file:", error.message);
+      }
+    }
+    return redirect(response, "/kb?notice=deleted");
+  }
+
+  return sendKbDocument(response, 404, kbNotFoundDocument({ username }));
+}
+
+async function sendKbFile(response, document, { download }) {
+  let body;
+  try {
+    body = await readFile(kbFilePath(document.id, document.stored_name));
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      return sendKbDocument(response, 404, kbNotFoundDocument({ username }));
+    }
+    throw error;
+  }
+
+  response.setHeader("Cache-Control", "no-store");
+  response.setHeader("Content-Type", download ? "application/octet-stream" : document.mime_type);
+  response.setHeader("Content-Length", String(body.length));
+  response.setHeader("X-Content-Type-Options", "nosniff");
+  if (download || !isInlineKbMime(document.mime_type)) {
+    response.setHeader("Content-Disposition", contentDisposition(document.original_name));
+  } else if (isHtmlKbMime(document.mime_type)) {
+    response.setHeader(
+      "Content-Security-Policy",
+      "sandbox; default-src 'none'; style-src 'unsafe-inline' https:; img-src data: https:; font-src data: https:; media-src data: https:; script-src 'none'; connect-src 'none'; form-action 'none'; base-uri 'none'; frame-ancestors 'self'",
+    );
+    response.setHeader("Referrer-Policy", "no-referrer");
+  } else {
+    response.setHeader("Content-Security-Policy", "default-src 'none'; frame-ancestors 'self'; sandbox");
+  }
+  return send(response, 200, body);
+}
+
+function kbFilePath(id, storedName) {
+  if (basename(storedName) !== storedName || !storedName.startsWith(`${id}.`) || !/^[0-9a-f-]+\.[a-z0-9]+$/i.test(storedName)) {
+    throw new Error("Knowledge-base stored filename is invalid.");
+  }
+  return join(KB_FILES_DIR, storedName);
+}
+
+function contentDisposition(filename) {
+  const ascii = filename.replace(/[^\x20-\x7e]/g, "_").replace(/["\\]/g, "_");
+  return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
+}
+
+function sendKbDocument(response, status, document) {
+  setPageSecurityHeaders(response);
+  response.setHeader(
+    "Content-Security-Policy",
+    "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; frame-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+  );
+  return send(response, status, document);
+}
+
 function postDraftFromForm(form) {
   const tagIds = [...new Set(form.getAll("tagId")
     .map((value) => parsePositiveInteger(value))
@@ -664,9 +821,10 @@ function parseCookies(header) {
 
 function safeNext(value) {
   const normalized = String(value ?? "").replace(/[\r\n\\]/g, "");
-  if (normalized === "/harness") return normalized;
+  if (["/", "/harness", "/__sfrost-auth/models", "/__sfrost-auth/account"].includes(normalized)) return normalized;
+  if (normalized === "/kb" || normalized.startsWith("/kb/")) return normalized;
   if (normalized === "/blog" || normalized.startsWith("/blog/")) return normalized;
-  return "/blog";
+  return "/";
 }
 
 function isSameOrigin(request) {
@@ -891,9 +1049,9 @@ function loginDocument({ displayUsername, error, next }) {
     <section class="identity" aria-label="SFROST 私有工作台">
       <div class="brand"><span class="mark" aria-hidden="true"></span>SFROST / PRIVATE</div>
       <div class="intro">
-        <div class="eyebrow">BLOG &amp; AI WORKSPACE</div>
+        <div class="eyebrow">KNOWLEDGE · BLOG · AI</div>
         <h1>把想法留在霜线以内。</h1>
-        <p>你的私人 Blog 与 AI 工作空间。文章、管理后台和 Harness 仅在身份验证后开放。</p>
+        <p>你的私人知识库、Blog 与 AI 工作空间。文档、文章、模型设置和 Harness 仅在身份验证后开放。</p>
       </div>
       <div class="status">TLS 加密连接 · 私有访问</div>
     </section>
