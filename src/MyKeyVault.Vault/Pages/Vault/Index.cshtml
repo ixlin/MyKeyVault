@@ -80,7 +80,7 @@ else
                 </div>
                 <div class="ledger-actions">
                     @if (isRevealed) { <a asp-page="Index" asp-route-query="@Model.Query" asp-route-group="@Model.Group">隐藏</a> }
-                    else { <form method="post" asp-page-handler="Reveal"><input type="hidden" name="id" value="@item.Id" /><input type="hidden" name="query" value="@Model.Query" /><input type="hidden" name="group" value="@Model.Group" /><button class="text-button" type="submit">显示本行</button></form> }
+                    else { <form method="post" asp-page-handler="Reveal"><input type="hidden" name="id" value="@item.Id" /><input type="hidden" name="query" value="@Model.Query" /><input type="hidden" name="group" value="@Model.Group" /><button class="text-button" type="submit">显示</button></form> }
                     <a asp-page="Edit" asp-route-id="@item.Id">编辑</a>
                     <a asp-page="Details" asp-route-id="@item.Id" class="more-link" aria-label="查看 @item.Title 的安全详情">···</a>
                 </div>
