@@ -8,21 +8,10 @@
     @foreach (var secret in Model.Item.Secrets)
     {
         <article class="secret-field"><div><strong>@secret.FieldName</strong><code id="secret-@secret.Id">@(Model.RevealedSecretId == secret.Id ? Model.RevealedValue : "••••••••••••")</code></div>
-            <div><form method="post" asp-page-handler="Reveal"><input type="hidden" name="id" value="@Model.Item.Id" /><input type="hidden" name="secretId" value="@secret.Id" /><button class="text-button" type="submit">@((Model.RevealedSecretId == secret.Id) ? "已显示" : "显示一次")</button></form><a asp-page="SecretEdit" asp-route-id="@Model.Item.Id" asp-route-secretId="@secret.Id">更新</a>@if (Model.RevealedSecretId == secret.Id) { <button class="text-button copy-secret" type="button" data-secret-id="@secret.Id">复制</button> }</div>
+            <div><form method="post" asp-page-handler="Reveal"><input type="hidden" name="id" value="@Model.Item.Id" /><input type="hidden" name="secretId" value="@secret.Id" /><button class="text-button" type="submit">@((Model.RevealedSecretId == secret.Id) ? "已显示" : "显示一次")</button></form><a asp-page="SecretEdit" asp-route-id="@Model.Item.Id" asp-route-secretId="@secret.Id">更新</a>@if (Model.RevealedSecretId == secret.Id && secret.CanCopy) { <button class="copy-icon" type="button" data-copy-target="secret-@secret.Id" data-copy-url="@Url.Page("Details", "Copy", new { id = Model.Item.Id, secretId = secret.Id })" aria-label="复制内容" title="复制内容"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg></button> }</div>
         </article>
     }
     </section>
+    <div class="copy-toast" data-copy-toast role="status" aria-live="polite" hidden>复制成功</div>
     <div class="danger-zone"><form method="post" asp-page-handler="Archive"><input type="hidden" name="id" value="@Model.Item.Id" /><button class="text-button" type="submit">归档此条目</button></form><a asp-page="Delete" asp-route-id="@Model.Item.Id">彻底删除</a></div>
-}
-@if (Model.Item is not null && Model.RevealedSecretId is not null)
-{
-<script>
-document.querySelectorAll('.copy-secret').forEach(button => button.addEventListener('click', async () => {
-  const id = button.dataset.secretId, value = document.getElementById(`secret-${id}`).textContent;
-  await navigator.clipboard.writeText(value);
-  const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
-  await fetch(`?handler=Copy&id=@Model.Item.Id&secretId=${id}`, { method: 'POST', headers: { 'RequestVerificationToken': token } });
-  button.textContent = '已复制';
-}));
-</script>
 }

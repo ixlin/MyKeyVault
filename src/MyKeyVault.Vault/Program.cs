@@ -76,6 +76,22 @@ app.UseRouting();
 app.UseAuthentication();
 app.Use(async (context, next) =>
 {
+    if (context.Request.Path.StartsWithSegments("/Vault"))
+    {
+        context.Response.OnStarting(() =>
+        {
+            context.Response.Headers.CacheControl = "private, no-store, max-age=0";
+            context.Response.Headers.Pragma = "no-cache";
+            context.Response.Headers.XContentTypeOptions = "nosniff";
+            context.Response.Headers.ContentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
+            context.Response.Headers["Referrer-Policy"] = "same-origin";
+            return Task.CompletedTask;
+        });
+    }
+    await next();
+});
+app.Use(async (context, next) =>
+{
     if (context.Request.Path.StartsWithSegments("/wechat-articles") && context.User.Identity?.IsAuthenticated != true)
     {
         context.Response.StatusCode = StatusCodes.Status404NotFound;

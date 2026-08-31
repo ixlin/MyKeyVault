@@ -37,8 +37,11 @@ public sealed class DetailsModel(VaultDbContext db, UserManager<VaultUser> users
     public async Task<IActionResult> OnPostCopyAsync(Guid id, Guid secretId, CancellationToken cancellationToken)
     {
         var userId = users.GetUserId(User)!;
-        var allowed = await db.VaultSecrets.AnyAsync(x => x.Id == secretId && x.VaultItemId == id && x.VaultItem.OwnerId == userId && !x.VaultItem.IsArchived, cancellationToken);
-        if (!allowed) return NotFound();
+        var fieldName = await db.VaultSecrets
+            .Where(x => x.Id == secretId && x.VaultItemId == id && x.VaultItem.OwnerId == userId && !x.VaultItem.IsArchived)
+            .Select(x => x.FieldName)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (fieldName is null || !VaultFieldPresentation.CanCopy(fieldName)) return NotFound();
         db.SecurityAuditEvents.Add(new SecurityAuditEvent { UserId = userId, VaultItemId = id, Action = "secret_copied", Result = "success" });
         await db.SaveChangesAsync(cancellationToken);
         return new StatusCodeResult(StatusCodes.Status204NoContent);
@@ -49,10 +52,13 @@ public sealed class DetailsModel(VaultDbContext db, UserManager<VaultUser> users
         var item = await db.VaultItems.AsNoTracking().Include(x => x.Secrets).SingleOrDefaultAsync(x => x.Id == id && x.OwnerId == userId && !x.IsArchived, cancellationToken);
         Item = item is null ? null : ItemDetails.From(item);
     }
-    public sealed record SecretSummary(Guid Id, string FieldName);
+    public sealed record SecretSummary(Guid Id, string FieldName)
+    {
+        public bool CanCopy => VaultFieldPresentation.CanCopy(FieldName);
+    }
     public sealed record ItemDetails(Guid Id, string Title, VaultItemKind Kind, string? UrlOrHost, IReadOnlyList<SecretSummary> Secrets)
     {
-        public string KindLabel => Kind switch { VaultItemKind.ApiKey => "API KEY", VaultItemKind.BlockchainAccount => "链上账户", VaultItemKind.SecureNote => "私密笔记", VaultItemKind.Login => "账号登录", _ => Kind.ToString().ToUpperInvariant() };
+        public string KindLabel => Kind switch { VaultItemKind.ApiKey => "API KEY", VaultItemKind.BlockchainAccount => "链上账户", VaultItemKind.SecureNote => "私密笔记", VaultItemKind.BankCard => "银行卡", VaultItemKind.CreditCard => "信用卡", VaultItemKind.Login => "账号登录", _ => Kind.ToString().ToUpperInvariant() };
         public static ItemDetails From(VaultItem item) => new(item.Id, item.Title, item.Kind, item.UrlOrHost, item.Secrets.Select(x => new SecretSummary(x.Id, x.FieldName)).ToList());
     }
 }

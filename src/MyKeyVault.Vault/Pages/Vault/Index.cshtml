@@ -1,30 +1,92 @@
 @page
 @model MyKeyVault.Vault.Pages.Vault.IndexModel
 @{
-    ViewData["Title"] = "保险库";
+    ViewData["Title"] = "密码本";
 }
-<section class="vault-heading">
-    <div><p class="eyebrow">MY VAULT</p><h1>你的私密信息</h1><p>敏感字段已加密保存；默认不会展示或复制。</p></div>
-    <a class="button" asp-page="Create">新增条目</a>
+<section class="vault-heading ledger-heading">
+    <div><p class="eyebrow">PRIVATE LEDGER</p><h1>密码本</h1><p>@Model.Items.Count 个条目 · 敏感内容默认遮蔽，仅在当前行按需显示。</p></div>
+    <a class="button" asp-page="Create">＋ 快速添加</a>
 </section>
-<form method="get" class="search-bar"><label for="query">搜索条目</label><input id="query" asp-for="Query" placeholder="名称、地址或标签" autocomplete="off" /><button class="text-button" type="submit">搜索</button></form>
+
+<section class="vault-toolbar" aria-label="筛选和搜索">
+    <nav class="kind-tabs" aria-label="条目类型">
+        <a class="@(string.IsNullOrEmpty(Model.Group) ? "active" : "")" asp-page="Index" asp-route-query="@Model.Query">全部</a>
+        <a class="@(Model.Group == "login" ? "active" : "")" asp-page="Index" asp-route-group="login" asp-route-query="@Model.Query">账号</a>
+        <a class="@(Model.Group == "card" ? "active" : "")" asp-page="Index" asp-route-group="card" asp-route-query="@Model.Query">银行卡</a>
+        <a class="@(Model.Group == "note" ? "active" : "")" asp-page="Index" asp-route-group="note" asp-route-query="@Model.Query">笔记</a>
+    </nav>
+    <form method="get" class="search-bar ledger-search"><input type="hidden" asp-for="Group" /><label class="visually-hidden" for="query">搜索条目</label><input id="query" asp-for="Query" placeholder="搜索名称、网址或标签" autocomplete="off" /><button class="text-button" type="submit">搜索</button></form>
+</section>
 
 @if (!Model.Items.Any())
 {
-    <section class="empty-state"><p class="eyebrow">EMPTY VAULT</p><h2>从第一条私密信息开始</h2><p>保存账号、API Key 或服务器连接信息。你可以随时归档或撤销后续调用授权。</p><a class="button" asp-page="Create">新增条目</a></section>
+    <section class="empty-state"><p class="eyebrow">EMPTY VAULT</p><h2>这里还没有符合条件的条目</h2><p>添加登录账号、银行卡、信用卡或私密笔记。账号、卡号、密码与备注都会加密。</p><a class="button" asp-page="Create">快速添加</a></section>
 }
 else
 {
-    <section class="item-grid" aria-label="保险库条目">
-    @foreach (var item in Model.Items)
-    {
-        <a class="vault-item" asp-page="Details" asp-route-id="@item.Id">
-            <div class="item-top"><span class="kind">@item.KindLabel</span>@if (item.IsFavorite) { <span aria-label="已收藏">★</span> }</div>
-            <h2>@item.Title</h2>
-            <p>@(item.UrlOrHost ?? "未设置目标地址")</p>
-            @if (item.Tags.Any()) { <div class="tag-list">@foreach (var tag in item.Tags) { <span>@tag</span> }</div> }
-            <footer><span>@item.SecretFieldCount 个加密字段</span><time datetime="@item.UpdatedAtUtc.ToString("O")">更新于 @item.UpdatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd")</time></footer>
-        </a>
-    }
+    <form method="post" aria-hidden="true" class="antiforgery-holder"></form>
+    <section class="vault-ledger" aria-label="密码本条目">
+        <header><span>名称 / 网址</span><span>账号</span><span>密码</span><span>备注</span><span>操作</span></header>
+        @foreach (var item in Model.Items)
+        {
+            var isRevealed = Model.RevealedItemId == item.Id;
+            <article class="ledger-row @(isRevealed ? "is-revealed" : "")">
+                <div class="ledger-identity">
+                    <span class="kind-rail kind-@item.KindCss">@item.KindMark</span>
+                    <div><div class="ledger-title"><strong>@item.Title</strong>@if (item.IsFavorite) { <span title="优先显示">★</span> }</div>
+                    @if (item.SafeExternalUrl is not null) { <a href="@item.SafeExternalUrl" target="_blank" rel="noopener noreferrer">@item.UrlOrHost</a> }
+                    else { <span class="muted">@(item.UrlOrHost ?? "未设置网址")</span> }
+                    @if (item.Tags.Any()) { <div class="tag-list">@foreach (var tag in item.Tags) { <span>@tag</span> }</div> }
+                    <time datetime="@item.UpdatedAtUtc.ToString("O")">更新于 @item.UpdatedAtUtc.ToLocalTime().ToString("MM-dd")</time></div>
+                </div>
+                <div class="ledger-field" data-label="账号">
+                    @if (!item.AccountFields.Any()) { <span class="field-empty">—</span> }
+                    @foreach (var field in item.AccountFields)
+                    {
+                        <div class="field-value">
+                            @if (item.AccountFields.Count > 1) { <span class="field-name">@field.FieldName</span> }
+                            @if (isRevealed && Model.RevealedValues.TryGetValue(field.Id, out var value))
+                            {
+                                <span class="field-copy"><code id="secret-@field.Id">@value</code><button type="button" class="copy-icon" data-copy-target="secret-@field.Id" data-copy-url="@Url.Page("Index", "Copy", new { id = item.Id, secretId = field.Id })" aria-label="复制账号" title="复制账号"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg></button></span>
+                            }
+                            else { <code aria-label="已加密">••••••••</code> }
+                        </div>
+                    }
+                </div>
+                <div class="ledger-field" data-label="密码">
+                    @if (!item.PasswordFields.Any()) { <span class="field-empty">—</span> }
+                    @foreach (var field in item.PasswordFields)
+                    {
+                        <div class="field-value">
+                            @if (item.PasswordFields.Count > 1) { <span class="field-name">@field.FieldName</span> }
+                            @if (isRevealed && Model.RevealedValues.TryGetValue(field.Id, out var value))
+                            {
+                                <span class="field-copy"><code id="secret-@field.Id">@value</code><button type="button" class="copy-icon" data-copy-target="secret-@field.Id" data-copy-url="@Url.Page("Index", "Copy", new { id = item.Id, secretId = field.Id })" aria-label="复制密码" title="复制密码"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg></button></span>
+                            }
+                            else { <code aria-label="已加密">••••••••</code> }
+                        </div>
+                    }
+                </div>
+                <div class="ledger-field ledger-note" data-label="备注">
+                    @if (!item.NoteFields.Any()) { <span class="field-empty">—</span> }
+                    @foreach (var field in item.NoteFields)
+                    {
+                        <div class="field-value">
+                            @if (item.NoteFields.Count > 1) { <span class="field-name">@field.FieldName</span> }
+                            @if (isRevealed && Model.RevealedValues.TryGetValue(field.Id, out var value)) { <code>@value</code> }
+                            else { <code aria-label="已加密">••••••••</code> }
+                        </div>
+                    }
+                </div>
+                <div class="ledger-actions">
+                    @if (isRevealed) { <a asp-page="Index" asp-route-query="@Model.Query" asp-route-group="@Model.Group">隐藏</a> }
+                    else { <form method="post" asp-page-handler="Reveal"><input type="hidden" name="id" value="@item.Id" /><input type="hidden" name="query" value="@Model.Query" /><input type="hidden" name="group" value="@Model.Group" /><button class="text-button" type="submit">显示本行</button></form> }
+                    <a asp-page="Edit" asp-route-id="@item.Id">编辑</a>
+                    <a asp-page="Details" asp-route-id="@item.Id" class="more-link" aria-label="查看 @item.Title 的安全详情">···</a>
+                </div>
+            </article>
+        }
     </section>
+    <div class="copy-toast" data-copy-toast role="status" aria-live="polite" hidden>复制成功</div>
+    <p class="ledger-footnote">显示、复制、修改和删除都会校验当前用户权限；显示与复制动作会写入安全审计，但不会记录明文。</p>
 }

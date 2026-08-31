@@ -9,7 +9,9 @@ public enum VaultItemKind
     Server,
     Database,
     BlockchainAccount,
-    SecureNote
+    SecureNote,
+    BankCard,
+    CreditCard
 }
 
 public sealed class VaultItem

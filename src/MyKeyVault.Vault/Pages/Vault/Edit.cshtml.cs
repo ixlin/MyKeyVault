@@ -33,5 +33,5 @@ public sealed class EditModel(VaultDbContext db, UserManager<VaultUser> users) :
         await db.SaveChangesAsync(cancellationToken);
         return RedirectToPage("Details", new { id = item.Id });
     }
-    public sealed class InputModel { public Guid Id { get; set; } [Required, StringLength(160)] public string Title { get; set; } = string.Empty; [Required] public VaultItemKind Kind { get; set; } [StringLength(2048)] public string? UrlOrHost { get; set; } [StringLength(500)] public string TagsInput { get; set; } = string.Empty; public bool IsFavorite { get; set; } }
+    public sealed class InputModel { public Guid Id { get; set; } [Required, StringLength(160)] public string Title { get; set; } = string.Empty; [Required, EnumDataType(typeof(VaultItemKind))] public VaultItemKind Kind { get; set; } [StringLength(2048)] public string? UrlOrHost { get; set; } [StringLength(500)] public string TagsInput { get; set; } = string.Empty; public bool IsFavorite { get; set; } }
 }

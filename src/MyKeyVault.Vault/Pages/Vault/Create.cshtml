@@ -3,15 +3,29 @@
 @{
     ViewData["Title"] = "新增条目";
 }
-<section class="form-heading"><p class="eyebrow">NEW RECORD</p><h1>新增私密条目</h1><p>只有标题和目标地址用于识别；下方内容会在保存时加密。</p></section>
-<form method="post" class="vault-form">
+<section class="form-heading compact-heading"><div><p class="eyebrow">QUICK ADD</p><h1>新增私密条目</h1></div><p>名称和网址用于查找；账号、卡号、密码与备注分别加密。</p></section>
+<form method="post" class="vault-form vault-composer">
     <div asp-validation-summary="All" class="validation validation-summary" role="alert"></div>
-    <label>条目名称（必填）<input asp-for="Input.Title" autocomplete="off" placeholder="例如：生产环境数据库" /><span asp-validation-for="Input.Title" class="validation"></span></label>
-    <label>类型<select asp-for="Input.Kind" asp-items="Html.GetEnumSelectList<MyKeyVault.Vault.Models.VaultItemKind>()"></select></label>
-    <label>目标地址或主机（可选）<input asp-for="Input.UrlOrHost" autocomplete="off" placeholder="例如：db.example.com" /><span asp-validation-for="Input.UrlOrHost" class="validation"></span></label>
-    <label>标签（可选）<input asp-for="Input.TagsInput" autocomplete="off" placeholder="例如：生产, 个人" /><span class="field-help">用逗号分隔，仅自己可见。</span><span asp-validation-for="Input.TagsInput" class="validation"></span></label>
-    <label>加密字段名称（必填）<input asp-for="Input.FieldName" autocomplete="off" placeholder="例如：密码、API Key" /><span asp-validation-for="Input.FieldName" class="validation"></span></label>
-    <label>私密内容（必填）<textarea asp-for="Input.SecretValue" autocomplete="off" spellcheck="false" placeholder="只会加密保存，不会在审计日志中记录"></textarea><span asp-validation-for="Input.SecretValue" class="validation"></span></label>
-    <label class="check"><input asp-for="Input.IsFavorite" /> 收藏这个条目</label>
-    <div class="form-actions"><a asp-page="Index">取消</a><button class="button" type="submit">加密保存</button></div>
+    <section class="composer-section identity-section">
+        <div class="composer-title"><span>01</span><div><h2>基本信息</h2><p>用于列表识别，不要在名称中写密码或卡号。</p></div></div>
+        <div class="composer-grid">
+            <label>名称<input asp-for="Input.Title" autocomplete="off" placeholder="例如：Apple 账号、招商银行信用卡" /><span asp-validation-for="Input.Title" class="validation"></span></label>
+            <label>类型<select asp-for="Input.Kind" data-vault-kind>
+                <option value="Login">登录账号</option><option value="BankCard">银行卡</option><option value="CreditCard">信用卡</option><option value="SecureNote">私密笔记</option>
+                <optgroup label="更多类型"><option value="ApiKey">API Key</option><option value="Server">服务器</option><option value="Database">数据库</option><option value="BlockchainAccount">链上账户</option></optgroup>
+            </select></label>
+            <label class="span-2">网址或主机（可选）<input asp-for="Input.UrlOrHost" inputmode="url" autocomplete="url" placeholder="https://example.com" /><span asp-validation-for="Input.UrlOrHost" class="validation"></span></label>
+        </div>
+    </section>
+    <section class="composer-section encrypted-section">
+        <div class="composer-title"><span>02</span><div><h2>加密内容</h2><p>每项使用独立数据密钥加密，明文不会写入日志。</p></div></div>
+        <div class="composer-grid">
+            <label data-account-field><span data-field-label>账号信息</span><input asp-for="Input.AccountValue" autocomplete="username" placeholder="用户名、邮箱或登录账号" /><span asp-validation-for="Input.AccountValue" class="validation"></span></label>
+            <label data-secret-field><span data-field-label>密码或密钥</span><input asp-for="Input.SecretValue" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="输入密码或其它私密凭据" /><span asp-validation-for="Input.SecretValue" class="validation"></span></label>
+            <label class="span-2 notes-field" data-notes-field><span data-field-label>备注</span><textarea asp-for="Input.Notes" autocomplete="off" spellcheck="false" placeholder="登录方式、用途、补充说明等，都写在这里"></textarea><span asp-validation-for="Input.Notes" class="validation"></span></label>
+            <p class="card-safety span-2" data-card-safety hidden><strong>银行卡安全边界：</strong>可以保存卡号和用途备注；不要保存 CVV/CVC、安全码、PIN、短信验证码或动态口令。</p>
+        </div>
+    </section>
+    <details class="composer-optional"><summary>标签与收藏（可选）</summary><div class="composer-grid"><label>标签<input asp-for="Input.TagsInput" autocomplete="off" placeholder="例如：工作, 个人" /><span class="field-help">用逗号分隔，仅自己可见。</span><span asp-validation-for="Input.TagsInput" class="validation"></span></label><label class="check"><input asp-for="Input.IsFavorite" /> 优先显示这个条目</label></div></details>
+    <div class="form-actions sticky-actions"><a asp-page="Index">取消</a><span>至少填写一项加密内容</span><button class="button" type="submit">加密保存</button></div>
 </form>
