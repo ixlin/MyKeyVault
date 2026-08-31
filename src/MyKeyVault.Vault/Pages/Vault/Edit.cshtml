@@ -1,6 +1,45 @@
 @page "{id:guid}"
 @model MyKeyVault.Vault.Pages.Vault.EditModel
 @{ ViewData["Title"] = "编辑条目"; }
-<section class="form-heading"><p class="eyebrow">EDIT RECORD</p><h1>编辑条目</h1><p>修改名称、类型、地址和标签不会展示或改写加密字段。</p></section>
-<form method="post" class="vault-form"><div asp-validation-summary="ModelOnly" class="validation"></div><input type="hidden" asp-for="Input.Id" />
-<div class="composer-grid"><label>条目名称<input asp-for="Input.Title" autocomplete="off" /></label><label>类型<select asp-for="Input.Kind"><option value="Login">登录账号</option><option value="BankCard">银行卡</option><option value="CreditCard">信用卡</option><option value="SecureNote">私密笔记</option><option value="ApiKey">API Key</option><option value="Server">服务器</option><option value="Database">数据库</option><option value="BlockchainAccount">链上账户</option></select></label><label class="span-2">网址或主机<input asp-for="Input.UrlOrHost" autocomplete="url" /></label><label>标签<input asp-for="Input.TagsInput" autocomplete="off" /></label><label class="check"><input asp-for="Input.IsFavorite" /> 优先显示这个条目</label></div><div class="form-actions"><a asp-page="Details" asp-route-id="@Model.Input.Id">取消</a><button class="button" type="submit">保存修改</button></div></form>
+
+<section class="form-heading compact-heading"><div><p class="eyebrow">EDIT RECORD</p><h1>编辑全部信息</h1></div><p>名称、网址和所有加密字段都在同一页修改，保存后直接返回密码本。</p></section>
+
+<form method="post" class="vault-form vault-composer edit-composer">
+    <div asp-validation-summary="All" class="validation validation-summary" role="alert"></div>
+    <input type="hidden" name="Input.Id" value="@Model.Input.Id" />
+
+    <section class="composer-section identity-section">
+        <div class="composer-title"><span>01</span><div><h2>基本信息</h2><p>用于查找和分类，不会作为敏感内容展示。</p></div></div>
+        <div class="composer-grid">
+            <label>名称<input asp-for="Input.Title" autocomplete="off" /><span asp-validation-for="Input.Title" class="validation"></span></label>
+            <label>类型<select asp-for="Input.Kind">
+                <option value="Login">登录账号</option><option value="BankCard">银行卡</option><option value="CreditCard">信用卡</option><option value="SecureNote">私密笔记</option>
+                <option value="ApiKey">API Key</option><option value="Server">服务器</option><option value="Database">数据库</option><option value="BlockchainAccount">链上账户</option>
+            </select></label>
+            <label class="span-2">网址或主机（可选）<input asp-for="Input.UrlOrHost" autocomplete="url" inputmode="url" /><span asp-validation-for="Input.UrlOrHost" class="validation"></span></label>
+        </div>
+    </section>
+
+    <section class="composer-section encrypted-section">
+        <div class="composer-title"><span>02</span><div><h2>加密内容</h2><p>@Model.Input.Secrets.Count 个字段，均可直接修改。</p></div></div>
+        <div class="composer-grid secret-editor">
+            @for (var i = 0; i < Model.Input.Secrets.Count; i++)
+            {
+                <input type="hidden" name="Input.Secrets[@i].Id" value="@Model.Input.Secrets[i].Id" />
+                <input type="hidden" name="Input.Secrets[@i].FieldName" value="@Model.Input.Secrets[i].FieldName" />
+                @if (Model.Input.Secrets[i].IsLongText)
+                {
+                    <label class="span-2">@Model.Input.Secrets[i].FieldName@if (Model.Input.Secrets[i].IsNew) { <small>可选</small> }<textarea asp-for="Input.Secrets[i].Value" autocomplete="off" spellcheck="false"></textarea><span asp-validation-for="Input.Secrets[i].Value" class="validation"></span></label>
+                }
+                else
+                {
+                    <label>@Model.Input.Secrets[i].FieldName@if (Model.Input.Secrets[i].IsNew) { <small>可选</small> }<input asp-for="Input.Secrets[i].Value" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="@Model.Input.Secrets[i].InputMode" /><span asp-validation-for="Input.Secrets[i].Value" class="validation"></span></label>
+                }
+            }
+            <p class="editor-security span-2">这些值只在当前编辑页临时显示；保存时会使用新的随机数据密钥重新加密。</p>
+        </div>
+    </section>
+
+    <details class="composer-optional"><summary>标签与收藏（可选）</summary><div class="composer-grid"><label>标签<input asp-for="Input.TagsInput" autocomplete="off" placeholder="例如：工作, 个人" /><span class="field-help">用逗号分隔，仅自己可见。</span><span asp-validation-for="Input.TagsInput" class="validation"></span></label><label class="check"><input asp-for="Input.IsFavorite" /> 优先显示这个条目</label></div></details>
+    <div class="form-actions sticky-actions"><a asp-page="Index">取消</a><span>所有修改一次保存</span><button class="button" type="submit">保存修改</button></div>
+</form>

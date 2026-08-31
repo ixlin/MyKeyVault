@@ -39,7 +39,9 @@ public sealed class CreateModel(VaultDbContext db, UserManager<VaultUser> users,
 
     private void ValidateEncryptedContent()
     {
-        if (string.IsNullOrWhiteSpace(Input.AccountValue) && string.IsNullOrWhiteSpace(Input.SecretValue) && string.IsNullOrWhiteSpace(Input.Notes))
+        if (string.IsNullOrWhiteSpace(Input.AccountValue) && string.IsNullOrWhiteSpace(Input.SecretValue) && string.IsNullOrWhiteSpace(Input.Notes)
+            && string.IsNullOrWhiteSpace(Input.CardholderName) && string.IsNullOrWhiteSpace(Input.Expiry)
+            && string.IsNullOrWhiteSpace(Input.SecurityCode) && string.IsNullOrWhiteSpace(Input.Pin))
             ModelState.AddModelError(string.Empty, "请至少填写账号、卡号、密码或备注中的一项。");
         if (Input.Kind is VaultItemKind.BankCard or VaultItemKind.CreditCard && string.IsNullOrWhiteSpace(Input.AccountValue))
             ModelState.AddModelError("Input.AccountValue", "请填写卡号。");
@@ -51,6 +53,13 @@ public sealed class CreateModel(VaultDbContext db, UserManager<VaultUser> users,
             yield return (Input.Kind is VaultItemKind.BankCard or VaultItemKind.CreditCard ? "卡号" : "账号信息", Input.AccountValue.Trim());
         if (!string.IsNullOrWhiteSpace(Input.SecretValue))
             yield return (Input.Kind == VaultItemKind.ApiKey ? "API Key / Token" : "密码或密钥", Input.SecretValue);
+        if (Input.Kind is VaultItemKind.BankCard or VaultItemKind.CreditCard)
+        {
+            if (!string.IsNullOrWhiteSpace(Input.CardholderName)) yield return ("持卡人", Input.CardholderName.Trim());
+            if (!string.IsNullOrWhiteSpace(Input.Expiry)) yield return ("有效期", Input.Expiry.Trim());
+            if (!string.IsNullOrWhiteSpace(Input.SecurityCode)) yield return ("安全码 CVV/CVC", Input.SecurityCode.Trim());
+            if (!string.IsNullOrWhiteSpace(Input.Pin)) yield return ("PIN / 取款密码", Input.Pin.Trim());
+        }
         if (!string.IsNullOrWhiteSpace(Input.Notes))
             yield return (Input.Kind == VaultItemKind.SecureNote ? "私密笔记" : "备注", Input.Notes.Trim());
     }
@@ -69,6 +78,14 @@ public sealed class CreateModel(VaultDbContext db, UserManager<VaultUser> users,
         public string? SecretValue { get; set; }
         [StringLength(16_000, ErrorMessage = "备注不能超过 16000 个字符。")]
         public string? Notes { get; set; }
+        [StringLength(160, ErrorMessage = "持卡人姓名不能超过 160 个字符。")]
+        public string? CardholderName { get; set; }
+        [StringLength(32, ErrorMessage = "有效期不能超过 32 个字符。")]
+        public string? Expiry { get; set; }
+        [StringLength(16, ErrorMessage = "安全码不能超过 16 个字符。")]
+        public string? SecurityCode { get; set; }
+        [StringLength(64, ErrorMessage = "PIN 不能超过 64 个字符。")]
+        public string? Pin { get; set; }
         public bool IsFavorite { get; set; }
     }
 }

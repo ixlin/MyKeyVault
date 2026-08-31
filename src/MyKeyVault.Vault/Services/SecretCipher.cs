@@ -74,6 +74,20 @@ public sealed class SecretCipher
         }
     }
 
+    public void Update(VaultSecret secret, string plaintext)
+    {
+        ArgumentNullException.ThrowIfNull(secret);
+        ArgumentNullException.ThrowIfNull(plaintext);
+        var payload = EncryptValue(secret.FieldName, plaintext);
+        secret.Ciphertext = payload.Ciphertext;
+        secret.Nonce = payload.Nonce;
+        secret.AuthenticationTag = payload.AuthenticationTag;
+        secret.WrappedDataKey = payload.WrappedDataKey;
+        secret.KeyWrapNonce = payload.KeyWrapNonce;
+        secret.KeyWrapAuthenticationTag = payload.KeyWrapAuthenticationTag;
+        secret.UpdatedAtUtc = DateTime.UtcNow;
+    }
+
     public EncryptedPayload EncryptValue(string context, string plaintext)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(context);

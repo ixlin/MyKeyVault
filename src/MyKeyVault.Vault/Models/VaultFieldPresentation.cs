@@ -9,8 +9,8 @@ public enum VaultFieldColumn
 
 public static class VaultFieldPresentation
 {
-    private static readonly string[] AccountTerms = ["账号", "账户", "用户名", "邮箱", "卡号"];
-    private static readonly string[] PasswordTerms = ["密码", "密钥", "api key", "token", "secret"];
+    private static readonly string[] AccountTerms = ["账号", "账户", "用户名", "邮箱", "卡号", "持卡人"];
+    private static readonly string[] PasswordTerms = ["密码", "密钥", "api key", "token", "secret", "安全码", "cvv", "cvc", "pin"];
 
     public static VaultFieldColumn Classify(string fieldName)
     {

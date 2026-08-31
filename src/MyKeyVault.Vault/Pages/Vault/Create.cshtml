@@ -22,8 +22,14 @@
         <div class="composer-grid">
             <label data-account-field><span data-field-label>账号信息</span><input asp-for="Input.AccountValue" autocomplete="username" placeholder="用户名、邮箱或登录账号" /><span asp-validation-for="Input.AccountValue" class="validation"></span></label>
             <label data-secret-field><span data-field-label>密码或密钥</span><input asp-for="Input.SecretValue" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="输入密码或其它私密凭据" /><span asp-validation-for="Input.SecretValue" class="validation"></span></label>
+            <div class="card-fields span-2" data-card-fields hidden>
+                <label>持卡人姓名（可选）<input asp-for="Input.CardholderName" autocomplete="off" placeholder="卡面姓名" /><span asp-validation-for="Input.CardholderName" class="validation"></span></label>
+                <label>有效期（可选）<input asp-for="Input.Expiry" autocomplete="off" inputmode="numeric" placeholder="MM / YY" /><span asp-validation-for="Input.Expiry" class="validation"></span></label>
+                <label>安全码 CVV/CVC（可选）<input asp-for="Input.SecurityCode" type="text" autocomplete="off" inputmode="numeric" autocapitalize="off" spellcheck="false" placeholder="卡背面 3 位或正面 4 位" /><span asp-validation-for="Input.SecurityCode" class="validation"></span></label>
+                <label>PIN / 取款密码（可选）<input asp-for="Input.Pin" type="text" autocomplete="off" inputmode="numeric" autocapitalize="off" spellcheck="false" placeholder="仅在确有需要时保存" /><span asp-validation-for="Input.Pin" class="validation"></span></label>
+            </div>
             <label class="span-2 notes-field" data-notes-field><span data-field-label>备注</span><textarea asp-for="Input.Notes" autocomplete="off" spellcheck="false" placeholder="登录方式、用途、补充说明等，都写在这里"></textarea><span asp-validation-for="Input.Notes" class="validation"></span></label>
-            <p class="card-safety span-2" data-card-safety hidden><strong>银行卡安全边界：</strong>可以保存卡号和用途备注；不要保存 CVV/CVC、安全码、PIN、短信验证码或动态口令。</p>
+            <p class="card-safety span-2" data-card-safety hidden><strong>高敏信息：</strong>安全码和 PIN 会分别加密并默认遮蔽。请只保存在自己的保险库中，不要保存短信验证码或会不断变化的动态口令。</p>
         </div>
     </section>
     <details class="composer-optional"><summary>标签与收藏（可选）</summary><div class="composer-grid"><label>标签<input asp-for="Input.TagsInput" autocomplete="off" placeholder="例如：工作, 个人" /><span class="field-help">用逗号分隔，仅自己可见。</span><span asp-validation-for="Input.TagsInput" class="validation"></span></label><label class="check"><input asp-for="Input.IsFavorite" /> 优先显示这个条目</label></div></details>

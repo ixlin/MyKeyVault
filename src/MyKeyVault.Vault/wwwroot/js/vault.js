@@ -6,6 +6,7 @@
   const secretField = document.querySelector("[data-secret-field]");
   const notesField = document.querySelector("[data-notes-field]");
   const safetyNote = document.querySelector("[data-card-safety]");
+  const cardFields = document.querySelector("[data-card-fields]");
 
   const updateComposer = () => {
     if (!kindSelect) return;
@@ -19,7 +20,11 @@
       const label = accountField.querySelector("[data-field-label]");
       const input = accountField.querySelector("input");
       if (label) label.textContent = isCard ? "卡号" : "账号信息";
-      if (input) input.placeholder = isCard ? "银行卡号或信用卡号" : "用户名、邮箱或登录账号";
+      if (input) {
+        input.placeholder = isCard ? "银行卡号或信用卡号" : "用户名、邮箱或登录账号";
+        input.autocomplete = isCard ? "off" : "username";
+        input.inputMode = isCard ? "numeric" : "text";
+      }
     }
     if (secretField) {
       secretField.hidden = isCard || isNote;
@@ -32,6 +37,7 @@
       const label = notesField.querySelector("[data-field-label]");
       if (label) label.textContent = isNote ? "私密笔记" : "备注";
     }
+    if (cardFields) cardFields.hidden = !isCard;
     if (safetyNote) safetyNote.hidden = !isCard;
   };
 
