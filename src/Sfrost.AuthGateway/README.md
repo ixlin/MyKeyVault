@@ -61,3 +61,10 @@ browser never receives credential values. Nginx adds the gateway's small model
 key entry script to Harness HTML, because upstream intentionally disables its
 configuration plane in non-loopback browsers. This integration does not patch
 the Harness package and therefore survives normal package upgrades.
+
+The production model catalog is tracked in
+`scripts/deepseek-harness-settings.yaml`. It uses the stable
+`deepseek-flash` API name for DeepSeek V4.1 Flash, declares native text and
+image input, and retains `deepseek-v4-pro` as the second selectable model.
+The catalog is stored outside the upstream Harness package, so model changes
+and normal Harness upgrades remain independent.
