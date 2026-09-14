@@ -51,16 +51,35 @@ vectorized; a real embedding/indexing worker can later update that state after
 successful ingestion.
 
 The Nginx `auth_request` check fails closed: if the gateway is unavailable or a
-cookie is invalid, Harness is not proxied to the requester. The original
-DeepSeek Harness installation is not modified, so its package can still be
-upgraded independently.
+cookie is invalid, Harness is not proxied to the requester. The upstream
+DeepSeek Harness package is not patched. Its current production version is
+`@deepseek-ai/dsh@0.1.5-rc.1`, pinned with its dependency lockfile in
+`scripts/deepseek-harness-runtime/`. The systemd unit points at
+`/opt/deepseek-harness-current`, a symlink to the installed version; the
+previous package and a consistent pre-upgrade state backup are retained for
+rollback.
+
+Since DSH 0.1.2, the Web app also requires its own authority-bound browser
+cookie. The systemd launch-token script places the current per-process token in
+`/run/deepseek-harness-launch/token` (`root:sfrost_publish`, `0640`). The
+authenticated gateway exchanges it over loopback using the public Host and
+forwards only DSH's signed, HttpOnly, SameSite=Strict cookie with `Secure` added.
+No launch token is sent to a browser URL. Nginx uses this bridge only when an
+authenticated `/harness` request receives a DSH 401. The same gateway bridges
+the new `/api/credentials/{describe,set,unset}` RPCs, with the previous RPC
+shape retained for rollback. The old third-party `dsh-file-upload` profile
+bundle must not be mounted: this DSH version already includes the official
+`@deepseek-ai/dsh-client-file-upload` bundle. The desired new profile is in
+`scripts/deepseek-harness-web-profile.json`.
 
 The authenticated `/__sfrost-auth/models` page manages the write-only
 `DEEPSEEK_API_KEY` through Harness's loopback-only credential API. The public
 browser never receives credential values. Nginx adds the gateway's small model
 key entry script to Harness HTML, because upstream intentionally disables its
 configuration plane in non-loopback browsers. This integration does not patch
-the Harness package and therefore survives normal package upgrades.
+the Harness package. Future upgrades still require testing the browser-auth,
+credential RPC, third-party bundle, and old-session compatibility contracts
+before changing the symlink.
 
 The production model catalog is tracked in
 `scripts/deepseek-harness-settings.yaml`. It uses the stable

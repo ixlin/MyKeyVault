@@ -76,9 +76,12 @@ const SESSION_SECONDS = 12 * 60 * 60;
 const REMEMBER_SECONDS = 30 * 24 * 60 * 60;
 const MAX_FORM_BYTES = 512 * 1024;
 const DEEPSEEK_CREDENTIAL_REF = "DEEPSEEK_API_KEY";
+const HARNESS_LAUNCH_TOKEN_FILE = process.env.SFROST_HARNESS_LAUNCH_TOKEN_FILE
+  || "/run/deepseek-harness-launch/token";
 const KB_FILES_DIR = process.env.SFROST_KB_FILES_DIR || "/var/lib/sfrost-auth-gateway/kb-files";
 const KB_INBOX_DIR = process.env.SFROST_KB_INBOX_DIR || "/var/lib/sfrost-kb-inbox";
 const failedAttempts = new Map();
+let harnessRpcCookie = "";
 const initialCredentials = await loadCredentialState();
 let username = initialCredentials.username;
 let passwordRecord = parsePasswordRecord(initialCredentials.passwordRecord);
@@ -126,6 +129,25 @@ const server = http.createServer(async (request, response) => {
     // Nginx auth_request subrequests can retain the original HTTP method.
     if (requestUrl.pathname === "/check") {
       return verifySession(request) ? send(response, 204) : send(response, 401);
+    }
+
+    if (request.method === "GET" && requestUrl.pathname === "/harness-launch") {
+      if (!verifySession(request)) {
+        return redirect(response, "/__sfrost-auth/login?next=/harness");
+      }
+      const authority = request.headers["x-forwarded-host"] || request.headers.host;
+      if (!["sfrost.cn", "www.sfrost.cn"].includes(authority)) {
+        return send(response, 403, "Forbidden");
+      }
+      try {
+        const cookie = await exchangeHarnessBrowserToken(authority);
+        response.setHeader("Set-Cookie", `${cookie}; Secure`);
+        return redirect(response, "/harness");
+      } catch (error) {
+        console.error("Unable to bootstrap Harness browser session:", error.message);
+        response.setHeader("Retry-After", "3");
+        return send(response, 503, "Harness is starting; retry shortly.");
+      }
     }
 
     if (requestUrl.pathname === "/blog" || requestUrl.pathname.startsWith("/blog/")) {
@@ -933,6 +955,107 @@ async function describeDeepSeekCredential() {
 }
 
 async function harnessCredentialRpc(method, payload) {
+  try {
+    await readHarnessLaunchToken();
+    const result = await harnessCredentialRpcV2(method, payload);
+    if (result !== null) return result;
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+  }
+  return harnessCredentialRpcV1(method, payload);
+}
+
+async function readHarnessLaunchToken() {
+  const token = (await readFile(HARNESS_LAUNCH_TOKEN_FILE, "utf8")).trim();
+  if (!/^[A-Za-z0-9_-]{16,128}$/.test(token)) {
+    throw new Error("Harness launch token has an invalid format.");
+  }
+  return token;
+}
+
+async function exchangeHarnessBrowserToken(authority) {
+  const endpoint = new URL("/", harnessApiUrl);
+  endpoint.searchParams.set("token", await readHarnessLaunchToken());
+  // Node fetch sets Host from the URL even if headers.host is supplied. Use
+  // node:http so DSH signs the cookie for the browser's public authority.
+  const upstream = await new Promise((resolve, reject) => {
+    const request = http.request(endpoint, {
+      method: "GET",
+      headers: { host: authority },
+      timeout: 5_000,
+    }, (response) => {
+      response.resume();
+      response.on("end", () => resolve({
+        status: response.statusCode,
+        location: response.headers.location,
+        cookie: response.headers["set-cookie"]?.[0] || "",
+      }));
+      response.on("error", reject);
+    });
+    request.on("timeout", () => request.destroy(new Error("Harness token exchange timed out.")));
+    request.on("error", reject);
+    request.end();
+  });
+  const cookie = upstream.cookie;
+  if (
+    upstream.status !== 303
+    || upstream.location !== "/"
+    || !/^dsh-auth-[A-Za-z0-9_-]+=v1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+;/.test(cookie)
+  ) {
+    throw new Error(`Harness browser-token exchange returned HTTP ${upstream.status}.`);
+  }
+  return cookie;
+}
+
+async function harnessCredentialRpcV2(method, payload) {
+  const action = {
+    "credentials.describe": "describe",
+    "credentials.set": "set",
+    "credentials.unset": "unset",
+  }[method];
+  if (!action) throw new Error("Unsupported Harness credential operation.");
+  const endpoint = new URL(`/api/credentials/${action}`, harnessApiUrl);
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    if (!harnessRpcCookie) {
+      const cookie = await exchangeHarnessBrowserToken(harnessApiUrl.host);
+      harnessRpcCookie = cookie.split(";", 1)[0];
+    }
+    const rpcId = randomBytes(16).toString("hex");
+    const upstream = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: harnessRpcCookie,
+      },
+      body: JSON.stringify({
+        type: "client-request",
+        rpcId,
+        method: `credentials/${action}`,
+        payload: { args: payload },
+      }),
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (upstream.status === 404) return null; // Old Harness during a rolling upgrade.
+    if (upstream.status === 401 && attempt === 0) {
+      harnessRpcCookie = "";
+      continue;
+    }
+    if (!upstream.ok) {
+      throw new Error(`Harness credential service returned HTTP ${upstream.status}.`);
+    }
+    const document = await upstream.json();
+    if (document?.rpcId !== rpcId || document?.result?.ok !== true) {
+      const message = document?.result?.error?.message || "credential operation failed";
+      throw new Error(`Harness credential service rejected the request: ${message}`);
+    }
+    return action === "describe"
+      ? { credentials: document.result.value }
+      : document.result.value ?? {};
+  }
+  throw new Error("Harness credential service rejected browser authentication.");
+}
+
+async function harnessCredentialRpcV1(method, payload) {
   const rpcId = randomBytes(16).toString("hex");
   const endpoint = new URL(`/api/${method}`, harnessApiUrl);
   const upstream = await fetch(endpoint, {
