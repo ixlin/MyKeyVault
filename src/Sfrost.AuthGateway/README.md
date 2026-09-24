@@ -59,6 +59,18 @@ DeepSeek Harness package is not patched. Its current production version is
 previous package and a consistent pre-upgrade state backup are retained for
 rollback.
 
+Before each start, `scripts/deepseek-harness-profile-links.sh` checks the five
+core `@deepseek-ai` module links in the Web profile and points them at the
+current installation. An old profile-local `dsh-tools` link causes tool calls
+to fail with `Cannot read properties of undefined (reading 'prepare')` even
+when the Web UI and model replies still work. The script refuses to replace a
+real profile package directory.
+
+The Nginx attachment endpoint `/api/session/uploadFileBinary` allows a 100 MiB
+body only after portal authentication. Other routes keep their existing body
+limits. The default 1 MiB limit previously rejected normal PPTX uploads with
+HTTP 413 before Harness could inspect the file.
+
 Since DSH 0.1.2, the Web app also requires its own authority-bound browser
 cookie. The systemd launch-token script places the current per-process token in
 `/run/deepseek-harness-launch/token` (`root:sfrost_publish`, `0640`). The
