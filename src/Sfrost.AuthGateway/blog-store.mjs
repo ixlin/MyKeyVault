@@ -206,3 +206,56 @@ export async function getBlogStats() {
   );
   return result.rows[0];
 }
+
+export async function createBlogMedia(media) {
+  await pool.query(
+    `INSERT INTO sfrost_blog_media
+       (id, original_name, extension, mime_type, size_bytes)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [media.id, media.originalName, media.extension, media.mimeType, media.sizeBytes],
+  );
+}
+
+export async function getBlogMedia(id) {
+  const result = await pool.query(
+    `SELECT id, original_name, extension, mime_type, size_bytes, created_at
+       FROM sfrost_blog_media WHERE id = $1`,
+    [id],
+  );
+  return result.rows[0];
+}
+
+export async function listBlogMedia() {
+  const result = await pool.query(
+    `SELECT m.id, m.original_name, m.extension, m.mime_type, m.size_bytes,
+            m.created_at,
+            EXISTS (
+              SELECT 1 FROM sfrost_blog_posts p
+               WHERE strpos(p.content, '/blog/media/' || m.id::text) > 0
+            ) AS in_use
+       FROM sfrost_blog_media m
+      ORDER BY m.created_at DESC`,
+  );
+  return result.rows;
+}
+
+export async function blogMediaUsage() {
+  const result = await pool.query(
+    "SELECT COALESCE(SUM(size_bytes), 0)::bigint AS bytes FROM sfrost_blog_media",
+  );
+  return Number(result.rows[0].bytes);
+}
+
+export async function deleteUnusedBlogMedia(id) {
+  const result = await pool.query(
+    `DELETE FROM sfrost_blog_media m
+      WHERE m.id = $1
+        AND NOT EXISTS (
+          SELECT 1 FROM sfrost_blog_posts p
+           WHERE strpos(p.content, '/blog/media/' || m.id::text) > 0
+        )
+      RETURNING extension`,
+    [id],
+  );
+  return result.rows[0];
+}

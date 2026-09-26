@@ -34,6 +34,23 @@ HTML is displayed through a CSP-sandboxed authenticated preview and is never
 executed as a trusted portal page. Word and other binary artifacts remain
 authenticated downloads.
 
+Markdown knowledge-base documents are rendered on the authenticated document
+page with a shared, HTML-disabled Markdown renderer. Files larger than 2 MiB
+remain downloads to keep page rendering bounded. The Blog uses the same
+renderer for article reading and the editor's server-generated preview.
+Formatting tools cover headings, bold, italic, lists, quotes, and links.
+
+Blog images and attachments are uploaded only by authenticated users through
+`/blog/admin/media` and stored in the private gateway state directory under
+`blog-media` (mode `0700`, files `0600`). Their `/blog/media/<id>` URLs remain
+behind the portal session check; non-image attachments download instead of
+executing in the browser. Supported images are PNG, JPEG, GIF, and WebP (up to
+8 MiB); supported attachments are PDF, Office Open XML, ZIP, and plain text,
+Markdown, or CSV (up to 50 MiB). The total store is capped at 512 MiB. Uploads
+are extension- and signature-checked where possible; SVG and executable HTML
+are deliberately not accepted. Media referenced in a Blog article cannot be
+removed until its reference is removed from the article.
+
 Harness publishes artifacts without sudo through a setgid inbox shared only by
 the `deepseek-harness` and `sfrost_blog` services. The `sfrost-publish` command
 copies a supported file into that inbox and returns its authenticated

@@ -29,3 +29,15 @@ CREATE INDEX IF NOT EXISTS ix_sfrost_blog_posts_public
 
 CREATE INDEX IF NOT EXISTS ix_sfrost_blog_post_tags_tag
   ON sfrost_blog_post_tags (tag_id, post_id);
+
+CREATE TABLE IF NOT EXISTS sfrost_blog_media (
+  id uuid PRIMARY KEY,
+  original_name varchar(180) NOT NULL,
+  extension varchar(12) NOT NULL,
+  mime_type varchar(100) NOT NULL,
+  size_bytes bigint NOT NULL CHECK (size_bytes > 0 AND size_bytes <= 52428800),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS ix_sfrost_blog_media_created
+  ON sfrost_blog_media (created_at DESC);

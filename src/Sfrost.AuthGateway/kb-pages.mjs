@@ -1,3 +1,5 @@
+import { markdownStyles } from "./markdown.mjs";
+
 const SITE_NAME = "Ben熊的AI Space";
 
 export function kbHomeDocument({ docs, username, query = "", imported = 0, notice = "" }) {
@@ -28,8 +30,8 @@ export function kbHomeDocument({ docs, username, query = "", imported = 0, notic
   });
 }
 
-export function kbDocumentDocument({ document, username }) {
-  const preview = previewFor(document);
+export function kbDocumentDocument({ document, username, markdownHtml }) {
+  const preview = previewFor(document, markdownHtml);
   return shell({
     title: `${document.title} · 知识库`,
     username,
@@ -60,8 +62,13 @@ function documentRow(document) {
   </article>`;
 }
 
-function previewFor(document) {
+function previewFor(document, markdownHtml) {
   const source = `/kb/raw/${document.id}`;
+  if (document.mime_type.startsWith("text/markdown")) {
+    return markdownHtml === null
+      ? `<section class="download-card"><div><h2>文件较大，请下载阅读</h2><p>在线排版支持 2 MB 以内的 Markdown 文档。</p></div><a class="download" href="/kb/d/${document.id}/download">下载原文件</a></section>`
+      : `<article class="markdown-document formatted-markdown">${markdownHtml}</article>`;
+  }
   if (document.mime_type.startsWith("text/html")) {
     return `<section class="preview-shell"><div class="preview-bar"><i></i><i></i><i></i><span>安全 HTML 预览</span></div><iframe title="${escapeAttribute(document.title)}" src="${source}" sandbox></iframe></section>`;
   }
@@ -75,7 +82,7 @@ function previewFor(document) {
 }
 
 function shell({ title, username, active, body }) {
-  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f5f5f7"><title>${escapeHtml(title)}</title><style>${styles()}</style></head><body><div class="frost-line" aria-hidden="true"></div><header class="site-header"><nav class="nav-wrap" aria-label="主导航"><a class="wordmark" href="/"><span class="bear">B</span><span>${SITE_NAME}</span></a><div class="nav-links"><a href="/">工作台</a><a class="${active === "kb" ? "active" : ""}" href="/kb">知识库</a><a href="/blog">BLOG</a><a href="/blog/admin">后台</a><a href="/harness">Harness</a><a href="/blog/account">个人中心</a></div><a class="account-chip" href="/blog/account" aria-label="个人中心">${escapeHtml(username.slice(0, 1).toUpperCase())}</a></nav></header>${body}<footer class="site-footer"><span>${SITE_NAME}</span><a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">蜀ICP备2024053184号</a></footer><nav class="mobile-tabbar" aria-label="移动端导航"><a href="/"><b>⌂</b><span>首页</span></a><a class="active" href="/kb"><b>库</b><span>知识</span></a><a href="/blog"><b>文</b><span>BLOG</span></a><a href="/harness"><b>AI</b><span>Harness</span></a><a href="/blog/account"><b>我</b><span>我的</span></a></nav></body></html>`;
+  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f5f5f7"><title>${escapeHtml(title)}</title><style>${styles()}${markdownStyles()}.markdown-document{max-width:900px;margin:0 auto;padding:48px min(6vw,76px) 70px;border:1px solid var(--line);border-radius:18px;background:#fff;box-shadow:0 18px 55px rgba(0,0,0,.06)}.document-head h1{font-size:clamp(34px,4.5vw,56px);line-height:1.12}@media(max-width:620px){.markdown-document{padding:24px 20px 42px;border-radius:14px}}</style></head><body><div class="frost-line" aria-hidden="true"></div><header class="site-header"><nav class="nav-wrap" aria-label="主导航"><a class="wordmark" href="/"><span class="bear">B</span><span>${SITE_NAME}</span></a><div class="nav-links"><a href="/">工作台</a><a class="${active === "kb" ? "active" : ""}" href="/kb">知识库</a><a href="/blog">BLOG</a><a href="/blog/admin">后台</a><a href="/harness">Harness</a><a href="/blog/account">个人中心</a></div><a class="account-chip" href="/blog/account" aria-label="个人中心">${escapeHtml(username.slice(0, 1).toUpperCase())}</a></nav></header>${body}<footer class="site-footer"><span>${SITE_NAME}</span><a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">蜀ICP备2024053184号</a></footer><nav class="mobile-tabbar" aria-label="移动端导航"><a href="/"><b>⌂</b><span>首页</span></a><a class="active" href="/kb"><b>库</b><span>知识</span></a><a href="/blog"><b>文</b><span>BLOG</span></a><a href="/harness"><b>AI</b><span>Harness</span></a><a href="/blog/account"><b>我</b><span>我的</span></a></nav></body></html>`;
 }
 
 function styles() {

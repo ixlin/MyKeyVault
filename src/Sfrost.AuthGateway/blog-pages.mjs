@@ -1,3 +1,5 @@
+import { markdownStyles, renderMarkdown } from "./markdown.mjs";
+
 const SITE_NAME = "Ben熊的AI Space";
 
 export function workspaceHomeDocument({ username, kbCount, blogCount, credentialConfigured }) {
@@ -60,7 +62,7 @@ export function blogPostDocument({ post, username }) {
           ${post.summary ? `<p class="article-deck">${escapeHtml(post.summary)}</p>` : ""}
           <div class="article-meta"><time>${formatDate(post.published_at ?? post.updated_at, true)}</time><span>${readingMinutes(post.content)} 分钟阅读</span></div>
         </header>
-        <div class="article-body">${renderArticleBody(post.content)}</div>
+        <div class="article-body formatted-markdown">${renderMarkdown(post.content)}</div>
         <footer class="article-end"><span>⌁</span><p>写于 ${SITE_NAME}</p></footer>
       </article>
     </main>`,
@@ -102,22 +104,47 @@ export function blogEditorDocument({ post, tags, username, error, mode }) {
     title: `${isEdit ? "编辑文章" : "写文章"} · ${SITE_NAME}`,
     active: "write",
     username,
+    editorScript: true,
     body: `<main class="editor-main">
-      <header class="editor-head"><div><a class="backlink" href="/blog/admin">← 返回管理</a><h1>${isEdit ? "编辑文章" : "写一篇新文章"}</h1></div><p>纯文本会被安全排版；支持以 <code>#</code> 开始的标题、<code>-</code> 列表和 <code>&gt;</code> 引用。</p></header>
+      <header class="editor-head"><div><a class="backlink" href="/blog/admin">← 返回管理</a><h1>${isEdit ? "编辑文章" : "写一篇新文章"}</h1></div><p>用工具栏整理段落、插入图片或附件；保存前可切换预览。</p></header>
       ${error ? `<p class="notice error" role="alert">${escapeHtml(error)}</p>` : ""}
       <form class="editor-form" method="post" action="${action}">
         <section class="editor-canvas">
           <label class="field title-field"><span>标题</span><input name="title" maxlength="160" value="${escapeAttribute(post.title ?? "")}" placeholder="给这篇文章一个清楚的名字" required autofocus></label>
           <label class="field"><span>摘要 <small>可选，最多 320 字</small></span><textarea name="summary" rows="3" maxlength="320" placeholder="一句话说明为什么值得读">${escapeHtml(post.summary ?? "")}</textarea></label>
-          <label class="field"><span>正文</span><textarea class="content-editor" name="content" rows="22" maxlength="100000" placeholder="从这里开始……" required>${escapeHtml(post.content ?? "")}</textarea></label>
+          <div class="field body-field"><label for="blog-content">正文 <small>Markdown 编辑</small></label>
+            <div class="editor-toolbar" role="toolbar" aria-label="正文格式">
+              <div class="tool-group"><select id="heading-select" aria-label="标题级别"><option value="">正文</option><option value="h1">大标题</option><option value="h2">标题</option><option value="h3">小标题</option></select><button type="button" data-md="bold" aria-label="加粗" title="加粗"><strong>B</strong></button><button type="button" data-md="italic" aria-label="倾斜" title="倾斜"><em>I</em></button></div>
+              <div class="tool-group"><button type="button" data-md="ul" title="无序列表">• 列表</button><button type="button" data-md="ol" title="编号列表">1. 列表</button><button type="button" data-md="quote" title="引用">❝ 引用</button><button type="button" data-md="link" title="插入链接">链接</button></div>
+              <div class="tool-group tool-upload"><button type="button" data-upload="image">插入图片</button><button type="button" data-upload="file">添加附件</button></div>
+              <div class="tool-group tool-view"><button type="button" id="editor-preview-toggle" aria-pressed="false">预览</button></div>
+            </div>
+            <textarea id="blog-content" class="content-editor" name="content" rows="22" maxlength="100000" placeholder="从这里开始……" required>${escapeHtml(post.content ?? "")}</textarea>
+            <div id="blog-preview" class="editor-preview formatted-markdown" hidden></div>
+            <input id="blog-upload-input" type="file" hidden>
+            <p id="editor-status" class="editor-status" role="status" aria-live="polite">选择文字后点击工具栏即可排版。图片最大 8 MB，其他附件最大 50 MB。</p>
+          </div>
         </section>
         <aside class="editor-sidebar">
           <section class="side-card"><h2>发布状态</h2><label class="status-choice"><input type="radio" name="status" value="draft" ${(post.status ?? "draft") === "draft" ? "checked" : ""}><span><strong>保存为草稿</strong><small>只在后台可见</small></span></label><label class="status-choice"><input type="radio" name="status" value="published" ${post.status === "published" ? "checked" : ""}><span><strong>发布到首页</strong><small>登录后即可阅读</small></span></label></section>
           <section class="side-card"><div class="side-title"><h2>标签</h2><a href="/blog/admin/tags">管理</a></div>${tagOptions}</section>
+          <section class="side-card"><div class="side-title"><h2>附件</h2><a href="/blog/admin/media">管理文件</a></div><p class="side-hint">图片会显示在正文中；其他文件会插入下载链接。所有文件都需要登录才能访问。</p></section>
           <button class="button primary wide" type="submit">${post.status === "published" ? "保存修改" : "保存文章"}</button>
         </aside>
       </form>
     </main>`,
+  });
+}
+
+export function blogMediaDocument({ files, username, notice = "", error = "" }) {
+  const rows = files.length
+    ? files.map((file) => `<div class="media-row"><div><strong>${escapeHtml(file.original_name)}</strong><small>${formatMediaSize(file.size_bytes)} · ${formatDate(file.created_at)}</small></div><span>${file.in_use ? "文章使用中" : "未使用"}</span><a href="/blog/media/${file.id}">下载</a>${file.in_use ? "" : `<form method="post" action="/blog/admin/media/${file.id}/delete" onsubmit="return confirm('确定删除这个文件？')"><button class="text-danger" type="submit">删除</button></form>`}</div>`).join("")
+    : `<div class="admin-empty"><p>还没有上传文件。编辑文章时可插入图片或附件。</p></div>`;
+  return blogShell({
+    title: `文件管理 · ${SITE_NAME}`,
+    active: "admin",
+    username,
+    body: `<main class="admin-main narrow"><header class="page-head"><div><a class="backlink" href="/blog/admin">← 返回文章管理</a><h1>文件管理</h1><p>查看已上传的图片和附件；正文仍在使用的文件不会被删除。</p></div></header>${notice ? `<p class="notice success">${escapeHtml(notice)}</p>` : ""}${error ? `<p class="notice error">${escapeHtml(error)}</p>` : ""}<section class="media-list">${rows}</section></main>`,
   });
 }
 
@@ -164,7 +191,7 @@ export function blogNotFoundDocument({ username }) {
   });
 }
 
-function blogShell({ title, active, username, body }) {
+function blogShell({ title, active, username, body, editorScript = false }) {
   return `<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -172,7 +199,8 @@ function blogShell({ title, active, username, body }) {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f5f5f7">
   <title>${escapeHtml(title)}</title>
-  <style>${blogStyles()}</style>
+  <style>${blogStyles()}${markdownStyles()}${editorStyles()}</style>
+  ${editorScript ? '<script src="/blog/editor.js" defer></script>' : ""}
 </head>
 <body>
   <div class="frost-line" aria-hidden="true"></div>
@@ -211,47 +239,13 @@ function tagPill(tag) {
   return `<span class="tag">${escapeHtml(tag.name)}</span>`;
 }
 
-function renderArticleBody(content) {
-  const lines = String(content).replaceAll("\r\n", "\n").split("\n");
-  const blocks = [];
-  let paragraph = [];
-  let list = [];
-  const flushParagraph = () => {
-    if (paragraph.length > 0) blocks.push(`<p>${inlineFormat(paragraph.join(" "))}</p>`);
-    paragraph = [];
-  };
-  const flushList = () => {
-    if (list.length > 0) blocks.push(`<ul>${list.map((item) => `<li>${inlineFormat(item)}</li>`).join("")}</ul>`);
-    list = [];
-  };
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) {
-      flushParagraph();
-      flushList();
-    } else if (trimmed.startsWith("## ")) {
-      flushParagraph(); flushList(); blocks.push(`<h2>${inlineFormat(trimmed.slice(3))}</h2>`);
-    } else if (trimmed.startsWith("# ")) {
-      flushParagraph(); flushList(); blocks.push(`<h2>${inlineFormat(trimmed.slice(2))}</h2>`);
-    } else if (trimmed.startsWith("> ")) {
-      flushParagraph(); flushList(); blocks.push(`<blockquote>${inlineFormat(trimmed.slice(2))}</blockquote>`);
-    } else if (trimmed.startsWith("- ")) {
-      flushParagraph(); list.push(trimmed.slice(2));
-    } else {
-      flushList(); paragraph.push(trimmed);
-    }
-  }
-  flushParagraph();
-  flushList();
-  return blocks.join("");
-}
-
-function inlineFormat(text) {
-  return escapeHtml(text).replace(/`([^`]+)`/g, "<code>$1</code>");
-}
-
 function readingMinutes(content) {
   return Math.max(1, Math.ceil(String(content).length / 500));
+}
+
+function formatMediaSize(bytes) {
+  const size = Number(bytes);
+  return size < 1024 * 1024 ? `${(size / 1024).toFixed(1)} KB` : `${(size / 1024 / 1024).toFixed(1)} MB`;
 }
 
 function excerpt(content, maxLength) {
@@ -295,4 +289,8 @@ function blogStyles() {
     .workspace-main{padding-bottom:100px}.workspace-hero{padding:96px 0 64px}.workspace-hero h1{margin:20px 0 24px;font-size:clamp(54px,7.4vw,94px);font-weight:710;line-height:.94;letter-spacing:-.072em}.workspace-hero h1 span{color:#8b8b91}.workspace-hero>p:last-child{max-width:620px;margin:0;color:var(--muted);font-size:18px;line-height:1.7}.module-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.module-card{position:relative;min-height:260px;padding:30px;border:1px solid rgba(255,255,255,.9);border-radius:24px;color:var(--ink);background:var(--surface);text-decoration:none;box-shadow:0 1px 0 rgba(0,0,0,.03);overflow:hidden;transition:transform .22s,box-shadow .22s}.module-card:hover{transform:translateY(-4px);box-shadow:var(--shadow)}.module-code{position:absolute;right:22px;top:18px;color:rgba(0,113,227,.14);font:700 72px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:-.12em}.module-card small{color:var(--blue);font:650 10px/1 ui-monospace,monospace;letter-spacing:.14em}.module-card h2{margin:18px 0 12px;font-size:34px;letter-spacing:-.045em}.module-card p{max-width:28em;margin:0;color:var(--muted);font-size:14px;line-height:1.65}.module-card footer{position:absolute;right:30px;bottom:26px;left:30px;display:flex;justify-content:space-between;color:var(--faint);font-size:12px}.module-card footer b{color:var(--blue);font-size:18px}.module-card.knowledge{background:linear-gradient(145deg,rgba(255,255,255,.9),rgba(232,245,255,.72))}.module-card.harness{background:linear-gradient(145deg,rgba(255,255,255,.9),rgba(239,235,255,.72))}.site-footer{width:min(1180px,calc(100% - 40px));margin:0 auto;padding:32px 0 42px;border-top:1px solid var(--line);display:flex;justify-content:space-between;color:var(--faint);font-size:11px}.site-footer>div{display:flex;gap:28px}.site-footer nav{display:flex;gap:16px}.site-footer a{color:var(--faint);text-decoration:none}.site-footer a:hover{color:var(--ink)}.mobile-tabbar{display:none}
     :focus-visible{outline:3px solid rgba(0,113,227,.42);outline-offset:3px}@media(max-width:900px){.nav-links{gap:15px}.nav-links a:nth-child(4){display:none}.module-grid{grid-template-columns:1fr}.hero{min-height:430px;padding:70px 0}.compose-orb{width:126px;height:126px}.article-grid{grid-template-columns:1fr}.editor-form{grid-template-columns:1fr}.editor-sidebar{position:static}.post-row{grid-template-columns:76px minmax(0,1fr)}.post-row>time{display:none}.row-actions{grid-column:2;justify-content:flex-start}.settings-grid{grid-template-columns:1fr}}@media(max-width:620px){body{padding-bottom:84px}.nav-wrap,main,.site-footer{width:min(100% - 28px,1180px)}.nav-links,.account-chip{display:none}.wordmark span:last-child{display:inline}.workspace-hero{padding:66px 0 48px}.workspace-hero h1{font-size:50px}.module-card{min-height:230px;padding:25px}.module-card footer{right:25px;left:25px}.hero{align-items:flex-start;min-height:auto;padding:66px 0 60px}.hero h1{font-size:54px}.hero-note{font-size:16px}.compose-orb{display:none}.stream-head{padding-top:32px}.article-card{min-height:320px;padding:26px}.article-card footer{left:26px;right:26px}.reading{padding-top:50px}.article-header h1{font-size:44px}.article-body{font-size:18px}.page-head{align-items:flex-start;flex-direction:column;padding-top:54px}.page-head h1{font-size:42px}.stat-strip{grid-template-columns:1fr 1fr}.stat-strip>:nth-child(2){border-right:0}.stat-strip>:nth-child(-n+2){border-bottom:1px solid var(--line)}.post-row{grid-template-columns:1fr}.post-state,.row-actions{grid-column:1}.editor-main{padding-top:48px}.editor-head{display:block}.editor-head>p{margin-top:18px}.editor-canvas{padding:22px}.site-footer{display:grid;gap:18px}.site-footer>div{justify-content:space-between}.mobile-tabbar{position:fixed;z-index:950;right:10px;bottom:max(10px,env(safe-area-inset-bottom));left:10px;height:66px;padding:6px;border:1px solid rgba(255,255,255,.78);border-radius:22px;display:grid;grid-template-columns:repeat(5,1fr);background:rgba(250,250,252,.86);box-shadow:0 12px 38px rgba(0,0,0,.16);backdrop-filter:saturate(180%) blur(24px)}.mobile-tabbar a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border-radius:16px;color:#7a7a80;font-size:9px;text-decoration:none}.mobile-tabbar b{font-size:14px;line-height:1}.mobile-tabbar a.active{color:var(--blue);background:rgba(0,113,227,.09)}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
   `;
+}
+
+function editorStyles() {
+  return `.body-field>label{display:flex;justify-content:space-between;margin-bottom:9px;color:#4c4c50;font-size:12px;font-weight:650}.body-field>label small{color:var(--faint);font-weight:400}.body-field .content-editor{display:block;min-height:470px;margin:0;border-top:0;border-radius:0 0 13px 13px}.editor-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px;border:1px solid #d2d2d7;border-radius:13px 13px 0 0;background:#f8f9fb}.tool-group{display:flex;align-items:center;gap:3px;padding-right:7px;border-right:1px solid #e1e4e8}.tool-group:last-child{padding-right:0;border-right:0}.tool-group button,.tool-group select{min-height:34px;padding:5px 9px;border:0;border-radius:8px;color:#363a42;background:transparent;font:600 12px/1.2 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;cursor:pointer}.tool-group button:hover,.tool-group button:focus-visible,.tool-group select:hover{background:#e9eef6}.tool-group button[aria-pressed="true"]{color:#075cac;background:#e0efff}.tool-group select{max-width:95px}.tool-view{margin-left:auto}.editor-preview{min-height:470px;padding:26px 25px;border:1px solid #d2d2d7;border-radius:0 0 13px 13px;background:#fff}.editor-preview[hidden],.content-editor[hidden]{display:none}.editor-status{min-height:19px;margin:9px 1px 0;color:#787e87;font-size:11px;line-height:1.5}.editor-status.is-error{color:var(--red)}.side-hint{margin:0;color:var(--muted);font-size:12px;line-height:1.65}.media-list{border:1px solid var(--line);border-radius:18px;background:rgba(255,255,255,.75);overflow:hidden}.media-row{display:grid;grid-template-columns:minmax(0,1fr) 94px 44px 44px;gap:14px;align-items:center;padding:17px 21px;border-bottom:1px solid var(--line);font-size:12px}.media-row:last-child{border-bottom:0}.media-row>div{display:grid;gap:4px;min-width:0}.media-row strong{overflow-wrap:anywhere;font-size:14px}.media-row small,.media-row>span{color:var(--muted)}.media-row>a{color:var(--blue);text-decoration:none}.media-row form{margin:0}@media(max-width:620px){.editor-toolbar{gap:5px}.tool-group{flex-wrap:wrap}.tool-view{margin-left:0}.editor-preview{padding:20px 16px}.media-row{grid-template-columns:minmax(0,1fr) auto auto;gap:8px}.media-row>span{grid-column:1/-1;grid-row:2}}`;
 }

@@ -9,16 +9,22 @@ import {
 } from "node:crypto";
 import { basename, dirname, join } from "node:path";
 import { promisify } from "node:util";
+import { renderMarkdown } from "./markdown.mjs";
 import {
   createPost,
+  createBlogMedia,
   createTag,
+  blogMediaUsage,
+  deleteUnusedBlogMedia,
   deletePost,
   deleteTag,
   getBlogStats,
   getPost,
+  getBlogMedia,
   getPublishedPost,
   initializeBlogStore,
   listAllPosts,
+  listBlogMedia,
   listPublishedPosts,
   listTags,
   updatePost,
@@ -27,12 +33,19 @@ import {
   blogAccountDocument,
   blogAdminDocument,
   blogEditorDocument,
+  blogMediaDocument,
   blogHomeDocument,
   blogNotFoundDocument,
   blogPostDocument,
   blogTagsDocument,
   workspaceHomeDocument,
 } from "./blog-pages.mjs";
+import {
+  BlogMediaError,
+  MAX_BLOG_MEDIA_TOTAL_BYTES,
+  blogMediaPath,
+  saveBlogMediaFile,
+} from "./blog-media.mjs";
 import { isHtmlKbMime, isInlineKbMime } from "./kb-files.mjs";
 import { ingestKbInbox } from "./kb-inbox.mjs";
 import {
@@ -74,12 +87,13 @@ if (cookieSecret.length < 32) {
 const COOKIE_NAME = "sfrost_session";
 const SESSION_SECONDS = 12 * 60 * 60;
 const REMEMBER_SECONDS = 30 * 24 * 60 * 60;
-const MAX_FORM_BYTES = 512 * 1024;
+const MAX_FORM_BYTES = 2 * 1024 * 1024;
 const DEEPSEEK_CREDENTIAL_REF = "DEEPSEEK_API_KEY";
 const HARNESS_LAUNCH_TOKEN_FILE = process.env.SFROST_HARNESS_LAUNCH_TOKEN_FILE
   || "/run/deepseek-harness-launch/token";
 const KB_FILES_DIR = process.env.SFROST_KB_FILES_DIR || "/var/lib/sfrost-auth-gateway/kb-files";
 const KB_INBOX_DIR = process.env.SFROST_KB_INBOX_DIR || "/var/lib/sfrost-kb-inbox";
+const BLOG_MEDIA_DIR = process.env.SFROST_BLOG_MEDIA_DIR || "/var/lib/sfrost-auth-gateway/blog-media";
 const failedAttempts = new Map();
 let harnessRpcCookie = "";
 const initialCredentials = await loadCredentialState();
@@ -366,7 +380,7 @@ const server = http.createServer(async (request, response) => {
   }
 });
 
-server.requestTimeout = 10_000;
+server.requestTimeout = 120_000;
 server.headersTimeout = 12_000;
 server.listen(port, "127.0.0.1", () => {
   console.log(`sfrost auth gateway listening on 127.0.0.1:${port}`);
@@ -375,6 +389,93 @@ server.listen(port, "127.0.0.1", () => {
 async function handleBlogRequest(request, response, requestUrl) {
   if (request.method === "POST" && !isSameOrigin(request)) {
     return send(response, 403, "Forbidden");
+  }
+
+  if (request.method === "GET" && requestUrl.pathname === "/blog/editor.js") {
+    setPageSecurityHeaders(response);
+    response.setHeader("Content-Type", "text/javascript; charset=utf-8");
+    return send(response, 200, await readFile(new URL("./blog-editor.js", import.meta.url)));
+  }
+
+  const mediaMatch = requestUrl.pathname.match(/^\/blog\/media\/([0-9a-f-]{36})$/i);
+  if (request.method === "GET" && mediaMatch && isUuid(mediaMatch[1])) {
+    const media = await getBlogMedia(mediaMatch[1]);
+    if (!media) return send(response, 404, "File not found");
+    let body;
+    try {
+      body = await readFile(blogMediaPath(BLOG_MEDIA_DIR, media.id, media.extension));
+    } catch (error) {
+      if (error?.code === "ENOENT") return send(response, 404, "File not found");
+      throw error;
+    }
+    response.setHeader("Cache-Control", "private, no-store");
+    response.setHeader("Content-Type", media.mime_type);
+    response.setHeader("Content-Length", String(body.length));
+    response.setHeader("X-Content-Type-Options", "nosniff");
+    response.setHeader("Cross-Origin-Resource-Policy", "same-origin");
+    response.setHeader("Content-Disposition", media.mime_type.startsWith("image/")
+      ? "inline"
+      : contentDisposition(media.original_name));
+    return send(response, 200, body);
+  }
+
+  if (request.method === "POST" && requestUrl.pathname === "/blog/admin/preview") {
+    const form = await readForm(request);
+    const content = String(form.get("content") ?? "");
+    if (content.length > 100_000) return send(response, 413, "Article is too long");
+    return sendJson(response, 200, { html: renderMarkdown(content) });
+  }
+
+  if (request.method === "POST" && requestUrl.pathname === "/blog/admin/media") {
+    try {
+      const usedBytes = await blogMediaUsage();
+      if (usedBytes >= MAX_BLOG_MEDIA_TOTAL_BYTES) {
+        throw new BlogMediaError(507, "附件空间已满，请先清理未使用的文件。");
+      }
+      const media = await saveBlogMediaFile(request, {
+        directory: BLOG_MEDIA_DIR,
+        id: randomUUID(),
+        originalName: requestUrl.searchParams.get("name"),
+      });
+      if (usedBytes + media.sizeBytes > MAX_BLOG_MEDIA_TOTAL_BYTES) {
+        await unlink(blogMediaPath(BLOG_MEDIA_DIR, media.id, media.extension));
+        throw new BlogMediaError(507, "附件空间已满，请先清理未使用的文件。");
+      }
+      try {
+        await createBlogMedia(media);
+      } catch (error) {
+        await unlink(blogMediaPath(BLOG_MEDIA_DIR, media.id, media.extension));
+        throw error;
+      }
+      return sendJson(response, 201, {
+        url: `/blog/media/${media.id}`,
+        name: media.originalName,
+        isImage: media.isImage,
+      });
+    } catch (error) {
+      if (error instanceof BlogMediaError) return sendJson(response, error.status, { error: error.message });
+      throw error;
+    }
+  }
+
+  if (request.method === "GET" && requestUrl.pathname === "/blog/admin/media") {
+    return sendBlogDocument(response, 200, blogMediaDocument({
+      files: await listBlogMedia(),
+      username,
+      notice: requestUrl.searchParams.get("notice") === "deleted" ? "文件已删除。" : "",
+      error: requestUrl.searchParams.get("error") === "in-use" ? "文件仍被文章使用，先从正文移除链接。" : "",
+    }));
+  }
+
+  const mediaDeleteMatch = requestUrl.pathname.match(/^\/blog\/admin\/media\/([0-9a-f-]{36})\/delete$/i);
+  if (request.method === "POST" && mediaDeleteMatch && isUuid(mediaDeleteMatch[1])) {
+    await readForm(request);
+    const deleted = await deleteUnusedBlogMedia(mediaDeleteMatch[1]);
+    if (!deleted) return redirect(response, "/blog/admin/media?error=in-use");
+    await unlink(blogMediaPath(BLOG_MEDIA_DIR, mediaDeleteMatch[1], deleted.extension)).catch((error) => {
+      if (error?.code !== "ENOENT") console.error("Unable to remove blog media file:", error.message);
+    });
+    return redirect(response, "/blog/admin/media?notice=deleted");
   }
 
   if (request.method === "GET" && requestUrl.pathname === "/blog") {
@@ -564,9 +665,14 @@ async function handleKbRequest(request, response, requestUrl) {
   const documentMatch = requestUrl.pathname.match(/^\/kb\/d\/([0-9a-f-]{36})$/i);
   if (request.method === "GET" && documentMatch && isUuid(documentMatch[1])) {
     const document = await getKbDoc(documentMatch[1]);
-    return document
-      ? sendKbDocument(response, 200, kbDocumentDocument({ document, username }))
-      : sendKbDocument(response, 404, kbNotFoundDocument({ username }));
+    if (!document) return sendKbDocument(response, 404, kbNotFoundDocument({ username }));
+    let markdownHtml;
+    if (document.mime_type.startsWith("text/markdown")) {
+      markdownHtml = Number(document.size_bytes) <= 2 * 1024 * 1024
+        ? renderMarkdown(await readFile(kbFilePath(document.id, document.stored_name), "utf8"))
+        : null;
+    }
+    return sendKbDocument(response, 200, kbDocumentDocument({ document, username, markdownHtml }));
   }
 
   const rawMatch = requestUrl.pathname.match(/^\/kb\/raw\/([0-9a-f-]{36})$/i);
@@ -648,7 +754,7 @@ function sendKbDocument(response, status, document) {
   setPageSecurityHeaders(response);
   response.setHeader(
     "Content-Security-Policy",
-    "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; frame-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+    "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self' https: data:; frame-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
   );
   return send(response, status, document);
 }
@@ -1085,7 +1191,7 @@ function setPageSecurityHeaders(response) {
   response.setHeader("Content-Type", "text/html; charset=utf-8");
   response.setHeader(
     "Content-Security-Policy",
-    "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+    "default-src 'none'; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' https: data:; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
   );
   response.setHeader("Referrer-Policy", "no-referrer");
   response.setHeader("X-Content-Type-Options", "nosniff");
@@ -1095,6 +1201,13 @@ function setPageSecurityHeaders(response) {
 function send(response, status, body = "") {
   response.statusCode = status;
   response.end(body);
+}
+
+function sendJson(response, status, data) {
+  response.setHeader("Cache-Control", "no-store");
+  response.setHeader("Content-Type", "application/json; charset=utf-8");
+  response.setHeader("X-Content-Type-Options", "nosniff");
+  return send(response, status, JSON.stringify(data));
 }
 
 function redirect(response, location) {
