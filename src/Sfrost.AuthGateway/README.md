@@ -70,7 +70,7 @@ successful ingestion.
 The Nginx `auth_request` check fails closed: if the gateway is unavailable or a
 cookie is invalid, Harness is not proxied to the requester. The upstream
 DeepSeek Harness package is not patched. Its current production version is
-`@deepseek-ai/dsh@0.1.5-rc.1`, pinned with its dependency lockfile in
+`@deepseek-ai/dsh@0.2.0-rc.2`, pinned with its dependency lockfile in
 `scripts/deepseek-harness-runtime/`. The systemd unit points at
 `/opt/deepseek-harness-current`, a symlink to the installed version; the
 previous package and a consistent pre-upgrade state backup are retained for

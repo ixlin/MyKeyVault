@@ -11,6 +11,9 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
-    "@deepseek-ai/dsh": "0.1.5-rc.1"
+    "@deepseek-ai/dsh": "0.2.0-rc.2"
+  },
+  "overrides": {
+    "fflate": "0.8.3"
   }
 }

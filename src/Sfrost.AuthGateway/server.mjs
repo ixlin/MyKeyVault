@@ -1099,7 +1099,8 @@ async function exchangeHarnessBrowserToken(authority) {
   const cookie = upstream.cookie;
   if (
     upstream.status !== 303
-    || upstream.location !== "/"
+    // DSH 0.2 uses a relative same-directory redirect; it is not forwarded.
+    || !["/", "./"].includes(upstream.location)
     || !/^dsh-auth-[A-Za-z0-9_-]+=v1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+;/.test(cookie)
   ) {
     throw new Error(`Harness browser-token exchange returned HTTP ${upstream.status}.`);
