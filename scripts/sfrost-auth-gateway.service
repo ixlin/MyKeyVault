@@ -17,8 +17,8 @@ Environment=SFROST_BLOG_DB_NAME=sfrost_blog
 Environment=SFROST_BLOG_DB_USER=sfrost_blog
 Environment=SFROST_KB_FILES_DIR=/var/lib/sfrost-auth-gateway/kb-files
 Environment=SFROST_KB_INBOX_DIR=/var/lib/sfrost-kb-inbox
-Environment=PATH=/opt/node-v22.19.0/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-ExecStart=/opt/node-v22.19.0/bin/node /opt/sfrost-auth-gateway/server.mjs
+Environment=PATH=/opt/node-v22.23.3/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/opt/node-v22.23.3/bin/node /opt/sfrost-auth-gateway/server.mjs
 Restart=on-failure
 RestartSec=3s
 TimeoutStopSec=10s

@@ -6,6 +6,25 @@ import { join } from "node:path";
 import test from "node:test";
 import { BlogMediaError, saveBlogMediaFile } from "./blog-media.mjs";
 import { renderMarkdown } from "./markdown.mjs";
+import { HttpInputError, readUrlEncodedForm } from "./request-form.mjs";
+
+test("form decoding preserves Chinese split across network chunks", async () => {
+  const bytes = Buffer.from("content=知识库&title=测试");
+  const request = Readable.from([bytes.subarray(0, 9), bytes.subarray(9, 11), bytes.subarray(11)]);
+  request.headers = { "content-type": "application/x-www-form-urlencoded; charset=UTF-8" };
+  const form = await readUrlEncodedForm(request, 1024);
+  assert.equal(form.get("content"), "知识库");
+  assert.equal(form.get("title"), "测试");
+});
+
+test("invalid form input reports client errors instead of a service failure", async () => {
+  const wrongType = Readable.from([Buffer.from("{}")]);
+  wrongType.headers = { "content-type": "application/json" };
+  await assert.rejects(readUrlEncodedForm(wrongType, 64), (error) => error instanceof HttpInputError && error.status === 415);
+  const tooLarge = Readable.from([Buffer.from("title=too-long")]);
+  tooLarge.headers = { "content-type": "application/x-www-form-urlencoded" };
+  await assert.rejects(readUrlEncodedForm(tooLarge, 4), (error) => error instanceof HttpInputError && error.status === 413);
+});
 
 test("Markdown renders reading structure while escaping active HTML", () => {
   const html = renderMarkdown("# 标题\n\n**加粗**、*倾斜*\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\n<script>alert(1)</script>\n\n[bad](javascript:alert(1))");

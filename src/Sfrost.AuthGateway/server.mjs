@@ -10,6 +10,7 @@ import {
 import { basename, dirname, join } from "node:path";
 import { promisify } from "node:util";
 import { renderMarkdown } from "./markdown.mjs";
+import { HttpInputError, readUrlEncodedForm } from "./request-form.mjs";
 import {
   createPost,
   createBlogMedia,
@@ -375,6 +376,11 @@ const server = http.createServer(async (request, response) => {
 
     return send(response, 404, "Not found");
   } catch (error) {
+    if (error instanceof HttpInputError) {
+      response.setHeader("Content-Type", "text/plain; charset=utf-8");
+      response.setHeader("Cache-Control", "no-store");
+      return send(response, error.status, error.message);
+    }
     console.error(error);
     return send(response, 500, "Service unavailable");
   }
@@ -963,19 +969,7 @@ function isSameOrigin(request) {
 }
 
 async function readForm(request) {
-  const contentType = request.headers["content-type"] ?? "";
-  if (!contentType.startsWith("application/x-www-form-urlencoded")) {
-    throw new Error("Unsupported form content type.");
-  }
-
-  let body = "";
-  for await (const chunk of request) {
-    body += chunk;
-    if (Buffer.byteLength(body) > MAX_FORM_BYTES) {
-      throw new Error("Form is too large.");
-    }
-  }
-  return new URLSearchParams(body);
+  return readUrlEncodedForm(request, MAX_FORM_BYTES);
 }
 
 function rateLimitDelay(clientKey) {
