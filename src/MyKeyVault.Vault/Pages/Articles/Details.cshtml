@@ -1,9 +1,14 @@
 @page "{id:long}"
 @model MyKeyVault.Vault.Pages.Articles.DetailsModel
-@{ ViewData["Title"] = Model.Article?.Title ?? "文章萃取"; }
+@{ ViewData["Title"] = Model.Article?.Title ?? "文章萃取"; ViewData["ArticleFullscreen"] = true; }
 @if (Model.Article is { } article)
 {
-<section class="article-chat-heading"><a asp-page="Index">← 公众号资料库</a><h1>@(article.Title ?? "文章抓取中")</h1><p>@(article.Author ?? "公众号文章") · @article.PublishedText</p><div class="detail-actions">@if (Model.PreviewUrl is not null) { <a href="@Model.PreviewUrl" target="_blank" rel="noopener">阅读原文</a> } @if (Model.PdfUrl is not null) { <a href="@Model.PdfUrl" target="_blank" rel="noopener">打开 PDF</a> }<a href="@article.SourceUrl" target="_blank" rel="noopener noreferrer">微信原文</a><a asp-page="Settings">模型设置</a></div></section>
+<section class="article-chat-heading">
+    <a asp-page="Index">← 返回资料库</a>
+    <h1>@(article.Title ?? "文章抓取中")</h1>
+    <p class="article-chat-meta"><span>@(article.Author ?? "公众号文章")</span><span>发布：@(string.IsNullOrWhiteSpace(article.PublishedText) ? "未知" : article.PublishedText)</span><span>抓取：<time datetime="@article.CreatedAtUtc.ToString("O")">@article.CreatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</time></span></p>
+    <div class="detail-actions">@if (Model.PreviewUrl is not null) { <a href="@Model.PreviewUrl" target="_blank" rel="noopener">阅读原文</a> } @if (Model.PdfUrl is not null) { <a href="@Model.PdfUrl" target="_blank" rel="noopener">打开 PDF</a> }<a href="@article.SourceUrl" target="_blank" rel="noopener noreferrer">微信原文</a><a asp-page="Settings">模型设置</a></div>
+</section>
 <div class="article-chat" data-article-chat data-history-url="@Url.Page("Details", "History", new { id = article.Id })" data-base-url="@Url.Page("Details", new { id = article.Id })">
     <aside class="chat-sidebar"><a asp-page="Details" asp-route-id="@article.Id" class="button">新对话</a><details class="chat-history-toggle" open><summary>萃取历史 <span data-history-count>@Model.Conversations.Count</span></summary><nav data-conversations aria-label="该文章的萃取历史">@foreach (var conversation in Model.Conversations) { <a asp-page="Details" asp-route-id="@article.Id" asp-route-Conversation="@conversation.Id" class="@(conversation.Id == Model.Conversation ? "active" : "")"><strong>@conversation.Title</strong><small>@conversation.UpdatedAtUtc.ToLocalTime().ToString("MM-dd HH:mm") · @conversation.Count 轮</small></a> }</nav><p data-history-empty hidden="@(Model.Conversations.Count != 0)">本篇文章还没有萃取记录。</p></details></aside>
     <section class="chat-main" aria-label="文章萃取对话">

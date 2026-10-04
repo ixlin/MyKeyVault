@@ -1,5 +1,6 @@
+@{ var articleFullscreen = ViewData["ArticleFullscreen"] is true; }
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" class="@(articleFullscreen ? "article-fullscreen" : null)">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -7,7 +8,7 @@
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     @if (Context.Request.Path.StartsWithSegments("/Articles")) { <link rel="stylesheet" href="~/css/articles.css" asp-append-version="true" /> }
 </head>
-<body>
+<body class="@(articleFullscreen ? "article-fullscreen" : null)">
     <header class="site-header">
         <a class="wordmark" asp-page="/Index"><span class="mark" aria-hidden="true">密</span> 我的密码本</a>
         <nav aria-label="主导航">
@@ -26,9 +27,12 @@
         </nav>
     </header>
     <main class="page-shell">@RenderBody()</main>
+    @if (!articleFullscreen)
+    {
     <footer class="site-footer">
         <span>&copy; 2026 我的密码本 · </span><a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer">蜀ICP备2024053184号-5</a>
     </footer>
+    }
     <script src="~/js/vault.js" asp-append-version="true" defer></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>

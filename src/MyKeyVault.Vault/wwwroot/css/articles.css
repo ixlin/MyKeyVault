@@ -20,3 +20,44 @@
 @media(max-width:760px){.article-chat{grid-template-columns:1fr;height:auto;min-height:650px;overflow:visible}.chat-sidebar{border-right:0;border-bottom:1px solid var(--line);padding:12px;gap:12px;overflow:visible}.chat-sidebar>.button{align-self:start;font-size:.85rem;padding:10px 18px}.chat-history-toggle>summary{margin:0;min-height:35px;display:list-item}.chat-history-toggle nav{max-height:210px;overflow:auto}.chat-main{min-height:540px;max-height:82dvh}.chat-toolbar{padding:12px;flex-wrap:wrap}.chat-messages{padding:18px 14px}.chat-composer{margin:0 10px 12px;padding:12px}.chat-user{max-width:95%;padding:12px 14px}.chat-welcome{margin:24px 0}.chat-composer small{display:none}.capture-panel{gap:18px}.capture-item{padding:16px}.capture-item-head>a{font-size:1rem}.capture-item-head{gap:10px}.capture-meta{gap:8px 14px}.capture-progress{grid-template-columns:1fr;gap:8px}.capture-process li{grid-template-columns:minmax(0,1fr) auto;gap:4px 8px}.capture-process time{grid-column:1/-1}.article-library>.section-title{align-items:stretch;flex-direction:column;gap:10px}.article-search input{flex:1;width:0}.capture-item-actions a,.capture-item-actions button{min-height:44px;display:inline-flex;align-items:center}.article-chat-heading .detail-actions a{min-height:40px;display:inline-flex;align-items:center}.article-chat-heading .detail-actions{gap:6px 20px}.article-chat-heading h1{margin-top:12px}.chat-history-toggle strong{-webkit-line-clamp:1}.markdown-content table{font-size:.86em}.chat-answer{font-size:.93rem}}
 @media(prefers-reduced-motion:reduce){.article-chat *{scroll-behavior:auto;transition:none}}
 @media(max-width:760px){.article-chat-heading .detail-actions{flex-direction:row;align-items:center;margin-top:8px;margin-bottom:14px}.article-chat-heading .detail-actions a{padding:4px 0;text-decoration:none}.article-chat-heading{margin-bottom:16px}}
+
+/* The extraction page owns the viewport; only its content panes scroll. */
+html.article-fullscreen{height:100%;overflow:hidden}
+body.article-fullscreen{height:100vh;height:100dvh;min-height:0;overflow:hidden;display:grid;grid-template-rows:auto minmax(0,1fr)}
+.article-fullscreen>.site-header{position:relative;flex-shrink:0}
+.article-fullscreen>.page-shell{width:100%;max-width:none;min-width:0;min-height:0;margin:0;padding:14px 24px 18px;display:flex;flex-direction:column;overflow:hidden;gap:12px}
+.article-fullscreen .article-chat-heading{flex:none;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 20px;margin:0;max-height:32%;overflow:auto;overscroll-behavior:contain}
+.article-fullscreen .article-chat-heading>a,.article-fullscreen .article-chat-heading h1{grid-column:1/-1}
+.article-fullscreen .article-chat-heading h1{font-size:clamp(1.1rem,1.6vw,1.5rem);margin:0;line-height:1.4}
+.article-fullscreen .article-chat-meta{display:flex;align-items:center;flex-wrap:wrap;gap:4px 18px;margin:0;font-size:.8rem}
+.article-fullscreen .article-chat-heading .detail-actions{flex-direction:row;align-items:center;gap:6px 18px;margin:0;font-size:.8rem}
+.article-fullscreen .article-chat-heading .detail-actions a{padding:5px 0;min-height:32px;white-space:nowrap}
+.article-fullscreen .article-chat{flex:1;min-height:0;height:auto;overflow:hidden}
+.article-fullscreen .chat-sidebar{min-height:0;overflow:auto;overscroll-behavior:contain}
+.article-fullscreen .chat-main{min-height:0;max-height:none;overflow:hidden}
+.article-fullscreen .chat-toolbar,.article-fullscreen .chat-composer,.article-fullscreen .chat-main>.notice{flex-shrink:0}
+.article-fullscreen .chat-composer textarea{max-height:min(180px,20dvh)}
+@media(max-width:1000px){
+  .article-fullscreen .article-chat-heading{grid-template-columns:minmax(0,1fr)}
+}
+@media(max-width:760px){
+  .article-fullscreen>.page-shell{padding:10px 10px max(10px,env(safe-area-inset-bottom));gap:8px}
+  .article-fullscreen .article-chat-heading{gap:4px;max-height:34%}
+  .article-fullscreen .article-chat-heading h1{font-size:1.05rem}
+  .article-fullscreen .article-chat-meta{font-size:.72rem;gap:2px 12px}
+  .article-fullscreen .article-chat-heading .detail-actions{gap:4px 18px}
+  .article-fullscreen .article-chat-heading .detail-actions a{min-height:36px}
+  .article-fullscreen .article-chat{grid-template-rows:auto minmax(0,1fr)}
+  .article-fullscreen .chat-sidebar{max-height:25dvh;padding:8px 12px;gap:8px}
+  .article-fullscreen .chat-history-toggle nav{max-height:14dvh}
+  .article-fullscreen .chat-history-toggle>summary{min-height:30px}
+  .article-fullscreen .chat-composer{padding:8px 12px;margin:0 8px 8px}
+  .article-fullscreen .chat-composer textarea{height:60px;min-height:40px}
+}
+@media(max-height:600px){
+  .article-fullscreen>.page-shell{padding-top:6px;padding-bottom:6px;gap:6px}
+  .article-fullscreen .article-chat-heading{max-height:26%}
+  .article-fullscreen .chat-composer{padding:6px 12px;margin-bottom:6px}
+  .article-fullscreen .chat-composer textarea{height:40px;min-height:32px;max-height:60px}
+  .article-fullscreen .chat-toolbar{padding-top:6px;padding-bottom:6px}
+}
