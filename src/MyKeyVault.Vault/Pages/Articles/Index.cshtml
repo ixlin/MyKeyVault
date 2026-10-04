@@ -1,18 +1,34 @@
 @page
 @model MyKeyVault.Vault.Pages.Articles.IndexModel
 @{ ViewData["Title"] = "公众号资料库"; }
-<section class="library-head">
-    <div><p class="eyebrow">WECHAT LIBRARY</p><h1>公众号资料库</h1><p>抓取原文，保留 PDF，并按你的问题萃取内容。</p></div>
-    <a class="settings-link" asp-page="Settings"><span class="status-dot @(Model.AiConfigured ? "status-completed" : "status-failed")"></span>@(Model.AiConfigured ? "AI 已配置" : "配置萃取模型")</a>
-</section>
+<section class="library-head"><div><h1>公众号资料库</h1><p>收藏原文，查看进度，围绕每篇文章展开对话。</p></div><a class="settings-link" asp-page="Settings">@(Model.AiConfigured ? "萃取模型设置" : "配置萃取模型")</a></section>
 @if (!string.IsNullOrWhiteSpace(Model.Notice)) { <div class="notice" role="status">@Model.Notice</div> }
 <section class="capture-panel">
-    <div><p class="eyebrow">ADD ARTICLES</p><h2>粘贴公众号文章链接</h2><p>每行一个，单次最多 10 篇。重复完成的文章不会再次抓取。</p></div>
-    <form method="post"><textarea asp-for="Urls" placeholder="https://mp.weixin.qq.com/s/..." aria-label="微信公众号文章链接"></textarea><span asp-validation-for="Urls" class="validation"></span><div><span class="service-state"><i class="status-dot @(Model.ScraperAvailable ? "status-completed" : "status-failed")"></i>@(Model.ScraperAvailable ? "抓取服务正常" : "抓取服务不可用")</span>@if (Model.ScraperAvailable) { <button class="button" type="submit">开始抓取</button> } else { <button class="button" type="button" disabled>开始抓取</button> }</div></form>
+    <div><h2>添加文章</h2><p>粘贴公众号链接，每行一条，最多 10 篇。已收录或正在抓取的链接会跳过。</p></div>
+    <form method="post" data-capture-form><textarea asp-for="Urls" maxlength="6000" required placeholder="https://mp.weixin.qq.com/s/..." aria-label="微信公众号文章链接"></textarea><span asp-validation-for="Urls" class="validation"></span><div><span class="service-state"><i class="status-dot @(Model.ScraperAvailable ? "status-completed" : "status-failed")"></i>@(Model.ScraperAvailable ? "抓取服务正常" : "服务暂不可用，请稍后重试")</span><button class="button" type="submit" disabled="@(!Model.ScraperAvailable)">开始抓取</button></div></form>
 </section>
-<section id="library" class="article-library">
-    <div class="section-title"><h2>全部文章</h2><span>@Model.Articles.Count 篇记录</span></div>
-    @if (Model.Articles.Count == 0) { <div class="empty-state"><h2>资料库还是空的</h2><p>从上方粘贴第一篇公众号文章链接。</p></div> }
-    else { <div class="article-list">@foreach (var article in Model.Articles) { <a asp-page="Details" asp-route-id="@article.Id" class="article-row"><span class="article-index">@article.Id.ToString("D3")</span><span class="article-main"><strong>@(article.Title ?? (article.Status == "failed" ? "抓取失败" : "正在抓取文章…"))</strong><small>@(article.Author ?? "公众号文章") @if (!string.IsNullOrWhiteSpace(article.PublishedText)) { <text>· @article.PublishedText</text> }</small>@if (!string.IsNullOrWhiteSpace(article.Error)) { <small class="validation">@article.Error</small> }</span><span class="article-meta">@if (article.ExtractionCount > 0) { <em>@article.ExtractionCount 次萃取</em> }<i class="status-pill status-@article.Status">@(article.Status == "completed" ? "已收录" : article.Status == "failed" ? "失败" : "处理中")</i></span></a> }</div> }
+<section id="library" class="article-library" data-article-library data-progress-url="@Url.Page("Index", "Progress", new { Model.Search, Model.PageNumber })">
+    <div class="section-title"><h2>文章 <small>@Model.TotalCount 篇</small></h2><form method="get" class="article-search"><input asp-for="Search" placeholder="搜索标题或公众号" aria-label="搜索文章" maxlength="100" /><button class="button compact">搜索</button></form></div>
+    <p data-progress-notice class="field-help" role="status"></p>
+    @if (Model.Articles.Count == 0) { <div class="empty-state"><h2>@(string.IsNullOrEmpty(Model.Search) ? "资料库还是空的" : "没有找到文章")</h2><p>粘贴链接添加文章，或换个关键词搜索。</p></div> }
+    <div class="capture-list">
+    @foreach (var article in Model.Articles)
+    {
+        var active = article.Status is "pending" or "processing";
+        <article class="capture-item" data-article-id="@article.Id" data-state="@article.Status">
+            <div class="capture-item-head"><a asp-page="Details" asp-route-id="@article.Id" data-article-title>@(article.Title ?? (active ? "正在获取文章标题…" : "抓取未完成"))</a><span class="status-pill status-@article.Status" data-article-state>@(article.Status == "completed" ? "已收录" : article.Status == "failed" ? "失败" : article.Status == "cancelled" ? "已取消" : "处理中")</span></div>
+            <p class="capture-meta"><span data-article-author>@(article.Author ?? "公众号文章")</span><span>@article.CreatedAtUtc.ToLocalTime().ToString("MM-dd HH:mm")</span><span data-article-resources>@article.Images 张图片 · @article.ExtractionCount 次萃取</span></p>
+            <div class="capture-progress" data-progress-block hidden="@(!active)"><progress max="100" value="@article.Progress" aria-label="文章抓取进度"></progress><span data-stage>@article.Stage · @article.Progress%</span></div>
+            <p class="validation" data-article-error hidden="@(string.IsNullOrEmpty(article.Error))">@article.Error</p>
+            <div class="capture-item-actions"><a asp-page="Details" asp-route-id="@article.Id">阅读与萃取</a><form method="post" asp-page-handler="Retry" data-retry hidden="@(article.Status is not ("failed" or "cancelled"))"><input type="hidden" name="id" value="@article.Id" /><button type="submit" class="text-button">重新抓取</button></form></div>
+            <details class="capture-process"><summary>处理过程</summary><ol data-process-log>@foreach (var entry in article.Logs) { <li><time>@entry.Time.Replace('T', ' ')</time><span>@entry.Message</span><small>@entry.Progress%</small></li> }</ol><p data-no-log hidden="@(article.Logs.Count > 0)">@(active ? "任务已排队，开始后会显示各阶段进度。" : "历史任务没有保存详细过程；新的抓取任务会记录。")</p></details>
+        </article>
+    }
+    </div>
+    <nav class="article-pagination" aria-label="文章翻页">
+        @if (Model.PageNumber > 1) { <a asp-page="Index" asp-route-Search="@Model.Search" asp-route-PageNumber="@(Model.PageNumber - 1)">上一页</a> }
+        <span>第 @Model.PageNumber / @Model.TotalPages 页</span>
+        @if (Model.PageNumber < Model.TotalPages) { <a asp-page="Index" asp-route-Search="@Model.Search" asp-route-PageNumber="@(Model.PageNumber + 1)">下一页</a> }
+    </nav>
 </section>
-@if (Model.Articles.Any(x => x.Status is "pending" or "processing")) { <script>setTimeout(() => location.reload(), 5000);</script> }
+@section Scripts { <script src="~/js/articles.js" asp-append-version="true" defer></script> }

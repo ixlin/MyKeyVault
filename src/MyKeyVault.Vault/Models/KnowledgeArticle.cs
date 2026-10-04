@@ -25,5 +25,8 @@ public sealed class KnowledgeArticle
     [MaxLength(600)] public string? ErrorMessage { get; set; }
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
     public DateTime? CompletedAtUtc { get; set; }
+    public int Progress { get; set; }
+    [MaxLength(300)] public string Stage { get; set; } = "等待开始";
+    public string ProcessLogJson { get; set; } = "[]";
     public ICollection<ArticleExtraction> Extractions { get; set; } = new List<ArticleExtraction>();
 }

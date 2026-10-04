@@ -22,11 +22,15 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 builder.Services.AddDbContext<VaultDbContext>(options => options.UseNpgsql(connectionString));
 builder.Services.Configure<VaultEncryptionOptions>(builder.Configuration.GetSection(VaultEncryptionOptions.SectionName));
 builder.Services.AddSingleton<SecretCipher>();
-builder.Services.AddScoped<McpTokenService>();
 builder.Services.Configure<ArticleScraperOptions>(builder.Configuration.GetSection(ArticleScraperOptions.SectionName));
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<ArticleScraperService>();
+if (!string.Equals(Environment.GetEnvironmentVariable("MYKEYVAULT_EF_DESIGN"), "1", StringComparison.Ordinal))
+    builder.Services.AddHostedService<ArticleTaskSyncWorker>();
 builder.Services.AddScoped<ArticleExtractionService>();
+builder.Services.AddHttpClient(nameof(ArticleExtractionService), client => client.Timeout = Timeout.InfiniteTimeSpan)
+    .ConfigurePrimaryHttpMessageHandler(PublicAiConnection.CreateHandler);
+builder.Services.AddSingleton<ArticleMarkdown>();
 builder.Services.Configure<ResetEmailOptions>(builder.Configuration.GetSection("Email"));
 builder.Services.AddScoped<IPasswordResetEmailSender, PasswordResetEmailSender>();
 builder.Services.AddScoped<PasswordResetService>();
@@ -98,7 +102,7 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.Use(async (context, next) =>
 {
-    if (context.Request.Path.StartsWithSegments("/Vault") || context.Request.Path.StartsWithSegments("/Identity/Account"))
+    if (context.Request.Path.StartsWithSegments("/Vault") || context.Request.Path.StartsWithSegments("/Articles") || context.Request.Path.StartsWithSegments("/Identity/Account"))
     {
         context.Response.OnStarting(() =>
         {
@@ -114,7 +118,10 @@ app.Use(async (context, next) =>
 });
 app.Use(async (context, next) =>
 {
-    if (context.Request.Path.StartsWithSegments("/wechat-articles") && context.User.Identity?.IsAuthenticated != true)
+    if (context.Request.Path.StartsWithSegments("/wechat-articles", out var articlePath) &&
+        (context.User.Identity?.IsAuthenticated != true ||
+         articlePath.Value?.Split('/', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() !=
+         context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value))
     {
         context.Response.StatusCode = StatusCodes.Status404NotFound;
         return;
@@ -137,34 +144,6 @@ app.UseStaticFiles(new StaticFileOptions
 });
 app.UseAuthorization();
 
-app.MapPost("/api/controlled-use-requests", async (HttpRequest request, ControlledUseRequestInput input, McpTokenService tokenService, VaultDbContext db, CancellationToken cancellationToken) =>
-{
-    var authorization = request.Headers.Authorization.ToString();
-    var rawToken = authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) ? authorization[7..].Trim() : string.Empty;
-    var token = await tokenService.ValidateAsync(rawToken, cancellationToken);
-    if (token is null) return Results.Unauthorized();
-    if (string.IsNullOrWhiteSpace(input.RequestedAction) || input.RequestedAction.Length > 120 || input.Reason?.Length > 500) return Results.ValidationProblem(new Dictionary<string, string[]> { ["request"] = ["动作或说明无效。"] });
-    var item = await db.VaultItems.SingleOrDefaultAsync(x => x.Id == input.VaultItemId && x.OwnerId == token.OwnerId && !x.IsArchived, cancellationToken);
-    if (item is null) return Results.NotFound();
-    var controlledRequest = new ControlledUseRequest { OwnerId = token.OwnerId, VaultItemId = item.Id, RequestedBy = token.Name, RequestedAction = input.RequestedAction.Trim(), Reason = string.IsNullOrWhiteSpace(input.Reason) ? null : input.Reason.Trim() };
-    db.ControlledUseRequests.Add(controlledRequest);
-    db.SecurityAuditEvents.Add(new SecurityAuditEvent { UserId = token.OwnerId, VaultItemId = item.Id, Action = "controlled_use_requested", Result = "pending", RequestCorrelationId = controlledRequest.Id.ToString("N") });
-    await db.SaveChangesAsync(cancellationToken);
-    return Results.Accepted($"/api/controlled-use-requests/{controlledRequest.Id}", new { requestId = controlledRequest.Id, status = controlledRequest.Status.ToString(), expiresAtUtc = controlledRequest.ExpiresAtUtc });
-});
-app.MapGet("/api/controlled-use-requests/{id:guid}", async (Guid id, HttpRequest request, McpTokenService tokenService, VaultDbContext db, CancellationToken cancellationToken) =>
-{
-    var authorization = request.Headers.Authorization.ToString();
-    var rawToken = authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) ? authorization[7..].Trim() : string.Empty;
-    var token = await tokenService.ValidateAsync(rawToken, cancellationToken);
-    if (token is null) return Results.Unauthorized();
-    var controlledRequest = await db.ControlledUseRequests.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id && x.OwnerId == token.OwnerId, cancellationToken);
-    if (controlledRequest is null) return Results.NotFound();
-    await db.SaveChangesAsync(cancellationToken);
-    return Results.Ok(new { requestId = controlledRequest.Id, status = controlledRequest.Status.ToString(), expiresAtUtc = controlledRequest.ExpiresAtUtc, resolvedAtUtc = controlledRequest.ResolvedAtUtc });
-});
 app.MapRazorPages();
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 app.Run();
-
-public sealed record ControlledUseRequestInput(Guid VaultItemId, string RequestedAction, string? Reason);

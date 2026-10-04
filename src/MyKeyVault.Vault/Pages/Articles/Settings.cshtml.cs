@@ -31,8 +31,8 @@ public sealed class SettingsModel(VaultDbContext db, UserManager<VaultUser> user
         var settings = await db.ArticleAiSettings.SingleOrDefaultAsync(x => x.OwnerId == ownerId, cancellationToken);
         HasApiKey = settings is not null;
         if (settings is null && string.IsNullOrWhiteSpace(Input.ApiKey)) ModelState.AddModelError("Input.ApiKey", "首次配置必须填写 API Key。");
-        if (!Uri.TryCreate(Input.BaseUrl, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps || uri.IsLoopback)
-            ModelState.AddModelError("Input.BaseUrl", "请输入非本机的 HTTPS API 地址。");
+        try { ArticleExtractionService.ValidateBaseUrl(Input.BaseUrl); }
+        catch (InvalidOperationException ex) { ModelState.AddModelError("Input.BaseUrl", ex.Message); }
         if (!ModelState.IsValid) return Page();
 
         settings ??= new ArticleAiSettings { OwnerId = ownerId };
@@ -60,7 +60,7 @@ public sealed class SettingsModel(VaultDbContext db, UserManager<VaultUser> user
     {
         [Required, MaxLength(40)] public string Provider { get; set; } = "deepseek";
         [Required, MaxLength(300), Display(Name = "API Base URL")] public string BaseUrl { get; set; } = "https://api.deepseek.com";
-        [Required, MaxLength(120), Display(Name = "模型名称")] public string ModelName { get; set; } = "deepseek-chat";
+        [Required, MaxLength(100), Display(Name = "模型名称")] public string ModelName { get; set; } = "deepseek-flash";
         [MaxLength(500), Display(Name = "API Key")] public string? ApiKey { get; set; }
     }
 }

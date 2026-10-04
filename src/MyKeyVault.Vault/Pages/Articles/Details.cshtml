@@ -1,19 +1,29 @@
 @page "{id:long}"
 @model MyKeyVault.Vault.Pages.Articles.DetailsModel
-@{ ViewData["Title"] = Model.Article?.Title ?? "文章"; }
-@if (Model.Article is not null)
+@{ ViewData["Title"] = Model.Article?.Title ?? "文章萃取"; }
+@if (Model.Article is { } article)
 {
-<section class="article-detail-head"><a asp-page="Index">← 返回资料库</a><div><p class="eyebrow">@Model.Article.Status.ToUpperInvariant()</p><h1>@(Model.Article.Title ?? "正在抓取文章…")</h1><p>@(Model.Article.Author ?? "未知公众号") @if (!string.IsNullOrWhiteSpace(Model.Article.PublishedText)) { <text>· @Model.Article.PublishedText</text> }</p></div><div class="detail-actions">@if (Model.PreviewUrl is not null) { <a class="button" href="@Model.PreviewUrl" target="_blank" rel="noopener">阅读原文</a> } @if (Model.PdfUrl is not null) { <a href="@Model.PdfUrl" target="_blank" rel="noopener">打开 PDF</a> } <a href="@Model.Article.SourceUrl" target="_blank" rel="noopener noreferrer">微信链接</a></div></section>
-@if (!string.IsNullOrWhiteSpace(Model.Notice)) { <div class="notice" role="status">@Model.Notice</div> }
-<div class="extraction-layout">
-<section class="extract-compose"><p class="eyebrow">NEW EXTRACTION</p><h2>你想从这篇文章得到什么？</h2>
-@if (!Model.AiConfigured) { <p>萃取前需要先保存 AI 服务配置。</p><a class="button" asp-page="Settings">配置萃取模型</a> }
-else if (Model.Article.Status != "completed") { <p>文章抓取完成后才能萃取。</p> }
-else { <form method="post" asp-page-handler="Extract"><textarea asp-for="Prompt" placeholder="例如：提炼核心论点，列出关键数据，并指出作者的假设与可能遗漏。"></textarea><span asp-validation-for="Prompt" class="validation"></span><div class="prompt-chips"><button type="button" data-prompt="提炼核心观点，并区分事实、观点与推断。">核心观点</button><button type="button" data-prompt="整理文章中的关键数据、人物、日期和结论。">关键事实</button><button type="button" data-prompt="生成可执行的行动清单，注明每项行动的依据。">行动清单</button></div><button class="button" type="submit">开始萃取</button></form> }
-</section>
-<section class="extraction-history"><div class="section-title"><h2>萃取记录</h2><span>@Model.Extractions.Count 次</span></div>
-@if (Model.Extractions.Count == 0) { <p class="empty-copy">还没有萃取结果。</p> }
-else { @foreach (var item in Model.Extractions) { <details class="extraction-card" @(Request.Query["extraction"] == item.Id.ToString() ? "open" : null)><summary><span><strong>@(item.Prompt.Length > 80 ? item.Prompt[..80] + "…" : item.Prompt)</strong><small>@item.ModelUsed · @item.CreatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</small></span><i class="status-pill status-@item.Status">@(item.Status == "completed" ? "完成" : "失败")</i></summary>@if (item.Status == "completed") { <pre>@item.Result</pre> } else { <p class="validation">@item.ErrorMessage</p> }</details> } }
-</section></div>
-<script>document.querySelectorAll('[data-prompt]').forEach(b=>b.addEventListener('click',()=>document.getElementById('Prompt').value=b.dataset.prompt));</script>
+<section class="article-chat-heading"><a asp-page="Index">← 公众号资料库</a><h1>@(article.Title ?? "文章抓取中")</h1><p>@(article.Author ?? "公众号文章") · @article.PublishedText</p><div class="detail-actions">@if (Model.PreviewUrl is not null) { <a href="@Model.PreviewUrl" target="_blank" rel="noopener">阅读原文</a> } @if (Model.PdfUrl is not null) { <a href="@Model.PdfUrl" target="_blank" rel="noopener">打开 PDF</a> }<a href="@article.SourceUrl" target="_blank" rel="noopener noreferrer">微信原文</a><a asp-page="Settings">模型设置</a></div></section>
+<div class="article-chat" data-article-chat data-history-url="@Url.Page("Details", "History", new { id = article.Id })" data-base-url="@Url.Page("Details", new { id = article.Id })">
+    <aside class="chat-sidebar"><a asp-page="Details" asp-route-id="@article.Id" class="button">新对话</a><details class="chat-history-toggle" open><summary>萃取历史 <span data-history-count>@Model.Conversations.Count</span></summary><nav data-conversations aria-label="该文章的萃取历史">@foreach (var conversation in Model.Conversations) { <a asp-page="Details" asp-route-id="@article.Id" asp-route-Conversation="@conversation.Id" class="@(conversation.Id == Model.Conversation ? "active" : "")"><strong>@conversation.Title</strong><small>@conversation.UpdatedAtUtc.ToLocalTime().ToString("MM-dd HH:mm") · @conversation.Count 轮</small></a> }</nav><p data-history-empty hidden="@(Model.Conversations.Count != 0)">本篇文章还没有萃取记录。</p></details></aside>
+    <section class="chat-main" aria-label="文章萃取对话">
+        <div class="chat-toolbar"><span>@(Model.ModelName ?? "尚未配置模型")</span><small>围绕当前文章，可连续追问</small></div>
+        <div class="chat-messages" data-messages>
+        @if (Model.Turns.Count == 0) { <div class="chat-welcome" data-welcome><h2>把文章读透，再留下有用的内容。</h2><p>提炼观点、核对事实，或把文章转成行动清单。每次对话都会保存到左侧历史。</p><div class="prompt-chips"><button type="button" data-prompt="提炼文章的核心观点，区分事实、观点和推断。">核心观点</button><button type="button" data-prompt="整理文章中的关键数据及依据，指出信息缺口。">关键事实</button><button type="button" data-prompt="基于本文生成一份可执行的行动清单。">行动清单</button></div></div> }
+        @foreach (var turn in Model.Turns)
+        {
+            <article class="chat-turn" data-turn-id="@turn.Id" data-status="@turn.Status"><div class="chat-user">@turn.Prompt</div><div class="chat-answer markdown-content">@Html.Raw(Model.Render(turn.Result))</div>
+            @if (turn.Status != "completed") { <p class="chat-status" role="status">@(turn.Status == "processing" ? "正在生成；稍后自动同步结果。" : turn.ErrorMessage ?? "本次生成未完成。")</p> }
+            else if (!string.IsNullOrWhiteSpace(turn.ErrorMessage)) { <p class="chat-status">@turn.ErrorMessage</p> }
+            @if (!string.IsNullOrEmpty(turn.Result)) { <a class="chat-download" asp-page-handler="Download" asp-route-id="@article.Id" asp-route-extractionId="@turn.Id">下载 Markdown</a> }
+            </article>
+        }
+        </div>
+        @if (!Model.AiConfigured) { <div class="notice">先<a asp-page="Settings">配置萃取模型</a>，再开始对话。</div> }
+        else if (article.Status != "completed") { <div class="notice">文章尚未抓取完成。<a asp-page="Index">返回查看处理进度</a>。</div> }
+        else if (Model.PreviewUrl is null) { <div class="notice">此历史文章的正文文件缺失，暂时无法萃取。请在资料库重新添加原文链接。</div> }
+        else { <form class="chat-composer" method="post" asp-page-handler="Extract" data-chat-form><input asp-for="Conversation" type="hidden" /><label for="Prompt" class="field-help">向这篇文章提问</label><textarea asp-for="Prompt" minlength="2" maxlength="4000" required rows="3" placeholder="例如：这篇文章有哪些论据不足的地方？"></textarea><div><small>Enter 发送 · Shift + Enter 换行</small><button class="button" type="submit" data-send>发送</button><button class="button secondary-button" type="button" data-stop hidden>停止生成</button></div><p data-send-status class="field-help" role="status"></p></form> }
+    </section>
+</div>
 }
+@section Scripts { <script src="~/js/articles.js" asp-append-version="true" defer></script> }

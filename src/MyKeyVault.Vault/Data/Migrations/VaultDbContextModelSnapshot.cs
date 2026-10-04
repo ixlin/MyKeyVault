@@ -179,6 +179,7 @@ namespace MyKeyVault.Vault.Data.Migrations
                     b.Property<long>("Id").ValueGeneratedOnAdd().HasColumnType("bigint");
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
                     b.Property<long>("ArticleId").HasColumnType("bigint");
+                    b.Property<Guid>("ConversationId").HasColumnType("uuid");
                     b.Property<DateTime?>("CompletedAtUtc").HasColumnType("timestamp with time zone");
                     b.Property<DateTime>("CreatedAtUtc").HasColumnType("timestamp with time zone");
                     b.Property<string>("ErrorMessage").HasMaxLength(600).HasColumnType("character varying(600)");
@@ -190,6 +191,7 @@ namespace MyKeyVault.Vault.Data.Migrations
                     b.Property<int?>("TokensUsed").HasColumnType("integer");
                     b.HasKey("Id");
                     b.HasIndex("ArticleId");
+                    b.HasIndex("OwnerId", "ArticleId", "ConversationId");
                     b.HasIndex("OwnerId", "CreatedAtUtc");
                     b.ToTable("ArticleExtractions");
                 });
@@ -204,6 +206,9 @@ namespace MyKeyVault.Vault.Data.Migrations
                     b.Property<string>("ErrorMessage").HasMaxLength(600).HasColumnType("character varying(600)");
                     b.Property<string>("HtmlFileName").HasMaxLength(240).HasColumnType("character varying(240)");
                     b.Property<int>("ImagesCount").HasColumnType("integer");
+                    b.Property<int>("Progress").HasColumnType("integer");
+                    b.Property<string>("Stage").IsRequired().HasMaxLength(300).HasColumnType("character varying(300)");
+                    b.Property<string>("ProcessLogJson").IsRequired().HasColumnType("text");
                     b.Property<string>("OwnerId").IsRequired().HasMaxLength(450).HasColumnType("character varying(450)");
                     b.Property<string>("PdfFileName").HasMaxLength(240).HasColumnType("character varying(240)");
                     b.Property<string>("PublishedText").HasMaxLength(80).HasColumnType("character varying(80)");

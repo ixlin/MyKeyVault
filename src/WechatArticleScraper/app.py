@@ -127,6 +127,7 @@ app.add_middleware(
 
 # 任务存储（内存中，生产环境可以改用 Redis）
 tasks = {}
+scrape_slots = asyncio.Semaphore(1)  # One browser at a time on the small production server.
 # 保存正在运行的 Scraper 实例引用，用于强制停止
 running_scrapers = {}  # {task_id: {article_id: WechatArticleScraper}}
 
@@ -151,6 +152,7 @@ class ArticleResult(BaseModel):
     videos_count: int = 0
     progress: int = 0  # 0-100
     stage: str = "等待开始"  # 面向用户的阶段提示
+    logs: List[Dict[str, Any]] = Field(default_factory=list)
     status: str = "pending"  # pending, processing, completed, failed, cancelled
     error_message: Optional[str] = None
 
@@ -249,6 +251,10 @@ async def scrape_article(article_result: ArticleResult, output_dir: str, task_id
             # 只写面向用户的阶段信息，不暴露内部实现细节
             article_result.progress = int(percent)
             article_result.stage = message
+            # Keep a bounded timeline so polling does not miss intermediate stages.
+            article_result.logs = (article_result.logs + [{
+                "time": datetime.now().isoformat(), "progress": int(percent), "message": message[:300]
+            }])[-60:]
             # 更新任务的 updated_at 时间，防止被误判为超时
             if task_id and task_id in tasks:
                 tasks[task_id]['updated_at'] = datetime.now().isoformat()
@@ -337,7 +343,12 @@ async def process_scrape_task(task_id: str, request: ScrapeRequest):
         )
         os.makedirs(article_dir, exist_ok=True)
         
-        await scrape_article(article, article_dir, task_id)
+        async with scrape_slots:
+            if task.get("cancelled"):
+                article.status = "cancelled"
+                article.stage = "已取消"
+            else:
+                await scrape_article(article, article_dir, task_id)
         
         task["completed_count"] += 1
         task["updated_at"] = datetime.now().isoformat()

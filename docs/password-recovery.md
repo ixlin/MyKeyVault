@@ -6,7 +6,7 @@
 
 ## 邮件配置
 
-生产服务原先没有 SMTP 配置，需要先补齐。配置在服务器私有配置或 systemd 环境文件，禁止把真实授权码写进仓库。
+生产 SMTP 已配置并完成实际重置验证。授权码仅放在服务器 root 私有的 `/etc/mykeyvault-mail.env`（0600），由 systemd 环境文件加载，禁止写进仓库。
 
 ```ini
 Email__SmtpHost=smtp.qq.com
@@ -38,4 +38,4 @@ QQ 邮箱要先启用 SMTP，使用授权码而不是邮箱登录密码。465 �
 - `tests/PasswordRecovery` 在专用 PostgreSQL 数据库完成 21 项测试，包括并发只能消费一次、重放、过期、密码策略、解锁、发送限额及 SMTP 失败。
 - 测试程序只接受数据库名以 `recovery_test` 开头的连接，通过 `RECOVERY_TEST_DB` 环境变量传入；不可使用真实用户数据库。
 - 线上程序/数据库/原 Data Protection 密钥已备份在 `/var/backups/mykeyvault/password-recovery-20261004/`（root 私有），发布前后用户、条目及密文数量相同，原密钥文件 SHA256 一致。
-- 线上入口 HTTP 200、健康检查成功。邮件仍待配置，未发送真实验证码、未修改任何真实用户密码。
+- 线上入口 HTTP 200、健康检查成功；随后配置 SMTP、验证实际邮件发送，用户已确认完成密码重置。

@@ -45,7 +45,11 @@ public sealed class VaultDbContext(DbContextOptions<VaultDbContext> options) : I
             entity.HasIndex(x => new { x.OwnerId, x.SourceUrl });
             entity.HasMany(x => x.Extractions).WithOne(x => x.Article).HasForeignKey(x => x.ArticleId).OnDelete(DeleteBehavior.Cascade);
         });
-        builder.Entity<ArticleExtraction>(entity => entity.HasIndex(x => new { x.OwnerId, x.CreatedAtUtc }));
+        builder.Entity<ArticleExtraction>(entity =>
+        {
+            entity.HasIndex(x => new { x.OwnerId, x.CreatedAtUtc });
+            entity.HasIndex(x => new { x.OwnerId, x.ArticleId, x.ConversationId });
+        });
         builder.Entity<ArticleAiSettings>(entity => entity.HasIndex(x => x.OwnerId).IsUnique());
     }
 }

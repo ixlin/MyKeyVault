@@ -6,6 +6,7 @@ public sealed class ArticleExtraction
 {
     public long Id { get; set; }
     public long ArticleId { get; set; }
+    public Guid ConversationId { get; set; } = Guid.NewGuid();
     public KnowledgeArticle Article { get; set; } = default!;
     [Required, MaxLength(450)] public string OwnerId { get; set; } = string.Empty;
     [Required, MaxLength(4000)] public string Prompt { get; set; } = string.Empty;
