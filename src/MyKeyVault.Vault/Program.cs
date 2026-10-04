@@ -4,6 +4,8 @@ using MyKeyVault.Vault.Data;
 using MyKeyVault.Vault.Models;
 using MyKeyVault.Vault.Services;
 using Serilog;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -25,6 +27,25 @@ builder.Services.Configure<ArticleScraperOptions>(builder.Configuration.GetSecti
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<ArticleScraperService>();
 builder.Services.AddScoped<ArticleExtractionService>();
+builder.Services.Configure<ResetEmailOptions>(builder.Configuration.GetSection("Email"));
+builder.Services.AddScoped<IPasswordResetEmailSender, PasswordResetEmailSender>();
+builder.Services.AddScoped<PasswordResetService>();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.Configure<SecurityStampValidatorOptions>(options => options.ValidationInterval = TimeSpan.FromMinutes(1));
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("password-recovery", context => context.Request.Method != "POST"
+        ? RateLimitPartition.GetNoLimiter("read")
+        : RateLimitPartition.GetFixedWindowLimiter(context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions { PermitLimit = 20, Window = TimeSpan.FromMinutes(10), QueueLimit = 0 }));
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        context.HttpContext.Response.ContentType = "text/plain; charset=utf-8";
+        context.HttpContext.Response.Headers.RetryAfter = "600";
+        await context.HttpContext.Response.WriteAsync("操作过于频繁，请 10 分钟后重试。", cancellationToken);
+    };
+});
 
 builder.Services.AddDefaultIdentity<VaultUser>(options =>
     {
@@ -73,10 +94,11 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseRouting();
+app.UseRateLimiter();
 app.UseAuthentication();
 app.Use(async (context, next) =>
 {
-    if (context.Request.Path.StartsWithSegments("/Vault"))
+    if (context.Request.Path.StartsWithSegments("/Vault") || context.Request.Path.StartsWithSegments("/Identity/Account"))
     {
         context.Response.OnStarting(() =>
         {

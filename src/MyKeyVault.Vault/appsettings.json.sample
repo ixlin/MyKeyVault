@@ -5,6 +5,14 @@
   "VaultEncryption": {
     "MasterKey": "SET_ONLY_IN_ENVIRONMENT_OR_USER_SECRETS_BASE64_32_BYTES"
   },
+  "Email": {
+    "SmtpHost": "smtp.qq.com",
+    "SmtpPort": 465,
+    "SmtpUser": "REPLACE_WITH_SENDER_EMAIL",
+    "SmtpPassword": "SET_ONLY_ON_SERVER_SMTP_AUTHORIZATION_CODE",
+    "FromEmail": "REPLACE_WITH_SENDER_EMAIL",
+    "FromName": "我的密码本"
+  },
   "ArticleScraper": {
     "ServiceUrl": "http://127.0.0.1:5001",
     "MaxUrlsPerRequest": 10
