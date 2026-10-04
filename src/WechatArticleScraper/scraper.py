@@ -28,6 +28,8 @@ class WechatArticleScraper:
     PAGE_LOAD_TIMEOUT = 35  # 页面加载超时
     CONTENT_WAIT_TIMEOUT = 12  # 正文内容等待超时
     OVERALL_TIMEOUT = 150   # 整体任务超时（2.5分钟）
+    VIDEO_BUDGET = 30       # 视频下载总预算（秒），超预算即保留占位链接
+    VIDEO_READ_TIMEOUT = 15  # 单个视频单次读取超时（秒）
     
     def __init__(self, output_dir: str = "output", progress_callback: Optional[Callable[[int, str], None]] = None):
         self.output_dir = output_dir
@@ -851,13 +853,27 @@ class WechatArticleScraper:
             print(f"📹 发现 {len(videos)} 个视频，但无可下载的微信原生视频")
             return
         
-        print(f"📹 下载视频 ({len(native_videos)} 个)...")
+        print(f"📹 下载视频 ({len(native_videos)} 个，预算 {self.VIDEO_BUDGET}s)...")
+        budget_start = datetime.now()
         
         for i, video in enumerate(native_videos, 1):
             vid = video.get('vid')
             
             if vid in self.video_map:
                 continue
+            
+            # 整体任务时间预算不足时跳过剩余视频，避免整篇文章因视频下载而超时失败
+            try:
+                self._check_timeout("下载视频")
+            except Exception:
+                print(f"  ⏱️ 剩余时间不足，跳过剩余视频")
+                break
+            
+            # 视频下载总预算用尽时跳过，保留占位链接
+            remaining = self.VIDEO_BUDGET - (datetime.now() - budget_start).total_seconds()
+            if remaining <= 0:
+                print(f"  ⏱️ 视频下载预算用尽，保留占位链接")
+                break
             
             try:
                 # 查找对应的视频URL
@@ -875,8 +891,8 @@ class WechatArticleScraper:
                     print(f"  ⚠️ [{i}/{len(native_videos)}] 未找到视频URL (vid: {vid})")
                     continue
                 
-                # 下载视频
-                local_video_path = self._download_single_video(video_url, vid, i)
+                # 下载视频（限时，超时抛异常并降级为占位链接）
+                local_video_path = self._download_single_video(video_url, vid, i, max_seconds=remaining)
                 
                 # 下载封面图
                 local_cover_path = None
@@ -897,8 +913,11 @@ class WechatArticleScraper:
             except Exception as e:
                 print(f"  ✗ [{i}/{len(native_videos)}] 视频下载失败: {e}")
     
-    def _download_single_video(self, url: str, vid: str, index: int) -> str:
-        """下载单个视频文件"""
+    def _download_single_video(self, url: str, vid: str, index: int, max_seconds: Optional[float] = None) -> str:
+        """下载单个视频文件（限时、非致命；超时抛异常由调用方降级为占位链接）"""
+        if max_seconds is None:
+            max_seconds = float(self.VIDEO_BUDGET)
+        
         # 生成文件名
         url_hash = hashlib.md5(vid.encode()).hexdigest()[:8]
         filename = f"video_{index:03d}_{url_hash}.mp4"
@@ -914,8 +933,8 @@ class WechatArticleScraper:
             'Range': 'bytes=0-'  # 支持断点续传
         }
         
-        # 使用流式下载
-        response = self.session.get(url, headers=headers, timeout=120, stream=True)
+        # 使用流式下载；缩短单次读取超时，避免单个视频拖垮整篇文章
+        response = self.session.get(url, headers=headers, timeout=self.VIDEO_READ_TIMEOUT, stream=True)
         response.raise_for_status()
         
         # 获取文件大小
@@ -923,22 +942,36 @@ class WechatArticleScraper:
         
         downloaded = 0
         last_reported = -5
-        with open(filepath, 'wb') as f:
-            for chunk in response.iter_content(chunk_size=8192):
-                if chunk:
-                    f.write(chunk)
-                    downloaded += len(chunk)
-                    if total_size > 0:
-                        percent = (downloaded / total_size) * 100
-                        if percent - last_reported >= 5 or percent >= 100:
-                            last_reported = percent
-                            size_mb = total_size / (1024 * 1024)
-                            print(f"    📊 下载进度: {percent:.1f}% ({size_mb:.1f}MB)", end='\r', flush=True)
-                    else:
-                        # 无 content-length 时做轻量提示
-                        mb = downloaded / (1024 * 1024)
-                        if int(mb) != int((downloaded - len(chunk)) / (1024 * 1024)):
-                            print(f"    📊 已下载: {mb:.0f}MB", end='\r', flush=True)
+        start = datetime.now()
+        try:
+            with open(filepath, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        # 超过单视频时长上限即中止，交由上层降级为占位链接
+                        if (datetime.now() - start).total_seconds() > max_seconds:
+                            print(f"    ⏱️ 视频下载超过 {max_seconds:.0f}s，保留占位链接")
+                            raise TimeoutError(f"视频下载超过 {max_seconds:.0f}s")
+                        if total_size > 0:
+                            percent = (downloaded / total_size) * 100
+                            if percent - last_reported >= 5 or percent >= 100:
+                                last_reported = percent
+                                size_mb = total_size / (1024 * 1024)
+                                print(f"    📊 下载进度: {percent:.1f}% ({size_mb:.1f}MB)", end='\r', flush=True)
+                        else:
+                            # 无 content-length 时做轻量提示
+                            mb = downloaded / (1024 * 1024)
+                            if int(mb) != int((downloaded - len(chunk)) / (1024 * 1024)):
+                                print(f"    📊 已下载: {mb:.0f}MB", end='\r', flush=True)
+        except Exception:
+            # 清理未完成的临时文件
+            try:
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+            except Exception:
+                pass
+            raise
         
         print(f"    📊 下载完成: 100%                    ")
         
