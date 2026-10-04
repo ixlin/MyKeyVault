@@ -207,7 +207,7 @@ class WechatArticleScraper:
             "publish_time": article["publish_time"],
             "output_file": filename,
             "pdf_file": pdf_filename,
-            "images_count": len(self.image_map),
+            "images_count": len(set(self.image_map.values())),
             "videos_count": len(article.get("videos", []))
         }
     
@@ -1477,7 +1477,7 @@ class WechatArticleScraper:
             "publish_time": article['publish_time'],
             "source_url": article['source_url'],
             "scrape_time": datetime.now().isoformat(),
-            "images_count": len(self.image_map),
+            "images_count": len(set(self.image_map.values())),
             "videos_count": len(article.get('videos', []))
         }
         with open(meta_filepath, 'w', encoding='utf-8') as f:
