@@ -46,11 +46,22 @@
   let running = false, controller = null, historyTimer;
   const status = text => { if (form) form.querySelector('[data-send-status]').textContent = text; };
   const scroll = () => messages.scrollTo({ top: messages.scrollHeight, behavior: 'auto' });
-  const downloadLink = id => { const url = new URL(chat.dataset.baseUrl, location.origin); url.searchParams.set('handler', 'Download'); url.searchParams.set('extractionId', id); const link = element('a', '下载 Markdown', 'chat-download'); link.href = url; return link; };
+  const exportMenu = chat.querySelector('[data-conversation-export]');
+  const syncExport = conversation => {
+    exportMenu.hidden = !conversation;
+    exportMenu.inert = running;
+    if (running) exportMenu.open = false;
+    for (const link of exportMenu.querySelectorAll('[data-export-format]')) {
+      const url = new URL(chat.dataset.baseUrl, location.origin);
+      url.searchParams.set('handler', 'Download'); url.searchParams.set('Conversation', conversation || '');
+      url.searchParams.set('format', link.dataset.exportFormat); link.href = url;
+    }
+  };
   const refreshHistory = async (refreshTurns = false) => {
     try {
       const url = new URL(chat.dataset.historyUrl, location.origin);
       const conversation = form?.querySelector('[name=Conversation]').value || new URL(location.href).searchParams.get('Conversation');
+      syncExport(conversation);
       if (conversation) url.searchParams.set('Conversation', conversation);
       const response = await fetch(url, { cache: 'no-store', headers: { Accept: 'application/json' } });
       if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) throw new Error('历史记录暂时无法同步，请重新登录或刷新。');
@@ -70,7 +81,6 @@
           const answer = element('div', null, 'chat-answer markdown-content'); answer.innerHTML = item.html;
           turn.append(element('div', item.prompt, 'chat-user'), answer);
           if (item.status !== 'completed' || item.errorMessage) turn.append(element('p', item.status === 'processing' ? '正在生成，稍后自动同步…' : item.errorMessage || '已停止', 'chat-status'));
-          if (item.html) turn.append(downloadLink(item.id));
           messages.append(turn);
         }
       }
@@ -89,6 +99,7 @@
     event.preventDefault(); if (running || !form.reportValidity()) return;
     const prompt = textarea.value.trim(); if (prompt.length < 2) return;
     running = true; controller = new AbortController();
+    syncExport(form.querySelector('[name=Conversation]').value);
     form.querySelector('[data-send]').hidden = true; form.querySelector('[data-stop]').hidden = false; textarea.readOnly = true;
     chat.querySelector('[data-welcome]')?.remove();
     const turn = element('article', null, 'chat-turn');
@@ -101,6 +112,7 @@
       if (item.type === 'start') {
         turn.dataset.turnId = item.id;
         form.querySelector('[name=Conversation]').value = item.conversationId;
+        syncExport(item.conversationId);
         const url = new URL(chat.dataset.baseUrl, location.origin); url.searchParams.set('Conversation', item.conversationId); history.replaceState(null, '', url);
         textarea.value = '';
       }
@@ -112,7 +124,6 @@
       }
       if (item.type === 'done' || item.type === 'error') {
         terminal = true; answer.innerHTML = item.html || ''; answer.classList.remove('streaming-answer');
-        if (item.type === 'done') turn.append(downloadLink(item.id));
         if (item.type === 'error' && !reply && !item.id) textarea.value = prompt;
       }
       if (item.message) notice.textContent = item.message;
@@ -132,6 +143,7 @@
     } catch (error) { notice.textContent = error.name === 'AbortError' ? '已停止生成，正在保存已有内容。' : error.message; if (!turn.dataset.turnId) textarea.value = prompt; }
     finally {
       running = false; controller = null; textarea.readOnly = false; form.querySelector('[data-send]').hidden = false; form.querySelector('[data-stop]').hidden = true;
+      syncExport(form.querySelector('[name=Conversation]').value);
       await refreshHistory(false);
       status('可继续追问，或从左侧开始新对话。'); textarea.focus();
     }

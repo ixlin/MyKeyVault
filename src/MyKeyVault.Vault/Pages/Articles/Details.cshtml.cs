@@ -50,11 +50,24 @@ public sealed class DetailsModel(VaultDbContext db, UserManager<VaultUser> users
         }, cancellationToken);
         return new EmptyResult();
     }
-    public async Task<IActionResult> OnGetDownloadAsync(long id, long extractionId, CancellationToken cancellationToken)
+    public async Task<IActionResult> OnGetDownloadAsync(long id, long? extractionId, string? format, CancellationToken cancellationToken)
     {
-        var item = await db.ArticleExtractions.AsNoTracking().SingleOrDefaultAsync(x => x.Id == extractionId && x.ArticleId == id && x.OwnerId == users.GetUserId(User), cancellationToken);
-        if (item is null || string.IsNullOrEmpty(item.Result)) return NotFound();
-        return File(System.Text.Encoding.UTF8.GetBytes($"# 萃取记录\n\n{item.Prompt}\n\n{item.Result}\n"), "text/markdown; charset=utf-8", $"article-{id}-extraction-{item.Id}.md");
+        var ownerId = users.GetUserId(User)!;
+        // Old per-turn links now export their entire conversation as well.
+        if (Conversation is null && extractionId is not null)
+            Conversation = await db.ArticleExtractions.Where(x => x.Id == extractionId && x.ArticleId == id && x.OwnerId == ownerId)
+                .Select(x => (Guid?)x.ConversationId).SingleOrDefaultAsync(cancellationToken);
+        if (Conversation is null) return NotFound();
+        var article = await db.KnowledgeArticles.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id && x.OwnerId == ownerId, cancellationToken);
+        if (article is null) return NotFound();
+        var turns = await db.ArticleExtractions.AsNoTracking().Where(x => x.ArticleId == id && x.OwnerId == ownerId && x.ConversationId == Conversation)
+            .OrderBy(x => x.Id).ToListAsync(cancellationToken);
+        if (turns.Count == 0) return NotFound();
+        if (format is not (null or "markdown" or "html")) return BadRequest();
+        var html = format == "html";
+        var content = html ? ArticleConversationExport.Html(article, turns, markdown) : ArticleConversationExport.Markdown(article, turns);
+        return File(System.Text.Encoding.UTF8.GetBytes(content), html ? "text/html; charset=utf-8" : "text/markdown; charset=utf-8",
+            $"article-{id}-conversation-{Conversation.Value:N}.{(html ? "html" : "md")}");
     }
     private async Task<bool> LoadAsync(long id, CancellationToken cancellationToken)
     {

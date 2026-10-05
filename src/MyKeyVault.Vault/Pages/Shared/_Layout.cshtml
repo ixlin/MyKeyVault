@@ -9,6 +9,8 @@
     @if (Context.Request.Path.StartsWithSegments("/Articles")) { <link rel="stylesheet" href="~/css/articles.css" asp-append-version="true" /> }
 </head>
 <body class="@(articleFullscreen ? "article-fullscreen" : null)">
+    @if (!articleFullscreen)
+    {
     <header class="site-header">
         <a class="wordmark" asp-page="/Index"><span class="mark" aria-hidden="true">密</span> 我的密码本</a>
         <nav aria-label="主导航">
@@ -26,6 +28,7 @@
             }
         </nav>
     </header>
+    }
     <main class="page-shell">@RenderBody()</main>
     @if (!articleFullscreen)
     {
