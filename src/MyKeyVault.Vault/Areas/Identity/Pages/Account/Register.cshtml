@@ -3,7 +3,19 @@
 @{
     ViewData["Title"] = "创建保险库";
 }
-<section class="auth-page">
-    <div class="auth-intro"><p class="eyebrow">CREATE YOUR VAULT</p><h1>从第一条<br /><em>私密信息</em>开始。</h1><p>创建后，你可以加密保存账号、密钥和服务器连接信息；敏感字段默认不会明文显示。</p></div>
-    <form method="post" class="auth-card"><input type="hidden" asp-for="ReturnUrl" /><div asp-validation-summary="ModelOnly" class="validation" role="alert"></div><label>邮箱地址<input asp-for="Input.Email" autocomplete="email" inputmode="email" placeholder="you@example.com" /></label><label>设置密码<input asp-for="Input.Password" autocomplete="new-password" placeholder="至少 12 位，包含大小写、数字和符号" /></label><label>确认密码<input asp-for="Input.ConfirmPassword" autocomplete="new-password" placeholder="再次输入密码" /></label><button class="button" type="submit">创建我的保险库</button><p class="auth-switch">已有账号？<a asp-page="./Login" asp-route-returnUrl="@Model.ReturnUrl">去登录</a></p></form>
+<section class="ui-auth-card">
+    <h1>创建保险库</h1>
+    <p class="ui-auth-sub">从一个只属于你的加密空间开始。</p>
+    <form method="post" class="ui-auth-form">
+        <input type="hidden" asp-for="ReturnUrl" />
+        @if (!ViewData.ModelState.IsValid)
+        {
+            <div asp-validation-summary="ModelOnly" class="validation ui-notice ui-notice-danger" role="alert"></div>
+        }
+        <label class="ui-field"><span class="ui-label">邮箱地址</span><input asp-for="Input.Email" autocomplete="email" inputmode="email" placeholder="you@example.com" /><span asp-validation-for="Input.Email" class="validation"></span></label>
+        <label class="ui-field"><span class="ui-label">设置密码</span><input asp-for="Input.Password" autocomplete="new-password" placeholder="至少 12 位，包含大小写、数字和符号" /><span class="ui-help">至少 12 个字符，包含大写、小写字母、数字和符号。</span><span asp-validation-for="Input.Password" class="validation"></span></label>
+        <label class="ui-field"><span class="ui-label">确认密码</span><input asp-for="Input.ConfirmPassword" autocomplete="new-password" placeholder="再次输入密码" /><span asp-validation-for="Input.ConfirmPassword" class="validation"></span></label>
+        <button class="ui-btn ui-btn-primary" type="submit">创建我的保险库</button>
+    </form>
+    <p class="ui-auth-links">已有账号？<a asp-page="./Login" asp-route-returnUrl="@Model.ReturnUrl">去登录</a></p>
 </section>

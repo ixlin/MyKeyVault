@@ -1,36 +1,121 @@
 @page
 @model IndexModel
-@{ ViewData["Title"] = User.Identity?.IsAuthenticated == true ? "工作台" : "我的密码本"; }
-@if (User.Identity?.IsAuthenticated != true)
+@{
+    var signedIn = User.Identity?.IsAuthenticated == true;
+    ViewData["Title"] = signedIn ? "工作台" : "私人密码本";
+    var displayName = (Model.Email ?? User.Identity?.Name ?? "").Split('@')[0];
+    var greeting = DateTime.Now.Hour < 12 ? "早上好" : DateTime.Now.Hour < 18 ? "下午好" : "晚上好";
+}
+@if (!signedIn)
 {
-<section class="landing public-landing">
-    <p class="eyebrow">PRIVATE BY DEFAULT</p>
-    <h1>把重要凭据放进<br /><em>可控的保险库。</em></h1>
-    <p class="lede">账号、银行卡、API Key 和私密笔记，加密保存，随时查找。</p>
-    <a class="button" asp-area="Identity" asp-page="/Account/Login">进入我的密码本</a>
-    <dl class="assurance-strip">
-        <div><dt>加密存储</dt><dd>敏感字段不以明文落库</dd></div>
-        <div><dt>按账户隔离</dt><dd>只有本人可以查看条目</dd></div>
-        <div><dt>可追溯</dt><dd>查看与使用均留审计</dd></div>
-    </dl>
+<section class="ui-landing">
+    <div>
+        <p class="ui-landing-kicker">私人密码本</p>
+        <h1>把重要凭据<br />放在<em>一个可控的地方</em>。</h1>
+        <p class="ui-landing-lede">账号、银行卡、API Key 和私密笔记，加密保存在自己的保险库里。需要时随时查找，不需要时安静地待着。</p>
+        <div class="ui-landing-actions">
+            <a class="ui-btn ui-btn-primary" asp-area="Identity" asp-page="/Account/Login">登录保险库</a>
+            <a class="ui-btn ui-btn-ghost" asp-area="Identity" asp-page="/Account/Register">创建保险库</a>
+        </div>
+    </div>
+    <div class="ui-preview" aria-hidden="true">
+        <div class="ui-preview-head"><span>我的密码本</span><span>仅自己可见</span></div>
+        <div class="ui-preview-row"><span class="ui-preview-icon">账</span><span><b>AppleUS</b><small>登录账号</small></span><span class="ui-preview-mask">••••••</span></div>
+        <div class="ui-preview-row"><span class="ui-preview-icon">文</span><span><b>公众号资料库</b><small>已收录文章</small></span><em>1 篇</em></div>
+        <div class="ui-preview-row"><span class="ui-preview-icon">萃</span><span><b>文章萃取</b><small>保留每次分析</small></span><em>5 次</em></div>
+        <div class="ui-preview-row"><span class="ui-preview-icon">盾</span><span><b>安全活动</b><small>显示与复制留痕</small></span><em>可追溯</em></div>
+    </div>
+</section>
+<section class="ui-features" aria-label="核心能力">
+    <article class="ui-feature"><span class="ui-feature-num">01</span><h2>加密存储</h2><p>敏感字段不以明文落库，每个字段使用独立数据密钥加密。</p></article>
+    <article class="ui-feature"><span class="ui-feature-num">02</span><h2>按账户隔离</h2><p>每个账号只能看到自己的条目，显示和复制都会校验权限。</p></article>
+    <article class="ui-feature"><span class="ui-feature-num">03</span><h2>可追溯</h2><p>显示、复制、修改和删除都会写入安全审计，但不会记录明文。</p></article>
 </section>
 }
 else
 {
-<section class="workspace-head">
-    <div><p class="eyebrow">WORKSPACE</p><h1>今天要处理什么？</h1><p>保存凭据，收集文章，或把长文变成可用的信息。</p></div>
-    <a class="button" asp-page="/Vault/Create">新增密码条目</a>
-</section>
-<section class="tool-grid" aria-label="核心功能">
-    <a class="tool-card tool-vault" asp-page="/Vault/Index"><span class="tool-symbol" aria-hidden="true">钥</span><div><p class="eyebrow">PASSWORDS</p><h2>密码本</h2><p>管理登录信息、API Key、服务器和私密笔记。</p></div><strong>@Model.VaultCount 条</strong></a>
-    <a class="tool-card tool-library" asp-page="/Articles/Index"><span class="tool-symbol" aria-hidden="true">文</span><div><p class="eyebrow">WECHAT LIBRARY</p><h2>公众号资料库</h2><p>粘贴链接抓取原文，在一个地方阅读与归档。</p></div><strong>@Model.ArticleCount 篇</strong></a>
-    <a class="tool-card tool-extract" asp-page="/Articles/Index" asp-fragment="library"><span class="tool-symbol" aria-hidden="true">萃</span><div><p class="eyebrow">EXTRACTIONS</p><h2>文章萃取</h2><p>按自己的问题总结文章，保留每次分析结果。</p></div><strong>@Model.ExtractionCount 次</strong></a>
-</section>
-<section class="workspace-lower">
-    <div><div class="section-title"><h2>最近文章</h2><a asp-page="/Articles/Index">查看全部</a></div>
-    @if (Model.Recent.Count == 0) { <p class="empty-copy">还没有文章。粘贴微信公众号链接即可开始。</p> }
-    else { <div class="recent-list">@foreach (var item in Model.Recent) { <a asp-page="/Articles/Details" asp-route-id="@item.Id"><span class="status-dot status-@item.Status"></span><span><strong>@item.Title</strong><small>@(item.Author ?? "公众号文章") · @item.CreatedAtUtc.ToLocalTime().ToString("MM-dd HH:mm")</small></span><em>@(item.Status == "completed" ? "打开" : item.Status == "failed" ? "失败" : "处理中")</em></a> }</div> }
+<header class="ui-page-head">
+    <div>
+        <h1>@greeting，@displayName</h1>
+        <p>这里有 @Model.VaultCount 个密码条目、@Model.ArticleCount 篇文章和 @Model.ExtractionCount 次萃取记录。</p>
     </div>
-    <aside class="security-note"><h2>账号与设置</h2><p>文章萃取只使用所选文章和当前对话。密码本中的私密信息不会发送给模型。</p><p><a asp-page="/Articles/Settings">萃取模型设置</a></p><p><a asp-area="Identity" asp-page="/Account/ForgotPassword">通过邮箱重置密码</a></p><a asp-page="/Vault/Audit">查看登录与条目活动</a></aside>
+    <div class="ui-page-actions">
+        <a class="ui-btn ui-btn-primary" asp-page="/Vault/Create">＋ 新增条目</a>
+    </div>
+</header>
+
+<section class="ui-stats" aria-label="概览">
+    <a class="ui-stat" asp-page="/Vault/Index">
+        <span class="ui-stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M10.8 12.2 19 4m-3 0h3v3"/></svg></span>
+        <span class="ui-stat-copy"><span class="ui-stat-num">@Model.VaultCount</span><span class="ui-stat-label">密码条目</span></span>
+        <span class="ui-stat-arrow" aria-hidden="true">→</span>
+    </a>
+    <a class="ui-stat" asp-page="/Articles/Index">
+        <span class="ui-stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v18H6.5A2.5 2.5 0 0 1 4 18.5z"/><path d="M4 17.5h16"/></svg></span>
+        <span class="ui-stat-copy"><span class="ui-stat-num">@Model.ArticleCount</span><span class="ui-stat-label">公众号文章</span></span>
+        <span class="ui-stat-arrow" aria-hidden="true">→</span>
+    </a>
+    <a class="ui-stat" asp-page="/Articles/Index">
+        <span class="ui-stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 12a8.5 8.5 0 1 1-4.2-7.35"/><path d="M21 4v5h-5"/></svg></span>
+        <span class="ui-stat-copy"><span class="ui-stat-num">@Model.ExtractionCount</span><span class="ui-stat-label">萃取对话</span></span>
+        <span class="ui-stat-arrow" aria-hidden="true">→</span>
+    </a>
+</section>
+
+<div class="ui-grid-2">
+    <section class="ui-card">
+        <div class="ui-card-head"><h2>最近条目</h2><a asp-page="/Vault/Index">查看全部</a></div>
+        @if (Model.RecentItems.Count == 0)
+        {
+            <div class="ui-card-body"><p class="ui-muted ui-small">还没有条目。<a asp-page="/Vault/Create">新增第一条</a>。</p></div>
+        }
+        else
+        {
+            <div class="ui-list">
+                @foreach (var item in Model.RecentItems)
+                {
+                    <a class="ui-list-row" asp-page="/Vault/Details" asp-route-id="@item.Id">
+                        <span class="ui-list-icon" aria-hidden="true">@item.KindMark</span>
+                        <span class="ui-list-main"><span class="ui-list-title">@item.Title</span><span class="ui-list-meta">更新于 @item.UpdatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</span></span>
+                        <span class="ui-list-side">打开</span>
+                    </a>
+                }
+            </div>
+        }
+    </section>
+    <section class="ui-card">
+        <div class="ui-card-head"><h2>最近文章</h2><a asp-page="/Articles/Index">查看全部</a></div>
+        @if (Model.Recent.Count == 0)
+        {
+            <div class="ui-card-body"><p class="ui-muted ui-small">还没有文章。粘贴微信公众号链接即可开始。</p></div>
+        }
+        else
+        {
+            <div class="ui-list">
+                @foreach (var item in Model.Recent)
+                {
+                    <a class="ui-list-row is-article" asp-page="/Articles/Details" asp-route-id="@item.Id">
+                        <span class="ui-list-icon" aria-hidden="true">文</span>
+                        <span class="ui-list-main"><span class="ui-list-title">@item.Title</span><span class="ui-list-meta">@(item.Author ?? "公众号文章") · @item.CreatedAtUtc.ToLocalTime().ToString("MM-dd HH:mm")</span></span>
+                        <span class="ui-list-side">@(item.Status == "completed" ? "打开" : item.Status == "failed" ? "失败" : "处理中")</span>
+                    </a>
+                }
+            </div>
+        }
+    </section>
+</div>
+
+<section class="ui-card ui-security-card">
+    <div class="ui-card-head"><h2>账号与安全</h2><a asp-page="/Settings/Index">账号设置</a></div>
+    <div class="ui-card-body ui-security-body">
+        <dl class="ui-account-facts">
+            <div><dt>登录邮箱</dt><dd>@Model.Email</dd></div>
+            <div><dt>上次登录</dt><dd>@(Model.LastLoginAtUtc?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "刚刚")</dd></div>
+        </dl>
+        <div class="ui-page-actions">
+            <a class="ui-btn ui-btn-ghost ui-btn-sm" asp-page="/Vault/Audit">查看安全活动</a>
+            <a class="ui-btn ui-btn-ghost ui-btn-sm" asp-page="/Settings/Index" asp-fragment="password">修改密码</a>
+        </div>
+    </div>
 </section>
 }

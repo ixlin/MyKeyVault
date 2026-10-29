@@ -1,0 +1,68 @@
+@page "/Settings"
+@model MyKeyVault.Vault.Pages.Settings.IndexModel
+@{ ViewData["Title"] = "设置"; }
+<header class="ui-page-head">
+    <div>
+        <h1>设置</h1>
+        <p>管理登录密码、文章萃取模型和账号安全。</p>
+    </div>
+</header>
+@if (!string.IsNullOrWhiteSpace(Model.Notice)) { <div class="ui-notice ui-notice-ok" role="status">@Model.Notice</div> }
+@if (!string.IsNullOrWhiteSpace(Model.Error)) { <div class="ui-notice ui-notice-danger" role="alert">@Model.Error</div> }
+
+<div class="ui-settings-grid">
+    <div class="ui-settings-stack">
+        <section class="ui-card" id="password">
+            <div class="ui-card-head"><h2>修改密码</h2></div>
+            <div class="ui-card-body">
+                <form method="post" asp-page-handler="ChangePassword" class="ui-form">
+                    @if (!ViewData.ModelState.IsValid)
+                    {
+                        <div asp-validation-summary="All" class="validation validation-summary ui-notice ui-notice-danger" role="alert"></div>
+                    }
+                    <label class="ui-field"><span class="ui-label">当前密码</span><input asp-for="Input.CurrentPassword" autocomplete="current-password" /><span asp-validation-for="Input.CurrentPassword" class="validation"></span></label>
+                    <label class="ui-field"><span class="ui-label">新密码</span><input asp-for="Input.NewPassword" autocomplete="new-password" /><span class="ui-help">至少 12 个字符，包含大写、小写字母、数字和符号。</span><span asp-validation-for="Input.NewPassword" class="validation"></span></label>
+                    <label class="ui-field"><span class="ui-label">确认新密码</span><input asp-for="Input.ConfirmPassword" autocomplete="new-password" /><span asp-validation-for="Input.ConfirmPassword" class="validation"></span></label>
+                    <div class="ui-form-actions">
+                        <span class="ui-help">修改后其他设备会在一分钟内退出。</span>
+                        <button class="ui-btn ui-btn-primary" type="submit">更新密码</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <section class="ui-card">
+            <div class="ui-card-head"><h2>文章萃取</h2></div>
+            <a class="ui-settings-link" asp-page="/Articles/Settings">
+                <span><b>萃取模型设置</b><span>配置 DeepSeek、OpenAI 或兼容的 Chat Completions 服务。</span></span>
+                <em aria-hidden="true">→</em>
+            </a>
+            <a class="ui-settings-link" asp-page="/Vault/Audit">
+                <span><b>安全活动</b><span>查看条目显示、复制、修改和密码重置记录。</span></span>
+                <em aria-hidden="true">→</em>
+            </a>
+        </section>
+    </div>
+
+    <aside class="ui-settings-stack">
+        <section class="ui-card">
+            <div class="ui-card-head"><h2>账号</h2></div>
+            <div class="ui-card-body">
+                <dl class="ui-account-facts">
+                    <div><dt>登录邮箱</dt><dd>@Model.Email</dd></div>
+                    <div><dt>创建时间</dt><dd>@(Model.CreatedAtUtc?.ToLocalTime().ToString("yyyy-MM-dd") ?? "—")</dd></div>
+                    <div><dt>上次登录</dt><dd>@(Model.LastLoginAtUtc?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "刚刚")</dd></div>
+                </dl>
+            </div>
+        </section>
+        <section class="ui-card">
+            <div class="ui-card-head"><h2>会话</h2></div>
+            <div class="ui-card-body">
+                <p class="ui-help">退出后需要重新输入邮箱和密码才能进入保险库。</p>
+                <form asp-area="Identity" asp-page="/Account/Logout" asp-route-returnUrl="/" method="post">
+                    <button class="ui-btn ui-btn-ghost" type="submit">退出登录</button>
+                </form>
+            </div>
+        </section>
+    </aside>
+</div>

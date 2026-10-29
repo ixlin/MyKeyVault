@@ -4,28 +4,82 @@
 
 @if (Model.Item is not null)
 {
-    <section class="record-heading">
-        <a class="record-back" asp-page="Index">← 返回密码本</a>
-        <div class="record-title"><div><p class="eyebrow">@Model.Item.KindLabel</p><h1>@Model.Item.Title</h1><p>@(Model.Item.UrlOrHost ?? "未设置网址")</p></div><a class="button record-edit" asp-page="Edit" asp-route-id="@Model.Item.Id">编辑全部信息</a></div>
-    </section>
-
-    <section class="record-card">
-        <header><div><p class="eyebrow">SECURE FIELDS</p><h2>加密内容</h2><p>单独显示所需字段，其他内容继续保持遮蔽。</p></div><a asp-page="SecretEdit" asp-route-id="@Model.Item.Id">＋ 新增字段</a></header>
-        <div class="record-secret-list">
-        @foreach (var secret in Model.Item.Secrets)
-        {
-            <article class="secret-field">
-                <div class="secret-main"><strong>@secret.FieldName</strong><code id="secret-@secret.Id">@(Model.RevealedSecretId == secret.Id ? Model.RevealedValue : "••••••••••••")</code></div>
-                <div class="secret-actions @((Model.RevealedSecretId == secret.Id && secret.CanCopy) ? "" : "no-copy")">
-                    <form method="post" asp-page-handler="Reveal"><input type="hidden" name="id" value="@Model.Item.Id" /><input type="hidden" name="secretId" value="@secret.Id" /><button class="text-button" type="submit">@((Model.RevealedSecretId == secret.Id) ? "已显示" : "显示")</button></form>
-                    <a asp-page="SecretEdit" asp-route-id="@Model.Item.Id" asp-route-secretId="@secret.Id">单独修改</a>
-                    @if (Model.RevealedSecretId == secret.Id && secret.CanCopy) { <button class="copy-icon" type="button" data-copy-target="secret-@secret.Id" data-copy-url="@Url.Page("Details", "Copy", new { id = Model.Item.Id, secretId = secret.Id })" aria-label="复制内容" title="复制内容"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg></button> }
-                </div>
-            </article>
-        }
+    <a class="ui-breadcrumb" asp-page="Index">← 返回密码本</a>
+    <header class="ui-record-head">
+        <div>
+            <span class="ui-badge">@Model.Item.KindLabel</span>
+            @if (Model.Item.IsFavorite) { <span class="ui-badge ui-badge-warn">优先显示</span> }
+            <h1>@Model.Item.Title</h1>
+            <p>@(Model.Item.UrlOrHost ?? "未设置网址")</p>
         </div>
-    </section>
+        <div class="ui-page-actions">
+            <a class="ui-btn ui-btn-primary" asp-page="Edit" asp-route-id="@Model.Item.Id">编辑信息</a>
+        </div>
+    </header>
+
+    <div class="ui-detail-grid">
+        <section class="ui-card">
+            <div class="ui-card-head">
+                <div>
+                    <h2>加密内容</h2>
+                    <p class="ui-help">按需显示单个字段，其余内容继续保持遮蔽。</p>
+                </div>
+                <a asp-page="SecretEdit" asp-route-id="@Model.Item.Id">＋ 新增字段</a>
+            </div>
+            @if (Model.Item.Secrets.Count == 0)
+            {
+                <div class="ui-card-body"><p class="ui-muted ui-small">这个条目还没有加密字段。</p></div>
+            }
+            else
+            {
+                <div class="ui-secret-list">
+                    @foreach (var secret in Model.Item.Secrets)
+                    {
+                        var revealed = Model.RevealedSecretId == secret.Id;
+                        <div class="ui-secret-row">
+                            <strong class="ui-secret-label">@secret.FieldName</strong>
+                            <code id="secret-@secret.Id">@(revealed ? Model.RevealedValue : "••••••••••••")</code>
+                            <div class="ui-secret-actions">
+                                @if (revealed)
+                                {
+                                    <a asp-page="Details" asp-route-id="@Model.Item.Id">隐藏</a>
+                                }
+                                else
+                                {
+                                    <form method="post" asp-page-handler="Reveal"><input type="hidden" name="id" value="@Model.Item.Id" /><input type="hidden" name="secretId" value="@secret.Id" /><button class="text-button" type="submit">显示</button></form>
+                                }
+                                <a asp-page="SecretEdit" asp-route-id="@Model.Item.Id" asp-route-secretId="@secret.Id">修改</a>
+                                @if (revealed && secret.CanCopy)
+                                {
+                                    <button class="copy-icon" type="button" data-copy-target="secret-@secret.Id" data-copy-url="@Url.Page("Details", "Copy", new { id = Model.Item.Id, secretId = secret.Id })" aria-label="复制内容" title="复制内容"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg></button>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </section>
+
+        <aside class="ui-detail-side">
+            <section class="ui-card">
+                <div class="ui-card-head"><h2>条目信息</h2></div>
+                <div class="ui-card-body">
+                    <dl class="ui-meta-list">
+                        <div><dt>类型</dt><dd>@Model.Item.KindLabel</dd></div>
+                        <div><dt>标签</dt><dd>@(Model.Item.Tags.Count == 0 ? "—" : string.Join("、", Model.Item.Tags))</dd></div>
+                        <div><dt>加密字段</dt><dd>@Model.Item.Secrets.Count 个</dd></div>
+                        <div><dt>创建时间</dt><dd>@Model.Item.CreatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</dd></div>
+                        <div><dt>更新时间</dt><dd>@Model.Item.UpdatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</dd></div>
+                    </dl>
+                </div>
+            </section>
+            <div class="ui-danger-zone">
+                <span>不再使用这个条目？</span>
+                <form method="post" asp-page-handler="Archive"><input type="hidden" name="id" value="@Model.Item.Id" /><button class="text-button" type="submit">归档</button></form>
+                <a asp-page="Delete" asp-route-id="@Model.Item.Id">彻底删除</a>
+            </div>
+        </aside>
+    </div>
 
     <div class="copy-toast" data-copy-toast role="status" aria-live="polite" hidden>复制成功</div>
-    <div class="danger-zone"><span>不再使用这个条目？</span><form method="post" asp-page-handler="Archive"><input type="hidden" name="id" value="@Model.Item.Id" /><button class="text-button" type="submit">归档</button></form><a asp-page="Delete" asp-route-id="@Model.Item.Id">彻底删除</a></div>
 }

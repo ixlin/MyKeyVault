@@ -1,5 +1,21 @@
 @page "{id:guid}"
 @model MyKeyVault.Vault.Pages.Vault.DeleteModel
 @{ ViewData["Title"] = "删除条目"; }
-<section class="form-heading"><p class="eyebrow">IRREVERSIBLE</p><h1>彻底删除条目</h1><p>将删除“@Model.Title”及其全部加密字段。此操作无法撤销。</p></section>
-<form method="post" class="vault-form"><input type="hidden" name="id" value="@Model.Id" /><label>输入“删除”以确认<input name="confirmation" autocomplete="off" /></label><div class="form-actions"><a asp-page="Details" asp-route-id="@Model.Id">取消</a><button class="button" type="submit">彻底删除</button></div></form>
+<a class="ui-breadcrumb" asp-page="Index">← 返回密码本</a>
+<header class="ui-page-head">
+    <div>
+        <h1>彻底删除条目</h1>
+        <p>将删除“@Model.Title”及其全部加密字段，此操作无法撤销。</p>
+    </div>
+</header>
+<form method="post" class="ui-form ui-card ui-form-card ui-form-wide">
+    <div class="ui-notice ui-notice-danger"><strong>此操作不可恢复。</strong> 如果只是想暂时不用，请返回详情页选择“归档”。</div>
+    <input type="hidden" name="id" value="@Model.Id" />
+    <div class="ui-form-grid">
+        <label class="ui-field ui-span-2"><span class="ui-label">输入“删除”以确认</span><input name="confirmation" autocomplete="off" placeholder="删除" /></label>
+    </div>
+    <div class="ui-form-actions">
+        <a class="ui-cancel" asp-page="Index">取消</a>
+        <button class="ui-btn ui-btn-danger" type="submit">彻底删除</button>
+    </div>
+</form>

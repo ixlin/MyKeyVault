@@ -12,7 +12,9 @@ public sealed class IndexModel(VaultDbContext db, UserManager<VaultUser> users, 
 {
     [BindProperty(SupportsGet = true)] public string? Query { get; set; }
     [BindProperty(SupportsGet = true)] public string? Group { get; set; }
+    [BindProperty(SupportsGet = true)] public bool Archived { get; set; }
     public IReadOnlyList<VaultItemSummary> Items { get; private set; } = Array.Empty<VaultItemSummary>();
+    public int ArchivedCount { get; private set; }
     public Guid? RevealedItemId { get; private set; }
     public IReadOnlyDictionary<Guid, string> RevealedValues { get; private set; } = new Dictionary<Guid, string>();
 
@@ -35,6 +37,18 @@ public sealed class IndexModel(VaultDbContext db, UserManager<VaultUser> users, 
         return Page();
     }
 
+    public async Task<IActionResult> OnPostRestoreAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var userId = users.GetUserId(User)!;
+        var item = await db.VaultItems.SingleOrDefaultAsync(x => x.Id == id && x.OwnerId == userId && x.IsArchived, cancellationToken);
+        if (item is null) return NotFound();
+        item.IsArchived = false;
+        item.UpdatedAtUtc = DateTime.UtcNow;
+        db.SecurityAuditEvents.Add(new SecurityAuditEvent { UserId = userId, VaultItemId = item.Id, Action = "vault_item_restored", Result = "success" });
+        await db.SaveChangesAsync(cancellationToken);
+        return RedirectToPage("Index");
+    }
+
     public async Task<IActionResult> OnPostCopyAsync(Guid id, Guid secretId, CancellationToken cancellationToken)
     {
         var userId = users.GetUserId(User)!;
@@ -51,7 +65,8 @@ public sealed class IndexModel(VaultDbContext db, UserManager<VaultUser> users, 
     private async Task LoadItemsAsync(CancellationToken cancellationToken)
     {
         var userId = users.GetUserId(User)!;
-        IQueryable<VaultItem> items = db.VaultItems.AsNoTracking().Where(x => x.OwnerId == userId && !x.IsArchived);
+        ArchivedCount = await db.VaultItems.CountAsync(x => x.OwnerId == userId && x.IsArchived, cancellationToken);
+        IQueryable<VaultItem> items = db.VaultItems.AsNoTracking().Where(x => x.OwnerId == userId && x.IsArchived == Archived);
         if (!string.IsNullOrWhiteSpace(Query))
         {
             var term = Query.Trim();
@@ -81,6 +96,7 @@ public sealed class IndexModel(VaultDbContext db, UserManager<VaultUser> users, 
         public IReadOnlyList<SecretSummary> NoteFields => Secrets.Where(x => VaultFieldPresentation.Classify(x.FieldName) == VaultFieldColumn.Note).ToList();
         public string KindMark => Kind switch { VaultItemKind.BankCard => "借", VaultItemKind.CreditCard => "信", VaultItemKind.SecureNote => "记", VaultItemKind.ApiKey => "KEY", VaultItemKind.Server => "服", VaultItemKind.Database => "库", VaultItemKind.BlockchainAccount => "链", _ => "账" };
         public string KindCss => Kind switch { VaultItemKind.BankCard => "bank", VaultItemKind.CreditCard => "credit", VaultItemKind.SecureNote => "note", _ => "login" };
+        public string KindLabel => Kind switch { VaultItemKind.ApiKey => "API Key", VaultItemKind.BlockchainAccount => "链上账户", VaultItemKind.SecureNote => "私密笔记", VaultItemKind.BankCard => "银行卡", VaultItemKind.CreditCard => "信用卡", VaultItemKind.Server => "服务器", VaultItemKind.Database => "数据库", _ => "登录账号" };
         public string? SafeExternalUrl => Uri.TryCreate(UrlOrHost, UriKind.Absolute, out var uri) && (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp) ? uri.AbsoluteUri : null;
     }
 }

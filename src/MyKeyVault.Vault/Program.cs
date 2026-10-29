@@ -79,6 +79,7 @@ builder.Services.AddRazorPages(options =>
 {
     options.Conventions.AuthorizeFolder("/Vault");
     options.Conventions.AuthorizeFolder("/Articles");
+    options.Conventions.AuthorizeFolder("/Settings");
 });
 
 var app = builder.Build();
@@ -95,6 +96,7 @@ if (!app.Environment.IsDevelopment())
     app.UseExceptionHandler("/Error");
     app.UseHsts();
 }
+app.UseStatusCodePagesWithReExecute("/Error", "?code={0}");
 
 app.UseHttpsRedirection();
 app.UseRouting();
@@ -102,7 +104,17 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.Use(async (context, next) =>
 {
-    if (context.Request.Path.StartsWithSegments("/Vault") || context.Request.Path.StartsWithSegments("/Articles") || context.Request.Path.StartsWithSegments("/Identity/Account"))
+    if (context.Request.Path.Equals("/Identity/Account/Manage", StringComparison.OrdinalIgnoreCase) ||
+        context.Request.Path.Equals("/Identity/Account/Manage/Index", StringComparison.OrdinalIgnoreCase))
+    {
+        context.Response.Redirect("/Settings");
+        return;
+    }
+    await next();
+});
+app.Use(async (context, next) =>
+{
+    if (context.Request.Path.StartsWithSegments("/Vault") || context.Request.Path.StartsWithSegments("/Articles") || context.Request.Path.StartsWithSegments("/Settings") || context.Request.Path.StartsWithSegments("/Identity/Account"))
     {
         context.Response.OnStarting(() =>
         {

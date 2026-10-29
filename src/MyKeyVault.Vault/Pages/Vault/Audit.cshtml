@@ -1,8 +1,59 @@
 @page
 @model MyKeyVault.Vault.Pages.Vault.AuditModel
-@{ ViewData["Title"] = "活动"; }
-<section class="vault-heading"><div><p class="eyebrow">ACTIVITY</p><h1>安全活动</h1><p>查看条目操作和密码重置记录；不会记录私密值。</p></div></section>
-<section class="audit-list">
-@if (!Model.Events.Any()) { <p class="empty-copy">还没有安全活动。</p> }
-@foreach (var entry in Model.Events) { <article><div><strong>@entry.Action</strong><span>@entry.Result</span></div><time datetime="@entry.OccurredAtUtc.ToString("O")">@entry.OccurredAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</time></article> }
-</section>
+@{ ViewData["Title"] = "安全活动"; }
+<header class="ui-page-head">
+    <div>
+        <h1>安全活动</h1>
+        <p>查看条目显示、复制、修改、归档和密码重置记录；不会记录私密值。</p>
+    </div>
+</header>
+<p class="ui-audit-meta">最近 @Model.Events.Count 条@(Model.TotalCount > Model.Events.Count ? $"，共 {Model.TotalCount} 条" : "")。活动记录不包含登录 IP 和设备信息。</p>
+
+@if (!Model.Events.Any())
+{
+    <div class="ui-empty">
+        <span class="ui-empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3 4.5 6v5.5c0 4.6 3.2 7.7 7.5 9.5 4.3-1.8 7.5-4.9 7.5-9.5V6z"/><path d="m9 12 2 2 4-4"/></svg></span>
+        <h2>还没有安全活动</h2>
+        <p>显示、复制或修改条目后，记录会出现在这里。</p>
+    </div>
+}
+else
+{
+    <div class="ui-table-wrap">
+        <table class="ui-table">
+            <thead>
+                <tr><th>时间</th><th>操作</th><th>条目</th><th>结果</th></tr>
+            </thead>
+            <tbody>
+            @foreach (var entry in Model.Events)
+            {
+                var title = entry.VaultItemId is not null && Model.ItemTitles.TryGetValue(entry.VaultItemId.Value, out var itemTitle) ? itemTitle : null;
+                <tr>
+                    <td data-label="时间"><time datetime="@entry.OccurredAtUtc.ToString("O")">@entry.OccurredAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</time></td>
+                    <td data-label="操作"><div class="ui-audit-action"><span class="ui-audit-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/></svg></span>@ActionLabel(entry.Action)</div></td>
+                    <td data-label="条目">@(title ?? "—")</td>
+                    <td data-label="结果">@if (entry.Result == "success") { <span class="ui-badge ui-badge-success">成功</span> } else { <span class="ui-badge ui-badge-danger">@(entry.Result ?? "未知")</span> }</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}
+
+@functions {
+    static string ActionLabel(string action) => action switch
+    {
+        "item_secrets_revealed" => "显示条目内容",
+        "secret_revealed" => "显示加密字段",
+        "secret_copied" => "复制加密字段",
+        "vault_item_created" => "新建条目",
+        "vault_item_updated" => "修改条目",
+        "vault_item_deleted" => "删除条目",
+        "vault_item_archived" => "归档条目",
+        "vault_item_restored" => "恢复条目",
+        "secret_created" => "新增加密字段",
+        "secret_updated" => "修改加密字段",
+        "password_reset" => "重置密码",
+        _ => action
+    };
+}

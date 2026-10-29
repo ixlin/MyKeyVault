@@ -1,0 +1,17 @@
+@page
+@model ErrorModel
+@{
+    ViewData["Title"] = Model.PageTitle;
+}
+<section class="ui-error-page">
+    <p class="ui-error-code">@Model.Code</p>
+    <h1>@Model.PageTitle</h1>
+    <p>@Model.Message</p>
+    <div class="ui-page-actions">
+        <a class="ui-btn ui-btn-primary" asp-page="/Index">返回首页</a>
+        @if (User.Identity?.IsAuthenticated != true)
+        {
+            <a class="ui-btn ui-btn-ghost" asp-area="Identity" asp-page="/Account/Login">登录</a>
+        }
+    </div>
+</section>

@@ -3,8 +3,20 @@
 @{
     ViewData["Title"] = "登录";
 }
-<section class="auth-page">
-    <div class="auth-intro"><p class="eyebrow">WELCOME BACK</p><h1>回到你的<br /><em>保险库。</em></h1><p>管理密码，收藏公众号文章，把值得留下的内容整理成知识。</p></div>
-    <form method="post" class="auth-card"><input type="hidden" asp-for="ReturnUrl" /><div asp-validation-summary="ModelOnly" class="validation" role="alert"></div><label>邮箱地址<input asp-for="Input.Email" autocomplete="email" inputmode="email" placeholder="you@example.com" /></label><label>密码<input asp-for="Input.Password" autocomplete="current-password" placeholder="输入你的密码" /></label><label class="check"><input asp-for="Input.RememberMe" /> 在此设备保持登录</label><button class="button" type="submit">登录保险库</button><p class="auth-switch">还没有保险库？<a asp-page="./Register" asp-route-returnUrl="@Model.ReturnUrl">创建一个</a></p></form>
+<section class="ui-auth-card">
+    <h1>登录保险库</h1>
+    <p class="ui-auth-sub">用注册邮箱和密码进入你的私人密码本。</p>
+    <form method="post" class="ui-auth-form">
+        <input type="hidden" asp-for="ReturnUrl" />
+        @if (!ViewData.ModelState.IsValid)
+        {
+            <div asp-validation-summary="ModelOnly" class="validation ui-notice ui-notice-danger" role="alert"></div>
+        }
+        <label class="ui-field"><span class="ui-label">邮箱地址</span><input asp-for="Input.Email" autocomplete="email" inputmode="email" placeholder="you@example.com" /><span asp-validation-for="Input.Email" class="validation"></span></label>
+        <label class="ui-field"><span class="ui-label">密码</span><input asp-for="Input.Password" autocomplete="current-password" placeholder="输入你的密码" /><span asp-validation-for="Input.Password" class="validation"></span></label>
+        <label class="ui-check"><input asp-for="Input.RememberMe" /> 在此设备保持登录</label>
+        <button class="ui-btn ui-btn-primary" type="submit">登录保险库</button>
+    </form>
+    <p class="ui-auth-links"><a asp-page="./ForgotPassword">忘记密码？通过邮箱重置</a></p>
+    <p class="ui-auth-links">还没有保险库？<a asp-page="./Register" asp-route-returnUrl="@Model.ReturnUrl">创建一个</a></p>
 </section>
-<p class="auth-switch"><a asp-page="./ForgotPassword">忘记密码？通过邮箱重置</a></p>

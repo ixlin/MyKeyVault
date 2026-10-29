@@ -1,42 +1,137 @@
-@{ var articleFullscreen = ViewData["ArticleFullscreen"] is true; }
+@{
+    var articleFullscreen = ViewData["ArticleFullscreen"] is true;
+    var path = Context.Request.Path.Value ?? "/";
+    var isAuthPage = path.StartsWith("/Identity/Account/Login", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWith("/Identity/Account/Register", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWith("/Identity/Account/ForgotPassword", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWith("/Identity/Account/ResetPassword", StringComparison.OrdinalIgnoreCase);
+    var isSignedIn = User?.Identity?.IsAuthenticated == true;
+    var isSettings = path.StartsWith("/Settings", StringComparison.OrdinalIgnoreCase) || path.StartsWith("/Articles/Settings", StringComparison.OrdinalIgnoreCase);
+    var section = isSettings ? "设置"
+        : path.StartsWith("/Vault/Audit", StringComparison.OrdinalIgnoreCase) ? "安全活动"
+        : path.StartsWith("/Vault", StringComparison.OrdinalIgnoreCase) ? "密码本"
+        : path.StartsWith("/Articles", StringComparison.OrdinalIgnoreCase) ? "公众号资料库"
+        : "工作台";
+    var accountName = User?.Identity?.Name ?? "";
+    var accountInitial = string.IsNullOrWhiteSpace(accountName) ? "我" : accountName[..1].ToUpperInvariant();
+    var pageTitle = ViewData["Title"] as string;
+}
 <!doctype html>
 <html lang="zh-CN" class="@(articleFullscreen ? "article-fullscreen" : null)">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>@ViewData["Title"] - 我的密码本</title>
+    <meta name="theme-color" content="#17202b" />
+    <title>@(string.IsNullOrWhiteSpace(pageTitle) ? "我的密码本" : pageTitle + " - 我的密码本")</title>
+    <link rel="icon" href="~/favicon.ico" sizes="any" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
-    @if (Context.Request.Path.StartsWithSegments("/Articles")) { <link rel="stylesheet" href="~/css/articles.css" asp-append-version="true" /> }
+    @if (path.StartsWith("/Articles", StringComparison.OrdinalIgnoreCase)) { <link rel="stylesheet" href="~/css/articles.css" asp-append-version="true" /> }
+    @if (!articleFullscreen)
+    {
+        <link rel="stylesheet" href="~/css/app.css" asp-append-version="true" />
+    }
 </head>
-<body class="@(articleFullscreen ? "article-fullscreen" : null)">
-    @if (!articleFullscreen)
-    {
-    <header class="site-header">
-        <a class="wordmark" asp-page="/Index"><span class="mark" aria-hidden="true">密</span> 我的密码本</a>
-        <nav aria-label="主导航">
-            @if (User.Identity?.IsAuthenticated == true)
-            {
-                <a asp-page="/Index">工作台</a>
-                <a asp-page="/Vault/Index">密码本</a>
-                <a asp-page="/Articles/Index">公众号资料库</a>
-                <form class="inline-form" asp-area="Identity" asp-page="/Account/Logout" asp-route-returnUrl="/" method="post"><button class="text-button">退出</button></form>
-            }
-            else
-            {
-                <a asp-area="Identity" asp-page="/Account/Login">登录</a>
-                <a class="button compact" asp-area="Identity" asp-page="/Account/Register">创建保险库</a>
-            }
-        </nav>
-    </header>
-    }
+<body class="@(articleFullscreen ? "article-fullscreen" : isAuthPage ? "ui-auth" : isSignedIn ? "ui-app" : "ui-public")">
+@if (articleFullscreen)
+{
     <main class="page-shell">@RenderBody()</main>
-    @if (!articleFullscreen)
-    {
-    <footer class="site-footer">
-        <span>&copy; 2026 我的密码本 · </span><a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer">蜀ICP备2024053184号-5</a>
-    </footer>
-    }
-    <script src="~/js/vault.js" asp-append-version="true" defer></script>
-    @await RenderSectionAsync("Scripts", required: false)
+}
+else if (isAuthPage)
+{
+    <div class="ui-auth-shell">
+        <header class="ui-auth-top">
+            <a class="ui-brand" asp-page="/Index"><span class="ui-brand-mark" aria-hidden="true">密</span>我的密码本</a>
+        </header>
+        <main class="ui-auth-main">@RenderBody()</main>
+        <footer class="ui-auth-foot"><span>&copy; 2026 我的密码本</span><a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer">蜀ICP备2024053184号-5</a></footer>
+    </div>
+}
+else if (isSignedIn)
+{
+    <a class="ui-skip" href="#main">跳到主要内容</a>
+    <div class="ui-shell">
+        <aside class="ui-sidebar">
+            <a class="ui-brand" asp-page="/Index"><span class="ui-brand-mark" aria-hidden="true">密</span>我的密码本</a>
+            <a class="ui-side-add" asp-page="/Vault/Create"><span aria-hidden="true">＋</span> 新增条目</a>
+            <nav class="ui-side-nav" aria-label="主导航">
+                <a class="@(section == "工作台" ? "is-active" : null)" asp-page="/Index" aria-current="@(section == "工作台" ? "page" : null)">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+                    工作台
+                </a>
+                <a class="@(section == "密码本" ? "is-active" : null)" asp-page="/Vault/Index" aria-current="@(section == "密码本" ? "page" : null)">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M10.8 12.2 19 4m-3 0h3v3"/></svg>
+                    密码本
+                </a>
+                <a class="@(section == "公众号资料库" ? "is-active" : null)" asp-page="/Articles/Index" aria-current="@(section == "公众号资料库" ? "page" : null)">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v18H6.5A2.5 2.5 0 0 1 4 18.5z"/><path d="M4 17.5h16"/></svg>
+                    公众号资料库
+                </a>
+                <a class="@(section == "安全活动" ? "is-active" : null)" asp-page="/Vault/Audit" aria-current="@(section == "安全活动" ? "page" : null)">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 6v5.5c0 4.6 3.2 7.7 7.5 9.5 4.3-1.8 7.5-4.9 7.5-9.5V6z"/><path d="m9 12 2 2 4-4"/></svg>
+                    安全活动
+                </a>
+                <a class="@(section == "设置" ? "is-active" : null)" asp-page="/Settings/Index" aria-current="@(section == "设置" ? "page" : null)">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.09A1.7 1.7 0 0 0 9 19.35a1.7 1.7 0 0 0-1.87.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.64 15 1.7 1.7 0 0 0 3.09 14H3v-4h.09A1.7 1.7 0 0 0 4.64 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.64 1.7 1.7 0 0 0 10 3.09V3h4v.09A1.7 1.7 0 0 0 15 4.64a1.7 1.7 0 0 0 1.87-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.36 9 1.7 1.7 0 0 0 20.91 10H21v4h-.09A1.7 1.7 0 0 0 19.4 15z"/></svg>
+                    设置
+                </a>
+            </nav>
+            <div class="ui-side-foot">
+                <a class="ui-account" asp-page="/Settings/Index">
+                    <span class="ui-avatar" aria-hidden="true">@accountInitial</span>
+                    <span class="ui-account-text"><b>@accountName</b><span>个人保险库</span></span>
+                </a>
+                <form asp-area="Identity" asp-page="/Account/Logout" asp-route-returnUrl="/" method="post" class="ui-logout-form">
+                    <button type="submit" class="ui-side-logout">退出登录</button>
+                </form>
+            </div>
+        </aside>
+        <div class="ui-content">
+            <header class="ui-mobilebar">
+                <a class="ui-brand" asp-page="/Index"><span class="ui-brand-mark" aria-hidden="true">密</span>我的密码本</a>
+                <a class="ui-avatar" asp-page="/Settings/Index" aria-label="账号设置">@accountInitial</a>
+            </header>
+            <main class="ui-main" id="main">@RenderBody()</main>
+            <footer class="ui-footer">
+                <span>&copy; 2026 我的密码本 · </span><a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer">蜀ICP备2024053184号-5</a>
+            </footer>
+        </div>
+    </div>
+    <nav class="ui-tabbar" aria-label="移动端导航">
+        <a class="@(section == "工作台" ? "is-active" : null)" asp-page="/Index" aria-current="@(section == "工作台" ? "page" : null)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+            工作台
+        </a>
+        <a class="@(section == "密码本" ? "is-active" : null)" asp-page="/Vault/Index" aria-current="@(section == "密码本" ? "page" : null)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M10.8 12.2 19 4m-3 0h3v3"/></svg>
+            密码本
+        </a>
+        <a class="@(section == "公众号资料库" ? "is-active" : null)" asp-page="/Articles/Index" aria-current="@(section == "公众号资料库" ? "page" : null)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v18H6.5A2.5 2.5 0 0 1 4 18.5z"/><path d="M4 17.5h16"/></svg>
+            文章
+        </a>
+        <a class="@(section == "设置" ? "is-active" : null)" asp-page="/Settings/Index" aria-current="@(section == "设置" ? "page" : null)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.09A1.7 1.7 0 0 0 9 19.35a1.7 1.7 0 0 0-1.87.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.64 15 1.7 1.7 0 0 0 3.09 14H3v-4h.09A1.7 1.7 0 0 0 4.64 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.64 1.7 1.7 0 0 0 10 3.09V3h4v.09A1.7 1.7 0 0 0 15 4.64a1.7 1.7 0 0 0 1.87-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.36 9 1.7 1.7 0 0 0 20.91 10H21v4h-.09A1.7 1.7 0 0 0 19.4 15z"/></svg>
+            设置
+        </a>
+    </nav>
+}
+else
+{
+    <div class="ui-public-shell">
+        <header class="ui-public-top">
+            <a class="ui-brand" asp-page="/Index"><span class="ui-brand-mark" aria-hidden="true">密</span>我的密码本</a>
+            <nav class="ui-public-nav" aria-label="主导航">
+                <a asp-area="Identity" asp-page="/Account/Login">登录</a>
+                <a class="ui-btn ui-btn-primary" asp-area="Identity" asp-page="/Account/Register">创建保险库</a>
+            </nav>
+        </header>
+        <main class="ui-public-main" id="main">@RenderBody()</main>
+        <footer class="ui-public-foot">
+            <span>&copy; 2026 我的密码本 · </span><a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer">蜀ICP备2024053184号-5</a>
+        </footer>
+    </div>
+}
+<script src="~/js/vault.js" asp-append-version="true" defer></script>
+@await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
