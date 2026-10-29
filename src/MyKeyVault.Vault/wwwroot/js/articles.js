@@ -40,9 +40,10 @@
     setTimeout(poll, 1000);
   }
   const chat = document.querySelector('[data-article-chat]'); if (!chat) return;
-  if (matchMedia('(max-width: 760px)').matches) chat.querySelector('.chat-history-toggle').open = false;
+  if (matchMedia('(max-width: 1080px)').matches) chat.querySelector('.chat-history-toggle').open = false;
   const form = chat.querySelector('[data-chat-form]');
   const messages = chat.querySelector('[data-messages]');
+  if (messages.querySelector('.chat-turn')) requestAnimationFrame(() => { messages.scrollTop = messages.scrollHeight; });
   let running = false, controller = null, historyTimer;
   const status = text => { if (form) form.querySelector('[data-send-status]').textContent = text; };
   const scroll = () => messages.scrollTo({ top: messages.scrollHeight, behavior: 'auto' });

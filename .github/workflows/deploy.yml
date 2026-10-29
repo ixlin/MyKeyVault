@@ -119,9 +119,10 @@ jobs:
             DEST_DIR=/var/www/mykeyvault
             SERVICE=mykeyvault.service
             sudo -n mkdir -p "$DEST_DIR"
-            # Production configuration and user uploads must survive application releases.
+            # Production configuration, data-protection keys and user uploads must survive releases.
             sudo -n rsync -a --delete \
               --exclude 'appsettings*.json' \
+              --exclude '.aspnet' \
               --exclude 'wwwroot/uploads' \
               --exclude 'wwwroot/wechat-articles' \
               "$SRC_DIR/" "$DEST_DIR/"

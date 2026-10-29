@@ -1,5 +1,6 @@
 @{
     var articleFullscreen = ViewData["ArticleFullscreen"] is true;
+    var flushMain = ViewData["FlushMain"] is true;
     var path = Context.Request.Path.Value ?? "/";
     var isAuthPage = path.StartsWith("/Identity/Account/Login", StringComparison.OrdinalIgnoreCase)
         || path.StartsWith("/Identity/Account/Register", StringComparison.OrdinalIgnoreCase)
@@ -29,6 +30,10 @@
     @if (!articleFullscreen)
     {
         <link rel="stylesheet" href="~/css/app.css" asp-append-version="true" />
+    }
+    @if (path.StartsWith("/Articles/Details", StringComparison.OrdinalIgnoreCase))
+    {
+        <link rel="stylesheet" href="~/css/article-workspace.css" asp-append-version="true" />
     }
 </head>
 <body class="@(articleFullscreen ? "article-fullscreen" : isAuthPage ? "ui-auth" : isSignedIn ? "ui-app" : "ui-public")">
@@ -90,10 +95,13 @@ else if (isSignedIn)
                 <a class="ui-brand" asp-page="/Index"><span class="ui-brand-mark" aria-hidden="true">密</span>我的密码本</a>
                 <a class="ui-avatar" asp-page="/Settings/Index" aria-label="账号设置">@accountInitial</a>
             </header>
-            <main class="ui-main" id="main">@RenderBody()</main>
-            <footer class="ui-footer">
-                <span>&copy; 2026 我的密码本 · </span><a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer">蜀ICP备2024053184号-5</a>
-            </footer>
+            <main class="ui-main @(flushMain ? "ui-main-flush" : null)" id="main">@RenderBody()</main>
+            @if (!flushMain)
+            {
+                <footer class="ui-footer">
+                    <span>&copy; 2026 我的密码本 · </span><a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer">蜀ICP备2024053184号-5</a>
+                </footer>
+            }
         </div>
     </div>
     <nav class="ui-tabbar" aria-label="移动端导航">

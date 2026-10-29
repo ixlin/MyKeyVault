@@ -64,18 +64,26 @@
                     </div>
                     <span class="status-pill status-@article.Status" data-article-state>@statusText</span>
                 </div>
-                <div class="ui-progress" data-progress-block hidden="@(!active)">
-                    <progress max="100" value="@article.Progress" aria-label="文章抓取进度"></progress>
-                    <span data-stage>@article.Stage · @article.Progress%</span>
-                </div>
-                <p class="validation" data-article-error hidden="@(string.IsNullOrEmpty(article.Error))">@article.Error</p>
                 <div class="ui-article-actions">
-                    <a asp-page="Details" asp-route-id="@article.Id">阅读与萃取</a>
+                    @if (!string.IsNullOrWhiteSpace(article.PreviewUrl))
+                    {
+                        <a class="ui-btn ui-btn-ghost ui-btn-sm" href="@article.PreviewUrl" target="_blank" rel="noopener" aria-label="阅读《@article.Title》原文">阅读原文</a>
+                    }
+                    else if (!string.IsNullOrWhiteSpace(article.SourceUrl))
+                    {
+                        <a class="ui-btn ui-btn-ghost ui-btn-sm" href="@article.SourceUrl" target="_blank" rel="noopener noreferrer" aria-label="阅读《@article.Title》原文">阅读原文</a>
+                    }
+                    <a class="ui-btn ui-btn-primary ui-btn-sm" asp-page="Details" asp-route-id="@article.Id">AI 萃取</a>
                     <form method="post" asp-page-handler="Retry" data-retry hidden="@(article.Status is not ("failed" or "cancelled"))">
                         <input type="hidden" name="id" value="@article.Id" />
                         <button type="submit" class="text-button">重新抓取</button>
                     </form>
                 </div>
+                <div class="ui-progress" data-progress-block hidden="@(!active)">
+                    <progress max="100" value="@article.Progress" aria-label="文章抓取进度"></progress>
+                    <span data-stage>@article.Stage · @article.Progress%</span>
+                </div>
+                <p class="validation" data-article-error hidden="@(string.IsNullOrEmpty(article.Error))">@article.Error</p>
                 <details class="ui-process">
                     <summary>处理过程</summary>
                     <ol data-process-log>@foreach (var entry in article.Logs) { <li><time>@entry.Time.Replace('T', ' ')</time><span>@entry.Message</span><small>@entry.Progress%</small></li> }</ol>

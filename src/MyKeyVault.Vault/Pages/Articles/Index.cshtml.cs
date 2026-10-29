@@ -69,11 +69,20 @@ public sealed class IndexModel(VaultDbContext db, UserManager<VaultUser> users, 
         PageNumber = Math.Clamp(PageNumber, 1, TotalPages);
         var rows = await query.OrderByDescending(x => x.CreatedAtUtc).Skip((PageNumber - 1) * 30).Take(30)
             .Select(x => new { x.Id, x.Title, x.Author, x.PublishedText, x.Status, x.ErrorMessage, x.ImagesCount, x.VideosCount, x.CreatedAtUtc,
-                Count = x.Extractions.Count(e => e.Status == "completed"), x.Progress, x.Stage, x.ProcessLogJson }).ToListAsync(cancellationToken);
+                Count = x.Extractions.Count(e => e.Status == "completed"), x.Progress, x.Stage, x.ProcessLogJson,
+                x.StorageKey, x.HtmlFileName, x.SourceUrl }).ToListAsync(cancellationToken);
         Articles = rows.Select(x => new ArticleRow(x.Id, x.Title, x.Author, x.PublishedText, x.Status, x.ErrorMessage, x.ImagesCount, x.VideosCount,
-            x.CreatedAtUtc, x.Count, x.Progress, x.Stage, ArticleScraperService.ReadLog(x.ProcessLogJson))).ToList();
+            x.CreatedAtUtc, x.Count, x.Progress, x.Stage, ArticleScraperService.ReadLog(x.ProcessLogJson),
+            BuildPreviewUrl(ownerId, x.StorageKey, x.HtmlFileName), x.SourceUrl)).ToList();
+    }
+
+    private static string? BuildPreviewUrl(string ownerId, string? storageKey, string? htmlFileName)
+    {
+        if (string.IsNullOrWhiteSpace(storageKey) || string.IsNullOrWhiteSpace(htmlFileName)) return null;
+        var segments = new[] { ownerId, storageKey, htmlFileName }.Select(Uri.EscapeDataString);
+        return "/wechat-articles/" + string.Join('/', segments);
     }
 
     public sealed record ArticleRow(long Id, string? Title, string? Author, string? PublishedText, string Status, string? Error, int Images, int Videos, DateTime CreatedAtUtc, int ExtractionCount,
-        int Progress, string Stage, IReadOnlyList<ArticleScraperService.ProgressEntry> Logs);
+        int Progress, string Stage, IReadOnlyList<ArticleScraperService.ProgressEntry> Logs, string? PreviewUrl, string? SourceUrl);
 }

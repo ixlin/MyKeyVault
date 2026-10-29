@@ -799,3 +799,23 @@ body.ui-public .ui-btn-primary:hover {
 }
 .ui-footer, .ui-public-foot, .ui-auth-foot { color: var(--ui-muted); }
 .validation-summary-errors ul { list-style: none; margin: 0; padding-left: 0; }
+
+/* library search: single clean field, no nested input border */
+.ui-app .ui-search input,
+.ui-app .ui-search input:focus {
+  min-height: 0 !important;
+  height: 32px !important;
+  padding: 0 4px !important;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none !important;
+}
+.ui-app .ui-search button { padding: 0 4px 0 12px; }
+.ui-article-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.ui-article-actions a:not(.ui-btn) { color: var(--ui-accent); font-weight: 650; text-decoration: none; }
+.ui-article-actions .ui-btn { min-height: 32px; padding: 0 11px; font-size: 12.5px; }
+.ui-article-actions form { margin: 0; }
+@media (max-width: 760px) {
+  .ui-article-actions .ui-btn { min-height: 40px; }
+}
