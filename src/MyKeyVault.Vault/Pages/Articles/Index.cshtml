@@ -6,23 +6,23 @@
         <h1>公众号资料库</h1>
         <p>收藏原文，查看抓取进度，围绕每篇文章展开对话。</p>
     </div>
-    <div class="ui-page-actions">
-        <a class="ui-btn ui-btn-ghost" asp-page="Settings">@(Model.AiConfigured ? "萃取模型设置" : "配置萃取模型")</a>
-    </div>
 </header>
 @if (!string.IsNullOrWhiteSpace(Model.Notice)) { <div class="ui-notice ui-notice-ok" role="status">@Model.Notice</div> }
 
-<section class="ui-capture">
-    <div>
+<section class="ui-capture ui-capture-compact">
+    <div class="ui-capture-copy">
         <h2>添加文章</h2>
-        <p>粘贴公众号链接，每行一条，最多 10 篇。已收录或正在抓取的链接会跳过。</p>
+        <p>一次添加一篇，粘贴公众号文章链接即可。已收录或正在抓取的链接会跳过。</p>
     </div>
     <form method="post" data-capture-form>
-        <textarea asp-for="Urls" maxlength="6000" required placeholder="https://mp.weixin.qq.com/s/..." aria-label="微信公众号文章链接"></textarea>
-        <span asp-validation-for="Urls" class="validation"></span>
-        <div class="ui-capture-foot">
-            <span class="ui-service"><i class="ui-service-dot @(Model.ScraperAvailable ? null : "is-off")"></i>@(Model.ScraperAvailable ? "抓取服务正常" : "服务暂不可用，请稍后重试")</span>
+        <div class="ui-capture-input">
+            <input asp-for="Urls" type="url" maxlength="500" required inputmode="url" autocomplete="off" placeholder="https://mp.weixin.qq.com/s/..." aria-label="微信公众号文章链接" />
             <button class="ui-btn ui-btn-primary" type="submit" disabled="@(!Model.ScraperAvailable)">开始抓取</button>
+        </div>
+        <span asp-validation-for="Urls" class="validation"></span>
+        <div class="ui-capture-meta">
+            <span class="ui-service"><i class="ui-service-dot @(Model.ScraperAvailable ? null : "is-off")"></i>@(Model.ScraperAvailable ? "抓取服务正常" : "服务暂不可用，请稍后重试")</span>
+            <span class="ui-help">一次一篇，避免一次抓取过多。</span>
         </div>
     </form>
 </section>

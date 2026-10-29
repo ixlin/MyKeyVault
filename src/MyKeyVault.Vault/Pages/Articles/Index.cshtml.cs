@@ -11,14 +11,13 @@ namespace MyKeyVault.Vault.Pages.Articles;
 
 public sealed class IndexModel(VaultDbContext db, UserManager<VaultUser> users, ArticleScraperService scraper) : PageModel
 {
-    [BindProperty, Required, MaxLength(6000)] public string Urls { get; set; } = string.Empty;
+    [BindProperty, Required, MaxLength(500)] public string Urls { get; set; } = string.Empty;
     [TempData] public string? Notice { get; set; }
     [BindProperty(SupportsGet = true), MaxLength(100)] public string? Search { get; set; }
     [BindProperty(SupportsGet = true)] public int PageNumber { get; set; } = 1;
     public int TotalCount { get; private set; }
     public int TotalPages => Math.Max(1, (TotalCount + 29) / 30);
     public bool ScraperAvailable { get; private set; }
-    public bool AiConfigured { get; private set; }
     public IReadOnlyList<ArticleRow> Articles { get; private set; } = Array.Empty<ArticleRow>();
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
@@ -33,6 +32,12 @@ public sealed class IndexModel(VaultDbContext db, UserManager<VaultUser> users, 
         var ownerId = users.GetUserId(User)!;
         if (!ModelState.IsValid) { await LoadAsync(ownerId, cancellationToken); return Page(); }
         var urls = Urls.Split(new[] { '\r', '\n', ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+        if (urls.Length != 1)
+        {
+            ModelState.AddModelError(nameof(Urls), "一次只能添加一篇文章，请逐篇粘贴链接。");
+            await LoadAsync(ownerId, cancellationToken);
+            return Page();
+        }
         var result = await scraper.SubmitAsync(ownerId, urls, cancellationToken);
         if (!result.Success)
         {
@@ -62,7 +67,6 @@ public sealed class IndexModel(VaultDbContext db, UserManager<VaultUser> users, 
     private async Task LoadAsync(string ownerId, CancellationToken cancellationToken, bool checkHealth = true)
     {
         ScraperAvailable = !checkHealth || await scraper.IsAvailableAsync(cancellationToken);
-        AiConfigured = await db.ArticleAiSettings.AnyAsync(x => x.OwnerId == ownerId, cancellationToken);
         var query = db.KnowledgeArticles.AsNoTracking().Where(x => x.OwnerId == ownerId);
         if (!string.IsNullOrWhiteSpace(Search)) { var search = Search.Trim()[..Math.Min(100, Search.Trim().Length)]; query = query.Where(x => (x.Title != null && x.Title.Contains(search)) || (x.Author != null && x.Author.Contains(search))); }
         TotalCount = await query.CountAsync(cancellationToken);

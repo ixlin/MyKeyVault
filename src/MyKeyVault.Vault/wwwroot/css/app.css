@@ -819,3 +819,27 @@ body.ui-public .ui-btn-primary:hover {
 @media (max-width: 760px) {
   .ui-article-actions .ui-btn { min-height: 40px; }
 }
+
+/* compact single-article capture */
+.ui-capture-compact {
+  grid-template-columns: 210px minmax(0, 1fr);
+  gap: 18px;
+  align-items: center;
+  padding: 13px 18px;
+}
+.ui-capture-compact .ui-capture-copy h2 { margin: 0 0 3px; }
+.ui-capture-compact .ui-capture-copy p { margin: 0; font-size: 12px; line-height: 1.55; }
+.ui-capture-compact form { gap: 5px; }
+.ui-capture-input { display: flex; align-items: center; gap: 8px; }
+.ui-capture-input input { flex: 1; min-width: 0; }
+.ui-capture-input .ui-btn { flex: none; min-height: 40px; }
+.ui-capture-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 16px; }
+.ui-capture-meta .ui-help { font-size: 11px; }
+@media (max-width: 760px) {
+  .ui-capture-compact { grid-template-columns: 1fr; gap: 9px; padding: 12px 14px; }
+  .ui-capture-compact .ui-capture-copy p { font-size: 11.5px; }
+  .ui-capture-input { flex-direction: row; align-items: center; }
+  .ui-capture-input .ui-btn { width: auto; padding: 0 13px; }
+  .ui-capture-meta { align-items: center; flex-direction: row; flex-wrap: wrap; gap: 3px 10px; }
+  .ui-capture-meta .ui-help { display: none; }
+}

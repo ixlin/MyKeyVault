@@ -32,7 +32,6 @@
             {
                 <a class="ui-btn-link" href="@article.SourceUrl" target="_blank" rel="noopener noreferrer">微信原文</a>
             }
-            <a class="ui-btn-link" asp-page="Settings">模型设置</a>
         </div>
     </header>
 
@@ -105,7 +104,7 @@
 
             @if (!Model.AiConfigured)
             {
-                <div class="ui-notice">先 <a asp-page="Settings">配置萃取模型</a>，再开始对话。</div>
+                <div class="ui-notice">先 <a asp-page="/Settings/Index" asp-fragment="ai">配置萃取模型</a>，再开始对话。</div>
             }
             else if (article.Status != "completed")
             {
@@ -119,8 +118,8 @@
             {
                 <form class="chat-composer aw-composer" method="post" asp-page-handler="Extract" data-chat-form>
                     <input asp-for="Conversation" type="hidden" />
-                    <label for="Prompt" class="field-help">向这篇文章提问</label>
-                    <textarea asp-for="Prompt" minlength="2" maxlength="4000" required rows="3" placeholder="例如：这篇文章有哪些论据不足的地方？"></textarea>
+                    <label for="Prompt" class="visually-hidden">向这篇文章提问</label>
+                    <textarea asp-for="Prompt" minlength="2" maxlength="4000" required rows="1" placeholder="向这篇文章提问…"></textarea>
                     <div>
                         <small>Enter 发送 · Shift + Enter 换行</small>
                         <button class="ui-btn ui-btn-primary" type="submit" data-send>发送</button>

@@ -7,7 +7,7 @@
         || path.StartsWith("/Identity/Account/ForgotPassword", StringComparison.OrdinalIgnoreCase)
         || path.StartsWith("/Identity/Account/ResetPassword", StringComparison.OrdinalIgnoreCase);
     var isSignedIn = User?.Identity?.IsAuthenticated == true;
-    var isSettings = path.StartsWith("/Settings", StringComparison.OrdinalIgnoreCase) || path.StartsWith("/Articles/Settings", StringComparison.OrdinalIgnoreCase);
+    var isSettings = path.StartsWith("/Settings", StringComparison.OrdinalIgnoreCase);
     var section = isSettings ? "设置"
         : path.StartsWith("/Vault/Audit", StringComparison.OrdinalIgnoreCase) ? "安全活动"
         : path.StartsWith("/Vault", StringComparison.OrdinalIgnoreCase) ? "密码本"

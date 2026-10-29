@@ -1,6 +1,12 @@
 @page "/Settings"
 @model MyKeyVault.Vault.Pages.Settings.IndexModel
-@{ ViewData["Title"] = "设置"; }
+@{
+    ViewData["Title"] = "设置";
+    var passwordErrors = ModelState.Where(x => x.Value is not null && x.Value.Errors.Count > 0 && x.Key.StartsWith("Input.", StringComparison.Ordinal))
+        .SelectMany(x => x.Value!.Errors).Select(x => x.ErrorMessage).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray();
+    var aiErrors = ModelState.Where(x => x.Value is not null && x.Value.Errors.Count > 0 && x.Key.StartsWith("AiInput.", StringComparison.Ordinal))
+        .SelectMany(x => x.Value!.Errors).Select(x => x.ErrorMessage).Where(x => !string.IsNullOrWhiteSpace(x)).ToArray();
+}
 <header class="ui-page-head">
     <div>
         <h1>设置</h1>
@@ -16,9 +22,9 @@
             <div class="ui-card-head"><h2>修改密码</h2></div>
             <div class="ui-card-body">
                 <form method="post" asp-page-handler="ChangePassword" class="ui-form">
-                    @if (!ViewData.ModelState.IsValid)
+                    @if (passwordErrors.Length > 0)
                     {
-                        <div asp-validation-summary="All" class="validation validation-summary ui-notice ui-notice-danger" role="alert"></div>
+                        <div class="ui-notice ui-notice-danger" role="alert"><ul>@foreach (var error in passwordErrors) { <li>@error</li> }</ul></div>
                     }
                     <label class="ui-field"><span class="ui-label">当前密码</span><input asp-for="Input.CurrentPassword" autocomplete="current-password" /><span asp-validation-for="Input.CurrentPassword" class="validation"></span></label>
                     <label class="ui-field"><span class="ui-label">新密码</span><input asp-for="Input.NewPassword" autocomplete="new-password" /><span class="ui-help">至少 12 个字符，包含大写、小写字母、数字和符号。</span><span asp-validation-for="Input.NewPassword" class="validation"></span></label>
@@ -31,16 +37,31 @@
             </div>
         </section>
 
-        <section class="ui-card">
-            <div class="ui-card-head"><h2>文章萃取</h2></div>
-            <a class="ui-settings-link" asp-page="/Articles/Settings">
-                <span><b>萃取模型设置</b><span>配置 DeepSeek、OpenAI 或兼容的 Chat Completions 服务。</span></span>
-                <em aria-hidden="true">→</em>
-            </a>
-            <a class="ui-settings-link" asp-page="/Vault/Audit">
-                <span><b>安全活动</b><span>查看条目显示、复制、修改和密码重置记录。</span></span>
-                <em aria-hidden="true">→</em>
-            </a>
+        <section class="ui-card" id="ai">
+            <div class="ui-card-head">
+                <h2>萃取模型</h2>
+                @if (Model.AiConfigured) { <span class="ui-badge ui-badge-success">已配置</span> } else { <span class="ui-badge">未配置</span> }
+            </div>
+            <div class="ui-card-body">
+                @if (!string.IsNullOrWhiteSpace(Model.AiNotice)) { <div class="ui-notice ui-notice-ok" role="status">@Model.AiNotice</div> }
+                <form method="post" asp-page-handler="SaveAi" class="ui-form">
+                    @if (aiErrors.Length > 0)
+                    {
+                        <div class="ui-notice ui-notice-danger" role="alert"><ul>@foreach (var error in aiErrors) { <li>@error</li> }</ul></div>
+                    }
+                    <div class="ui-form-grid">
+                        <label class="ui-field"><span class="ui-label">提供商</span><input asp-for="AiInput.Provider" autocomplete="off" placeholder="deepseek" /><span asp-validation-for="AiInput.Provider" class="validation"></span></label>
+                        <label class="ui-field"><span class="ui-label">模型名称</span><input asp-for="AiInput.ModelName" autocomplete="off" placeholder="deepseek-flash" /><span asp-validation-for="AiInput.ModelName" class="validation"></span></label>
+                        <label class="ui-field ui-span-2"><span class="ui-label">API Base URL</span><input asp-for="AiInput.BaseUrl" inputmode="url" autocomplete="url" placeholder="https://api.deepseek.com" /><span asp-validation-for="AiInput.BaseUrl" class="validation"></span></label>
+                        <label class="ui-field ui-span-2"><span class="ui-label">API Key</span><input asp-for="AiInput.ApiKey" type="password" autocomplete="new-password" placeholder="@(Model.HasApiKey ? "已加密保存；留空则不修改" : "输入 API Key")" /><span class="ui-help">Key 仅在发起萃取请求时短暂解密，不会显示在页面或日志中。</span><span asp-validation-for="AiInput.ApiKey" class="validation"></span></label>
+                    </div>
+                    <p class="ui-help">支持 DeepSeek、OpenAI 及兼容 Chat Completions 的 HTTPS 服务。每个 API Key 使用独立数据密钥加密。</p>
+                    <div class="ui-form-actions">
+                        <span class="ui-help">保存后，所有文章的 AI 萃取都会使用这里的配置。</span>
+                        <button class="ui-btn ui-btn-primary" type="submit">保存模型配置</button>
+                    </div>
+                </form>
+            </div>
         </section>
     </div>
 
@@ -54,6 +75,13 @@
                     <div><dt>上次登录</dt><dd>@(Model.LastLoginAtUtc?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "刚刚")</dd></div>
                 </dl>
             </div>
+        </section>
+        <section class="ui-card">
+            <div class="ui-card-head"><h2>安全活动</h2></div>
+            <a class="ui-settings-link" asp-page="/Vault/Audit">
+                <span><b>查看活动记录</b><span>条目显示、复制、修改和密码重置记录。</span></span>
+                <em aria-hidden="true">→</em>
+            </a>
         </section>
         <section class="ui-card">
             <div class="ui-card-head"><h2>会话</h2></div>

@@ -110,6 +110,12 @@ app.Use(async (context, next) =>
         context.Response.Redirect("/Settings");
         return;
     }
+    if (context.Request.Path.Equals("/Articles/Settings", StringComparison.OrdinalIgnoreCase) ||
+        context.Request.Path.Equals("/Articles/Settings/", StringComparison.OrdinalIgnoreCase))
+    {
+        context.Response.Redirect("/Settings#ai");
+        return;
+    }
     await next();
 });
 app.Use(async (context, next) =>
